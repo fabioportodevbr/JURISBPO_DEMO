@@ -88,7 +88,7 @@ import { FinanceiroProcessoCard } from "@/components/FinanceiroProcessoCard";
 ## Observações importantes
 
 1. O componente assume que existem tabelas `clientes`, `processos`, `contratos` e `profiles` com `escritorio_id`.
-2. O frontend usa somente `supabase.auth.getUser()` e `VITE_SUPABASE_ANON_KEY`.
+2. O frontend usa somente `supabase.auth.getUser()` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 3. Não há uso de `service_role` no frontend.
 4. A RLS é obrigatória e filtra por `escritorio_id`.
 5. Ajuste nomes de campos caso seu schema atual use variações como `nome_cliente`, `numero`, `titulo_processo`, etc.

@@ -2,7 +2,7 @@
 
 Sistema de gestão jurídica com autenticação real, banco de dados na nuvem e controle de acesso por perfil.
 
-**Stack:** React 18 + Vite · Supabase (auth + banco + storage) · Vercel (hospedagem gratuita)
+**Stack:** Next.js + React 18 - Supabase (auth + banco + storage) - Vercel (hospedagem gratuita)
 
 ---
 
@@ -12,7 +12,7 @@ Sistema de gestão jurídica com autenticação real, banco de dados na nuvem e 
 [Navegador do usuário]
         │
         ▼
-[Vercel — app React/Vite]  ←→  [Supabase]
+[Vercel - app Next.js]  ←→  [Supabase]
                                   ├── Auth (login/convite/senha)
                                   ├── PostgreSQL (dados)
                                   └── Storage (documentos)
@@ -103,15 +103,15 @@ cp .env.example .env
 
 Abra o arquivo `.env` num editor de texto e preencha:
 ```
-VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_anon_key_aqui
+NEXT_PUBLIC_SUPABASE_URL=https://SEU_PROJETO.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_anon_key_aqui
 ```
 
 ### Testar localmente
 ```bash
 npm run dev
 ```
-Acesse **http://localhost:5173** no navegador.
+Acesse **http://localhost:3000** no navegador.
 
 ---
 
@@ -164,8 +164,11 @@ Acesse **http://localhost:5173** no navegador.
 4. Acesse **https://vercel.com** e faça login com GitHub
 5. Clique em **Add New Project** → selecione o repositório `jurisboard`
 6. Na seção **Environment Variables**, adicione:
-   - `VITE_SUPABASE_URL` → sua URL do Supabase
-   - `VITE_SUPABASE_ANON_KEY` → sua chave anon
+   - `NEXT_PUBLIC_SUPABASE_URL` → sua URL do Supabase
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` -> sua chave anon
+   - `SUPABASE_SERVICE_ROLE_KEY` -> service role key do Supabase, apenas no servidor
+   - `IMAP_USER` e `IMAP_PASSWORD` -> e-mail monitorado e senha de app
+   - `CRON_SECRET` -> segredo forte para proteger o cron da Vercel
 7. Clique em **Deploy**
 8. Em ~2 minutos, seu app estará em **https://jurisboard-XXXX.vercel.app**
 
@@ -217,15 +220,15 @@ Após o deploy na Vercel:
 
 ```
 jurisboard/
-├── index.html                  # Entrada do app
-├── vite.config.js              # Configuração do Vite
+├── next.config.mjs             # Configuracao do Next.js
+├── pages/                      # Rotas e API Routes do Next.js
 ├── package.json                # Dependências
 ├── .env.example                # Modelo de variáveis de ambiente
 ├── .env                        # Suas credenciais (NÃO comite este arquivo)
 ├── supabase/
 │   └── schema.sql              # Schema completo do banco
 └── src/
-    ├── main.jsx                # Ponto de entrada React
+    ├── NextApp.jsx             # Entrada client-side do app React
     ├── App.jsx                 # Roteamento e layout principal
     ├── hooks/
     │   └── useAuth.jsx         # Hook de autenticação
@@ -274,6 +277,6 @@ Este pacote inclui integração incremental do módulo de acompanhamento process
 
 - Frontend: `src/components/AndamentosProcessuaisPush.jsx`, integrado à seção `Processos` e à aba `Andamentos` dentro de cada processo.
 - Banco: `supabase/migrations/20260505_acompanhamento_push_email.sql`.
-- Worker: `push-email-worker/`, monitorando `juridicocallbrbpo@gmail.com` por IMAP.
+- Funcao Next.js: `pages/api/push-email/run.ts`, monitorando `juridicocallbrbpo@gmail.com` por IMAP e acionavel por cron da Vercel ou por gerente logado.
 
 A migration nova apenas cria a tabela `andamentos_processuais_push` e suas policies. Ela não executa `DROP TABLE` e não altera tabelas existentes.

@@ -86,6 +86,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
   const [status,setStatus]=useState('ativos')
   const [onlyUnlinked,setOnlyUnlinked]=useState(false)
   const [openBodies,setOpenBodies]=useState({})
+  const [runningIngest,setRunningIngest]=useState(false)
 
   const load=async()=>{
     setLoading(true)
@@ -96,6 +97,25 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
   }
 
   useEffect(()=>{load()},[profile.escritorio_id,processo?.id])
+
+  const executarIngestao=async()=>{
+    setRunningIngest(true)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch('/api/push-email/run',{
+        method:'POST',
+        headers:session?.access_token?{Authorization:`Bearer ${session.access_token}`}:{}
+      })
+      const json=await res.json().catch(()=>({ok:false,error:'Resposta invalida da funcao.'}))
+      if(!res.ok||!json.ok)throw new Error(json.error||'Erro ao buscar e-mails.')
+      alert(`Busca concluida. Processados: ${json.processed}; salvos: ${json.saved}; ignorados: ${json.ignored}; falhas: ${json.failed}.`)
+      await load()
+    }catch(err){
+      alert(err?.message||'Erro ao executar busca de e-mails.')
+    }finally{
+      setRunningIngest(false)
+    }
+  }
 
   const counts=useMemo(()=>({
     ativos:(items||[]).filter(a=>a.status_associacao!=='ignorado').length,
@@ -171,7 +191,10 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
         <h3 style={{margin:'0 0 4px',fontSize:compact?15:18,display:'flex',gap:8,alignItems:'center'}}><Mail size={18}/> {headerTitle}</h3>
         <div style={{fontSize:12,color:C.muted}}>Caixa monitorada: <b>juridicocallbrbpo@gmail.com</b> · {sub}</div>
       </div>
-      <button onClick={load} disabled={loading} style={btnStyle()}><RefreshCw size={14}/> Atualizar</button>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        {profile?.role==='gerente'&&<button onClick={executarIngestao} disabled={runningIngest||loading} style={btnStyle('blue')}><Mail size={14}/> {runningIngest?'Buscando...':'Buscar e-mails'}</button>}
+        <button onClick={load} disabled={loading} style={btnStyle()}><RefreshCw size={14}/> Atualizar</button>
+      </div>
     </div>
 
     {!compact&&<>
