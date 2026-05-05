@@ -1,0 +1,27 @@
+:root {
+  --color-primary: #064e3b;
+  --color-primary-dark: #022c22;
+  --color-primary-soft: #d1fae5;
+  --color-bg: #f8fafc;
+  --color-card: #ffffff;
+  --color-sidebar: #050505;
+  --color-sidebar-soft: #111827;
+  --color-text: #111827;
+  --color-muted: #64748b;
+  --color-border: #e5e7eb;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+}
+
+html, body, #root {
+  background: var(--color-bg);
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+::selection {
+  background: rgba(6, 78, 59, 0.18);
+}

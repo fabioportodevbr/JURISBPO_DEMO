@@ -1,0 +1,26 @@
+{
+  "name": "jurisbpo-acompanhamento-push-email",
+  "version": "1.0.0",
+  "description": "Serviço de acompanhamento processual via push simulado por e-mail para JurisBPO.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "once": "tsx src/index.ts --once"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "latest",
+    "dotenv": "latest",
+    "imapflow": "latest",
+    "mailparser": "latest",
+    "node-cron": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
