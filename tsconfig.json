@@ -24,7 +24,8 @@
       ]
     },
     "forceConsistentCasingInFileNames": true,
-    "downlevelIteration": true
+    "downlevelIteration": true,
+    "ignoreDeprecations": 6
   },
   "include": [
     "next-env.d.ts",
