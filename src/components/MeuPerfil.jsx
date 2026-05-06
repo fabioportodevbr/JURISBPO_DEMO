@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase, updateProfile, ROLES } from '../lib/supabase.js'
+import { supabase, updateProfile, ROLES, can } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { CheckCircle, AlertCircle, Key, Upload, Image as ImageIcon } from 'lucide-react'
 import AvatarUsuario from './common/AvatarUsuario.jsx'
@@ -27,6 +27,7 @@ export default function MeuPerfil({ profile }) {
   const [newPass, setNewPass] = useState('')
   const [changingPass, setChangingPass] = useState(false)
   const [passMsg, setPassMsg] = useState(null)
+  const canEditProfile = can(profile, 'perfil.editar')
 
   useEffect(() => {
     setForm({ nome: profile?.nome || '', cargo: profile?.cargo || '', email: profile?.email || '', telefone: profile?.telefone || '', oab: profile?.oab || '', cor: profile?.cor || '#1d4ed8', avatar_url: profile?.avatar_url || profile?.foto_url || '' })
@@ -35,6 +36,7 @@ export default function MeuPerfil({ profile }) {
   const handleChange = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }))
 
   const uploadAvatar = async (file) => {
+    if (!canEditProfile) { setMsg({ type:'error', text:'Visitante possui acesso somente leitura.' }); return }
     if (!file) return
     if (!file.type?.startsWith('image/')) { setMsg({ type:'error', text:'Envie apenas imagens para a foto de perfil.' }); return }
     setUploading(true); setMsg(null)
@@ -56,6 +58,7 @@ export default function MeuPerfil({ profile }) {
   }
 
   const saveProfile = async () => {
+    if (!canEditProfile) { setMsg({ type:'error', text:'Visitante possui acesso somente leitura.' }); return }
     setSaving(true); setMsg(null)
     try {
       await updateProfile(profile.id, { nome: form.nome, cargo: form.cargo, email: form.email, telefone: form.telefone, oab: form.oab, cor: form.cor, avatar_url: form.avatar_url })
@@ -66,6 +69,7 @@ export default function MeuPerfil({ profile }) {
   }
 
   const changePassword = async () => {
+    if (!canEditProfile) { setPassMsg({ type:'error', text:'Visitante possui acesso somente leitura.' }); return }
     if (newPass.length < 8) { setPassMsg({ type: 'error', text: 'A senha deve ter pelo menos 8 caracteres.' }); return }
     setChangingPass(true); setPassMsg(null)
     const { error } = await supabase.auth.updateUser({ password: newPass })

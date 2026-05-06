@@ -58,7 +58,7 @@ CREATE TABLE public.usuarios_escritorios (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT usuarios_escritorios_unique UNIQUE (usuario_id, escritorio_id),
-  CONSTRAINT usuarios_escritorios_papel_check CHECK (papel IN ('gerente','advogado','assistente','cliente'))
+  CONSTRAINT usuarios_escritorios_papel_check CHECK (papel IN ('gerente','advogado','assistente','cliente','visitante'))
 );
 
 ALTER TABLE public.usuarios_escritorios
@@ -231,6 +231,47 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
+CREATE OR REPLACE FUNCTION public.usuario_pode_escrever(p_escritorio_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usuarios_escritorios ue
+    WHERE ue.escritorio_id = p_escritorio_id
+      AND ue.usuario_id = auth.uid()
+      AND ue.ativo = true
+      AND ue.papel <> 'visitante'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_pode_editar_proprio_profile()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usuarios_escritorios ue
+    WHERE ue.usuario_id = auth.uid()
+      AND ue.ativo = true
+      AND ue.papel <> 'visitante'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_tem_escritorio_storage(p_name TEXT)
+RETURNS BOOLEAN AS $$
+  SELECT CASE
+    WHEN split_part(p_name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    THEN public.usuario_tem_escritorio(split_part(p_name, '/', 1)::uuid)
+    ELSE false
+  END;
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_pode_escrever_storage(p_name TEXT)
+RETURNS BOOLEAN AS $$
+  SELECT CASE
+    WHEN split_part(p_name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    THEN public.usuario_pode_escrever(split_part(p_name, '/', 1)::uuid)
+    ELSE false
+  END;
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
 -- ============================================================
 -- TRIGGERS updated_at
 -- ============================================================
@@ -293,7 +334,7 @@ ALTER TABLE public.modelos_documentos ENABLE ROW LEVEL SECURITY;
 CREATE POLICY profiles_select_own ON public.profiles
 FOR SELECT TO authenticated USING (id = auth.uid());
 CREATE POLICY profiles_update_own ON public.profiles
-FOR UPDATE TO authenticated USING (id = auth.uid()) WITH CHECK (id = auth.uid());
+FOR UPDATE TO authenticated USING (id = auth.uid() AND public.usuario_pode_editar_proprio_profile()) WITH CHECK (id = auth.uid() AND public.usuario_pode_editar_proprio_profile());
 CREATE POLICY profiles_insert_own ON public.profiles
 FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
 
@@ -314,18 +355,35 @@ CREATE POLICY usuarios_escritorios_delete_manager ON public.usuarios_escritorios
 FOR DELETE TO authenticated USING (public.usuario_eh_gerente(escritorio_id));
 
 -- entidades por escritorio
-CREATE POLICY clientes_all_member ON public.clientes
-FOR ALL TO authenticated USING (public.usuario_tem_escritorio(escritorio_id)) WITH CHECK (public.usuario_tem_escritorio(escritorio_id));
-CREATE POLICY processos_all_member ON public.processos
-FOR ALL TO authenticated USING (public.usuario_tem_escritorio(escritorio_id)) WITH CHECK (public.usuario_tem_escritorio(escritorio_id));
-CREATE POLICY contratos_all_member ON public.contratos
-FOR ALL TO authenticated USING (public.usuario_tem_escritorio(escritorio_id)) WITH CHECK (public.usuario_tem_escritorio(escritorio_id));
-CREATE POLICY atividades_all_member ON public.atividades
-FOR ALL TO authenticated USING (public.usuario_tem_escritorio(escritorio_id)) WITH CHECK (public.usuario_tem_escritorio(escritorio_id));
-CREATE POLICY documentos_all_member ON public.documentos
-FOR ALL TO authenticated USING (public.usuario_tem_escritorio(escritorio_id)) WITH CHECK (public.usuario_tem_escritorio(escritorio_id));
-CREATE POLICY modelos_documentos_all_member ON public.modelos_documentos
-FOR ALL TO authenticated USING (public.usuario_tem_escritorio(escritorio_id)) WITH CHECK (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY clientes_select_member ON public.clientes
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY clientes_write_non_visitor ON public.clientes
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY processos_select_member ON public.processos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY processos_write_non_visitor ON public.processos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY contratos_select_member ON public.contratos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY contratos_write_non_visitor ON public.contratos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY atividades_select_member ON public.atividades
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY atividades_write_non_visitor ON public.atividades
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY documentos_select_member ON public.documentos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY documentos_write_non_visitor ON public.documentos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY modelos_documentos_select_member ON public.modelos_documentos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY modelos_documentos_write_non_visitor ON public.modelos_documentos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
 
 -- historico de atribuicoes: acessa se pertence ao escritorio da atividade
 CREATE POLICY atividade_atribuicoes_select_member ON public.atividade_atribuicoes
@@ -339,7 +397,7 @@ CREATE POLICY atividade_atribuicoes_insert_member ON public.atividade_atribuicoe
 FOR INSERT TO authenticated WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.atividades a
-    WHERE a.id = atividade_id AND public.usuario_tem_escritorio(a.escritorio_id)
+    WHERE a.id = atividade_id AND public.usuario_pode_escrever(a.escritorio_id)
   )
 );
 
@@ -362,20 +420,20 @@ DROP POLICY IF EXISTS documentos_storage_delete ON storage.objects;
 
 CREATE POLICY documentos_storage_select ON storage.objects
 FOR SELECT TO authenticated
-USING (bucket_id IN ('documentos','modelos'));
+USING (bucket_id IN ('documentos','modelos') AND public.usuario_tem_escritorio_storage(name));
 
 CREATE POLICY documentos_storage_insert ON storage.objects
 FOR INSERT TO authenticated
-WITH CHECK (bucket_id IN ('documentos','modelos'));
+WITH CHECK (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name));
 
 CREATE POLICY documentos_storage_update ON storage.objects
 FOR UPDATE TO authenticated
-USING (bucket_id IN ('documentos','modelos'))
-WITH CHECK (bucket_id IN ('documentos','modelos'));
+USING (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name))
+WITH CHECK (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name));
 
 CREATE POLICY documentos_storage_delete ON storage.objects
 FOR DELETE TO authenticated
-USING (bucket_id IN ('documentos','modelos'));
+USING (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name));
 
 -- ============================================================
 -- BOOTSTRAP: criar escritorio/profile/vinculo para usuario atual

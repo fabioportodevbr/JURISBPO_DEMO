@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { supabase, can } from '../lib/supabase.js'
 import { Plus, Edit2, Trash2, X, FileText, Eye, Search } from 'lucide-react'
 
 const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',red:'#dc2626',redBg:'#fee2e2',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',bg:'#f8fafc',grayBg:'#f1f5f9'}
@@ -20,6 +20,7 @@ function storageKey(profile){return `jurisbpo_acervo_modelos_${profile?.escritor
 export default function Acervo({profile}){
   const [items,setItems]=useState([]),[q,setQ]=useState(''),[advOpen,setAdvOpen]=useState(false),[tipo,setTipo]=useState('todos'),[area,setArea]=useState('todas'),[categoria,setCategoria]=useState('')
   const [modal,setModal]=useState(false),[form,setForm]=useState({}),[preview,setPreview]=useState(null),[loading,setLoading]=useState(true),[fallback,setFallback]=useState(false)
+  const canEdit = can(profile, 'docs.upload')
 
   const load=async()=>{
     setLoading(true)
@@ -45,9 +46,9 @@ export default function Acervo({profile}){
     return true
   })},[items,q,tipo,area,categoria])
 
-  const open=(m=null)=>{setForm(m?{...m}:{nome:'',tipo:'peticao',area:'judicial',categoria:'',descricao:''});setModal(true)}
+  const open=(m=null)=>{if(!canEdit)return alert('Visitante possui acesso somente leitura.');setForm(m?{...m}:{nome:'',tipo:'peticao',area:'judicial',categoria:'',descricao:''});setModal(true)}
   const persistLocal=(arr)=>{localStorage.setItem(storageKey(profile),JSON.stringify(arr));setItems(arr)}
-  const save=async()=>{
+  const save=async()=>{if(!canEdit)return alert('Visitante possui acesso somente leitura.');
     if(!form.nome)return alert('Informe o nome do modelo.')
     if(!nomeArquivoModelo(form)||!form.arquivo_base64)return alert('Anexe o arquivo editável do modelo.')
     const payload={...form,escritorio_id:profile.escritorio_id,created_by:form.created_by||profile.id,updated_at:new Date().toISOString()}
@@ -64,7 +65,7 @@ export default function Acervo({profile}){
     }
     setModal(false);load()
   }
-  const del=async(m)=>{
+  const del=async(m)=>{if(!canEdit)return alert('Visitante possui acesso somente leitura.');
     if(!confirm('Excluir este modelo do acervo?'))return
     if(fallback){persistLocal(items.filter(x=>x.id!==m.id));return}
     const {error}=await supabase.from('acervo_modelos').delete().eq('id',m.id)
@@ -76,7 +77,7 @@ export default function Acervo({profile}){
   return <div style={{padding:24}}>
     <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
       <div><h1 style={{margin:0,fontSize:22}}>Acervo</h1><p style={{color:C.muted}}>Modelos de documentos editáveis armazenados como arquivos anexos.</p></div>
-      <button onClick={()=>open()} style={{background:C.navy,color:'white',border:0,borderRadius:10,padding:'11px 16px',fontWeight:900,display:'flex',alignItems:'center',gap:8}}><Plus size={16}/>Novo modelo</button>
+      {canEdit&&<button onClick={()=>open()} style={{background:C.navy,color:'white',border:0,borderRadius:10,padding:'11px 16px',fontWeight:900,display:'flex',alignItems:'center',gap:8}}><Plus size={16}/>Novo modelo</button>}
     </div>
 
     {fallback&&<div style={{marginTop:12,background:C.amberBg,color:C.amber,border:'1px solid #fde68a',borderRadius:10,padding:12,fontSize:13,fontWeight:700}}>Tabela acervo_modelos não encontrada ou indisponível. Os modelos estão sendo salvos localmente neste navegador até a tabela ser criada no banco.</div>}
@@ -97,7 +98,7 @@ export default function Acervo({profile}){
       {filtered.map(m=><div key={m.id} style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:14,display:'grid',gap:10}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:10}}>
           <div><div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:6}}><Badge>{label(TIPOS,m.tipo)}</Badge><Badge color={C.green} bg={C.greenBg}>{label(AREAS,m.area)}</Badge>{m.categoria&&<Badge color={C.muted} bg={C.grayBg}>{m.categoria}</Badge>}</div><b style={{fontSize:16}}>{m.nome}</b></div>
-          <div style={{display:'flex',gap:2}}><button onClick={()=>open(m)} style={{border:0,background:'none',color:C.blue,cursor:'pointer'}}><Edit2 size={16}/></button><button onClick={()=>del(m)} style={{border:0,background:'none',color:C.red,cursor:'pointer'}}><Trash2 size={16}/></button></div>
+          <div style={{display:'flex',gap:2}}>{canEdit&&<button onClick={()=>open(m)} style={{border:0,background:'none',color:C.blue,cursor:'pointer'}}><Edit2 size={16}/></button>}{canEdit&&<button onClick={()=>del(m)} style={{border:0,background:'none',color:C.red,cursor:'pointer'}}><Trash2 size={16}/></button>}</div>
         </div>
         <div style={{fontSize:13,color:C.muted,minHeight:34}}>{m.descricao||'Sem descrição.'}</div>
         {nomeArquivoModelo(m)&&<div style={{fontSize:12,color:C.muted}}><b>Anexo:</b> {nomeArquivoModelo(m)}</div>}

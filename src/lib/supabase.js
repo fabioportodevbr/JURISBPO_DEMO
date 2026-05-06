@@ -14,29 +14,34 @@ export const ROLES = {
   advogado: { label: 'Advogado(a)', nivel: 3 },
   assistente: { label: 'Assistente', nivel: 2 },
   cliente: { label: 'Cliente', nivel: 1 },
+  visitante: { label: 'Visitante', nivel: 1, readOnly: true },
 }
 
 export const can = (profile, acao) => {
   if (!profile) return false
-  const nivel = ROLES[profile.role]?.nivel || 0
+  const role = ROLES[profile.role]
+  const nivel = role?.nivel || 0
+  const readOnly = !!role?.readOnly
   const perms = {
     'processos.ver': nivel >= 1,
-    'processos.criar': nivel >= 2,
-    'processos.editar': nivel >= 2,
-    'processos.excluir': nivel >= 4,
+    'processos.criar': !readOnly && nivel >= 2,
+    'processos.editar': !readOnly && nivel >= 2,
+    'processos.excluir': !readOnly && nivel >= 4,
     'contratos.ver': nivel >= 1,
-    'contratos.criar': nivel >= 2,
-    'contratos.editar': nivel >= 2,
-    'contratos.excluir': nivel >= 4,
+    'contratos.criar': !readOnly && nivel >= 2,
+    'contratos.editar': !readOnly && nivel >= 2,
+    'contratos.excluir': !readOnly && nivel >= 4,
     'atividades.ver': nivel >= 1,
-    'atividades.criar': nivel >= 1,
-    'atividades.editar': nivel >= 1,
-    'atividades.excluir': nivel >= 3,
-    'docs.upload': nivel >= 1,
-    'docs.excluir': nivel >= 3,
+    'atividades.criar': !readOnly && nivel >= 1,
+    'atividades.editar': !readOnly && nivel >= 1,
+    'atividades.excluir': !readOnly && nivel >= 3,
+    'docs.upload': !readOnly && nivel >= 1,
+    'docs.excluir': !readOnly && nivel >= 3,
     'equipe.ver': nivel >= 3,
     'equipe.gerenciar': nivel >= 4,
     'ia.usar': nivel >= 2,
+    'perfil.editar': !readOnly,
+    'mensagens.enviar': !readOnly && nivel >= 1,
   }
   return perms[acao] ?? false
 }

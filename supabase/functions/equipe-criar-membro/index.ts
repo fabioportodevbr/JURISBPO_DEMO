@@ -13,8 +13,10 @@ serve(async (req) => {
   try {
     const token = req.headers.get("Authorization")?.replace("Bearer ", "");
     const { email, nome, cargo, papel = "advogado", senha_temporaria, escritorio_id } = await req.json();
+    const papeisPermitidos = ["gerente", "advogado", "assistente", "cliente", "visitante"];
 
     if (!token) return new Response(JSON.stringify({ error: "Token ausente." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!papeisPermitidos.includes(papel)) return new Response(JSON.stringify({ error: "Papel invÃ¡lido." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (!email || !nome || !escritorio_id) return new Response(JSON.stringify({ error: "Nome, e-mail e empresa são obrigatórios." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

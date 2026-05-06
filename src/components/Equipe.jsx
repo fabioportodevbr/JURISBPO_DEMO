@@ -226,6 +226,7 @@ export default function Equipe({profile}){
             <select style={{...INP,marginTop:5}} value={novoMembro.papel} onChange={e=>setNovoMembro({...novoMembro,papel:e.target.value,cargo:ROLES[e.target.value]?.label || novoMembro.cargo})}>
               <option value="advogado">Advogado(a)</option>
               <option value="assistente">Assistente</option>
+              <option value="visitante">Visitante (somente leitura)</option>
               <option value="gerente">Gerente Jurídico</option>
             </select>
           </div>
