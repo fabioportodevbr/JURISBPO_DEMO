@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2015",
     "lib": [
       "dom",
       "dom.iterable",
@@ -25,7 +25,7 @@
     },
     "forceConsistentCasingInFileNames": true,
     "downlevelIteration": true,
-    "ignoreDeprecations": 6
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "next-env.d.ts",
