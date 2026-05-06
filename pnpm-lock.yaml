@@ -11,6 +11,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.39.0
         version: 2.105.3
+      imapflow:
+        specifier: ^1.3.3
+        version: 1.3.3
       lucide-react:
         specifier: ^0.383.0
         version: 0.383.0(react@18.3.1)
