@@ -1,504 +1,761 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Wallet, TrendingUp, TrendingDown, AlertCircle, Scale, FileText } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Edit2,
+  FileText,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Wallet,
+} from "lucide-react";
+import { can, supabase } from "@/lib/supabase.js";
 
-type FinanceiroTipo = "receita" | "despesa" | "honorario" | "acordo" | "custas" | "reembolso" | "outro";
-type FinanceiroStatus = "pendente" | "pago" | "atrasado" | "cancelado" | "parcial";
-type FormaPagamento = "pix" | "boleto" | "transferencia" | "cartao" | "dinheiro" | "outro";
-
-type Lancamento = {
+type Processo = {
   id: string;
-  escritorio_id: string;
-  cliente_id: string | null;
-  processo_id: string | null;
-  contrato_id: string | null;
-  criado_por: string | null;
-  tipo: FinanceiroTipo;
-  categoria: string | null;
-  descricao: string;
-  valor_bruto: number;
-  valor_liquido: number | null;
-  data_vencimento: string | null;
-  data_pagamento: string | null;
-  forma_pagamento: FormaPagamento | null;
-  status: FinanceiroStatus;
-  observacoes: string | null;
-  created_at: string;
-  clientes?: { nome: string | null } | null;
-  processos?: { numero_processo: string | null; titulo: string | null } | null;
+  numero?: string | null;
+  titulo?: string | null;
+  parte_contraria?: string | null;
+  categoria?: string | null;
+  status?: string | null;
+  valor_acao?: number | null;
+  transito_julgado?: boolean | null;
 };
 
-type Option = { id: string; label: string };
+type RegistroFinanceiro = {
+  id: string;
+  escritorio_id: string;
+  processo_id: string | null;
+  criado_por?: string | null;
+  natureza?: string | null;
+  data_referencia?: string | null;
+  valor_bruto?: number | string | null;
+  deposito_ro?: number | string | null;
+  deposito_rr?: number | string | null;
+  deposito_embargos?: number | string | null;
+  custas?: number | string | null;
+  fgts?: number | string | null;
+  honorarios_sucumbenciais?: number | string | null;
+  honorarios_periciais?: number | string | null;
+  inss_reclamante?: number | string | null;
+  inss_reclamada?: number | string | null;
+  multa_inadimplemento?: number | string | null;
+  forma_pagamento?: string | null;
+  numero_parcelas?: number | string | null;
+  primeiro_vencimento?: string | null;
+  status_pagamento?: string | null;
+  seguro_garantia?: boolean | null;
+  apolice_numero?: string | null;
+  apolice_inicio?: string | null;
+  apolice_fim?: string | null;
+  valor_assegurado?: number | string | null;
+  seguro_premio?: number | string | null;
+  observacoes?: string | null;
+  created_at?: string | null;
+};
 
 type FormState = {
-  tipo: FinanceiroTipo;
-  descricao: string;
-  cliente_id: string;
+  id: string;
   processo_id: string;
-  contrato_id: string;
-  categoria: string;
+  natureza: string;
+  data_referencia: string;
   valor_bruto: string;
-  valor_liquido: string;
-  data_vencimento: string;
-  data_pagamento: string;
-  forma_pagamento: "" | FormaPagamento;
-  status: FinanceiroStatus;
+  deposito_ro: string;
+  deposito_rr: string;
+  deposito_embargos: string;
+  custas: string;
+  fgts: string;
+  honorarios_sucumbenciais: string;
+  honorarios_periciais: string;
+  inss_reclamante: string;
+  inss_reclamada: string;
+  multa_inadimplemento: string;
+  forma_pagamento: string;
+  numero_parcelas: string;
+  primeiro_vencimento: string;
+  status_pagamento: string;
+  seguro_garantia: boolean;
+  apolice_numero: string;
+  apolice_inicio: string;
+  apolice_fim: string;
+  valor_assegurado: string;
+  seguro_premio: string;
   observacoes: string;
 };
 
+const C = {
+  navy: "#050505",
+  white: "#fff",
+  text: "#0f172a",
+  muted: "#64748b",
+  border: "#e5e7eb",
+  bg: "#f8fafc",
+  grayBg: "#f1f5f9",
+  blue: "#1d4ed8",
+  blueBg: "#dbeafe",
+  green: "#16a34a",
+  greenBg: "#dcfce7",
+  amber: "#b45309",
+  amberBg: "#fef3c7",
+  red: "#dc2626",
+  redBg: "#fee2e2",
+};
+
+const INP = {
+  width: "100%",
+  padding: "10px 12px",
+  border: "1px solid " + C.border,
+  borderRadius: 8,
+  boxSizing: "border-box" as const,
+  fontSize: 14,
+  background: C.white,
+  color: C.text,
+};
+
+const NATUREZAS = [
+  ["acordo", "Acordo"],
+  ["execucao", "Execução"],
+];
+
+const FORMAS = [
+  ["avista", "À vista"],
+  ["parcelado", "Parcelado"],
+];
+
+const STATUS = [
+  ["pendente", "Pendente"],
+  ["em_dia", "Em dia"],
+  ["atrasado", "Atrasado"],
+  ["pago", "Pago"],
+  ["quitado", "Quitado"],
+  ["inadimplido", "Inadimplido"],
+];
+
+const CATEGORIAS = [
+  ["todas", "Todas"],
+  ["trabalhista", "Trabalhista"],
+  ["civel", "Cível"],
+  ["administrativo", "Administrativo"],
+  ["tributario", "Tributário"],
+  ["criminal", "Criminal"],
+];
+
+const CAMPOS_VALOR = [
+  "valor_bruto",
+  "deposito_ro",
+  "deposito_rr",
+  "deposito_embargos",
+  "custas",
+  "fgts",
+  "honorarios_sucumbenciais",
+  "honorarios_periciais",
+  "inss_reclamante",
+  "inss_reclamada",
+  "multa_inadimplemento",
+  "valor_assegurado",
+  "seguro_premio",
+];
+
+const CAMPOS_ENCARGOS = [
+  "deposito_ro",
+  "deposito_rr",
+  "deposito_embargos",
+  "custas",
+  "fgts",
+  "honorarios_sucumbenciais",
+  "honorarios_periciais",
+  "inss_reclamante",
+  "inss_reclamada",
+  "multa_inadimplemento",
+  "seguro_premio",
+];
+
 const initialForm: FormState = {
-  tipo: "receita",
-  descricao: "",
-  cliente_id: "",
+  id: "",
   processo_id: "",
-  contrato_id: "",
-  categoria: "",
+  natureza: "acordo",
+  data_referencia: "",
   valor_bruto: "",
-  valor_liquido: "",
-  data_vencimento: "",
-  data_pagamento: "",
-  forma_pagamento: "",
-  status: "pendente",
+  deposito_ro: "",
+  deposito_rr: "",
+  deposito_embargos: "",
+  custas: "",
+  fgts: "",
+  honorarios_sucumbenciais: "",
+  honorarios_periciais: "",
+  inss_reclamante: "",
+  inss_reclamada: "",
+  multa_inadimplemento: "",
+  forma_pagamento: "avista",
+  numero_parcelas: "1",
+  primeiro_vencimento: "",
+  status_pagamento: "pendente",
+  seguro_garantia: false,
+  apolice_numero: "",
+  apolice_inicio: "",
+  apolice_fim: "",
+  valor_assegurado: "",
+  seguro_premio: "",
   observacoes: "",
 };
 
-const currency = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-});
-
-function formatCurrency(value: number | null | undefined) {
-  return currency.format(Number(value || 0));
+function F({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 12, minWidth: 0 }}>
+      <label style={{ fontSize: 11, fontWeight: 800, color: C.muted, textTransform: "uppercase", display: "block", marginBottom: 5 }}>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
 }
 
-function normalizeMoney(value: string) {
-  if (!value) return 0;
-  return Number(value.replace(/\./g, "").replace(",", ".")) || 0;
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      onClick={(event) => event.target === event.currentTarget && onClose()}
+      style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    >
+      <div style={{ width: "100%", maxWidth: 980, maxHeight: "92vh", background: C.white, borderRadius: 14, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: 18, borderBottom: "1px solid " + C.border }}>
+          <b>{title}</b>
+          <button onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", color: C.muted, fontWeight: 800 }}>Fechar</button>
+        </div>
+        <div style={{ padding: 18, overflow: "auto" }}>{children}</div>
+      </div>
+    </div>
+  );
 }
 
-function labelize(value?: string | null) {
-  if (!value) return "-";
-  return value.replace(/_/g, " ").replace(/^\w/, (char) => char.toUpperCase());
+function label(arr: string[][], value?: string | null) {
+  return arr.find((item) => item[0] === value)?.[1] || value || "-";
 }
 
-function statusClass(status: FinanceiroStatus) {
-  const classes = {
-    pago: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    pendente: "bg-amber-100 text-amber-800 border-amber-200",
-    atrasado: "bg-red-100 text-red-800 border-red-200",
-    cancelado: "bg-slate-100 text-slate-700 border-slate-200",
-    parcial: "bg-blue-100 text-blue-800 border-blue-200",
-  };
-  return classes[status] || classes.pendente;
+function parseMoney(value: unknown) {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  let text = String(value).replace(/[^\d,.-]/g, "");
+  if (!text) return 0;
+  if (text.includes(",")) text = text.replace(/\./g, "").replace(",", ".");
+  return Number(text) || 0;
 }
 
-function tipoClass(tipo: FinanceiroTipo) {
-  if (["receita", "honorario", "acordo", "reembolso"].includes(tipo)) return "text-emerald-700";
-  if (["despesa", "custas"].includes(tipo)) return "text-red-700";
-  return "text-slate-700";
+function money(value: unknown) {
+  return parseMoney(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function Financeiro() {
+function dateBR(value?: string | null) {
+  return value ? new Date(value + "T12:00:00").toLocaleDateString("pt-BR") : "-";
+}
+
+function normalizeInputValue(value: unknown) {
+  const number = parseMoney(value);
+  return number ? String(number) : "";
+}
+
+function totalEncargos(registro: RegistroFinanceiro) {
+  return CAMPOS_ENCARGOS.reduce((sum, field) => sum + parseMoney((registro as any)[field]), 0);
+}
+
+function totalRegistro(registro: RegistroFinanceiro) {
+  return parseMoney(registro.valor_bruto) + totalEncargos(registro);
+}
+
+function isPago(registro: RegistroFinanceiro) {
+  const status = String(registro.status_pagamento || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return ["pago", "quitado", "concluido"].includes(status);
+}
+
+function isAtrasado(registro: RegistroFinanceiro) {
+  if (isPago(registro)) return false;
+  const vencimento = registro.primeiro_vencimento || registro.data_referencia;
+  if (!vencimento) return String(registro.status_pagamento || "").toLowerCase() === "atrasado";
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return String(registro.status_pagamento || "").toLowerCase() === "atrasado" || new Date(vencimento + "T12:00:00") < hoje;
+}
+
+function financeiroExcluido(registro: RegistroFinanceiro) {
+  return String(registro.observacoes || "").includes("[REGISTRO_FINANCEIRO_EXCLUIDO:");
+}
+
+function processoLabel(processo?: Processo) {
+  if (!processo) return "Processo não localizado";
+  return [processo.numero, processo.titulo].filter(Boolean).join(" - ") || "Processo sem identificação";
+}
+
+function processoCategoria(processo?: Processo) {
+  return processo?.categoria || "trabalhista";
+}
+
+function economiaElegivel(processo: Processo | undefined, registros: RegistroFinanceiro[]) {
+  return processo?.transito_julgado === true || registros.some((registro) => ["acordo", "execucao"].includes(String(registro.natureza || "").toLowerCase()) && isPago(registro));
+}
+
+function withDeletedMarker(observacoes = "", evento: Record<string, unknown>) {
+  const limpas = String(observacoes || "").replace(/\n?\[REGISTRO_FINANCEIRO_EXCLUIDO:[^\]]*\]/g, "").trim();
+  return [limpas, `[REGISTRO_FINANCEIRO_EXCLUIDO:${encodeURIComponent(JSON.stringify(evento))}]`].filter(Boolean).join("\n");
+}
+
+export default function Financeiro({ profile }: { profile: any }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [clientes, setClientes] = useState<Option[]>([]);
-  const [processos, setProcessos] = useState<Option[]>([]);
-  const [contratos, setContratos] = useState<Option[]>([]);
-  const [profile, setProfile] = useState<{ id: string; escritorio_id: string } | null>(null);
+  const [registros, setRegistros] = useState<RegistroFinanceiro[]>([]);
+  const [processos, setProcessos] = useState<Processo[]>([]);
+  const [modal, setModal] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
   const [filters, setFilters] = useState({
     search: "",
-    cliente_id: "",
-    processo_id: "",
-    status: "",
-    tipo: "",
-    forma_pagamento: "",
+    natureza: "todos",
+    status: "todos",
+    categoria: "todas",
     data_inicio: "",
     data_fim: "",
+    apolice: "todos",
   });
 
-  async function loadBaseData() {
+  const canCreate = can(profile, "financeiro.criar");
+  const canEdit = can(profile, "financeiro.editar");
+  const canDelete = can(profile, "financeiro.excluir");
+
+  async function load() {
+    if (!profile?.escritorio_id) return;
     setLoading(true);
-
-    const { data: auth } = await supabase.auth.getUser();
-    const userId = auth.user?.id;
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, escritorio_id")
-      .eq("id", userId)
-      .single();
-
-    if (profileError || !profileData?.escritorio_id) {
-      console.error("Perfil sem escritorio_id", profileError);
-      setLoading(false);
-      return;
-    }
-
-    setProfile(profileData);
-
-    const [clientesRes, processosRes, contratosRes] = await Promise.all([
-      supabase.from("clientes").select("id, nome").eq("escritorio_id", profileData.escritorio_id).order("nome"),
-      supabase.from("processos").select("id, numero_processo, titulo").eq("escritorio_id", profileData.escritorio_id).order("created_at", { ascending: false }),
-      supabase.from("contratos").select("id, titulo, numero").eq("escritorio_id", profileData.escritorio_id).order("created_at", { ascending: false }),
+    const [{ data: financeiros, error: finError }, { data: processosData, error: procError }] = await Promise.all([
+      supabase
+        .from("financeiro_processos")
+        .select("*")
+        .eq("escritorio_id", profile.escritorio_id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("processos")
+        .select("id, numero, titulo, parte_contraria, categoria, status, valor_acao, transito_julgado")
+        .eq("escritorio_id", profile.escritorio_id)
+        .order("updated_at", { ascending: false }),
     ]);
 
-    setClientes((clientesRes.data || []).map((c: any) => ({ id: c.id, label: c.nome || "Cliente sem nome" })));
-    setProcessos((processosRes.data || []).map((p: any) => ({ id: p.id, label: p.numero_processo || p.titulo || "Processo sem identificação" })));
-    setContratos((contratosRes.data || []).map((c: any) => ({ id: c.id, label: c.titulo || c.numero || "Contrato sem identificação" })));
+    if (finError) console.error("Erro ao carregar financeiro", finError);
+    if (procError) console.error("Erro ao carregar processos", procError);
 
-    await loadLancamentos(profileData.escritorio_id);
+    setRegistros((financeiros || []) as RegistroFinanceiro[]);
+    setProcessos((processosData || []) as Processo[]);
     setLoading(false);
   }
 
-  async function loadLancamentos(escritorioId = profile?.escritorio_id) {
-    if (!escritorioId) return;
-
-    let query = supabase
-      .from("financeiro_lancamentos")
-      .select("*, clientes(nome), processos(numero_processo, titulo)")
-      .eq("escritorio_id", escritorioId)
-      .order("data_vencimento", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false });
-
-    if (filters.cliente_id) query = query.eq("cliente_id", filters.cliente_id);
-    if (filters.processo_id) query = query.eq("processo_id", filters.processo_id);
-    if (filters.status) query = query.eq("status", filters.status);
-    if (filters.tipo) query = query.eq("tipo", filters.tipo);
-    if (filters.forma_pagamento) query = query.eq("forma_pagamento", filters.forma_pagamento);
-    if (filters.data_inicio) query = query.gte("data_vencimento", filters.data_inicio);
-    if (filters.data_fim) query = query.lte("data_vencimento", filters.data_fim);
-
-    const { data, error } = await query;
-    if (error) {
-      console.error("Erro ao carregar financeiro", error);
-      return;
-    }
-
-    const normalized = (data || []) as Lancamento[];
-    const search = filters.search.trim().toLowerCase();
-    setLancamentos(
-      search
-        ? normalized.filter((item) =>
-            [item.descricao, item.categoria, item.clientes?.nome, item.processos?.numero_processo, item.processos?.titulo]
-              .filter(Boolean)
-              .some((field) => String(field).toLowerCase().includes(search))
-          )
-        : normalized
-    );
-  }
-
   useEffect(() => {
-    loadBaseData();
-  }, []);
+    load();
+  }, [profile?.escritorio_id]);
 
-  useEffect(() => {
-    if (profile?.escritorio_id) loadLancamentos(profile.escritorio_id);
-  }, [filters]);
+  const processoById = useMemo(() => {
+    const map = new Map<string, Processo>();
+    processos.forEach((processo) => map.set(processo.id, processo));
+    return map;
+  }, [processos]);
+
+  const ativos = useMemo(() => registros.filter((registro) => !financeiroExcluido(registro)), [registros]);
+
+  const filtered = useMemo(() => {
+    const term = filters.search.trim().toLowerCase();
+    return ativos.filter((registro) => {
+      const processo = registro.processo_id ? processoById.get(registro.processo_id) : undefined;
+      if (filters.natureza !== "todos" && registro.natureza !== filters.natureza) return false;
+      if (filters.status !== "todos" && String(registro.status_pagamento || "pendente") !== filters.status) return false;
+      if (filters.categoria !== "todas" && processoCategoria(processo) !== filters.categoria) return false;
+      if (filters.apolice === "sim" && !(registro.seguro_garantia || registro.apolice_numero || parseMoney(registro.valor_assegurado) > 0)) return false;
+      if (filters.apolice === "nao" && (registro.seguro_garantia || registro.apolice_numero || parseMoney(registro.valor_assegurado) > 0)) return false;
+
+      const dataBase = registro.data_referencia || registro.primeiro_vencimento || registro.created_at?.slice(0, 10) || "";
+      if (filters.data_inicio && dataBase < filters.data_inicio) return false;
+      if (filters.data_fim && dataBase > filters.data_fim) return false;
+
+      if (!term) return true;
+      return [
+        processo?.numero,
+        processo?.titulo,
+        processo?.parte_contraria,
+        processo?.categoria,
+        registro.natureza,
+        registro.status_pagamento,
+        registro.apolice_numero,
+        registro.observacoes,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term));
+    });
+  }, [ativos, filters, processoById]);
 
   const resumo = useMemo(() => {
-    const receitas = lancamentos.filter((l) => ["receita", "honorario", "acordo", "reembolso"].includes(l.tipo));
-    const despesas = lancamentos.filter((l) => ["despesa", "custas"].includes(l.tipo));
+    const total = filtered.reduce((sum, registro) => sum + totalRegistro(registro), 0);
+    const principal = filtered.reduce((sum, registro) => sum + parseMoney(registro.valor_bruto), 0);
+    const encargos = filtered.reduce((sum, registro) => sum + totalEncargos(registro), 0);
+    const pago = filtered.filter(isPago).reduce((sum, registro) => sum + totalRegistro(registro), 0);
+    const atrasado = filtered.filter(isAtrasado).reduce((sum, registro) => sum + totalRegistro(registro), 0);
+    const apolices = filtered.filter((registro) => registro.seguro_garantia || registro.apolice_numero || parseMoney(registro.valor_assegurado) > 0).length;
+    return { total, principal, encargos, pago, pendente: Math.max(total - pago, 0), atrasado, apolices };
+  }, [filtered]);
 
-    const receitaPrevista = receitas
-      .filter((l) => ["pendente", "parcial", "atrasado"].includes(l.status))
-      .reduce((sum, l) => sum + Number(l.valor_bruto || 0), 0);
-
-    const receitaRecebida = receitas
-      .filter((l) => l.status === "pago")
-      .reduce((sum, l) => sum + Number(l.valor_liquido || l.valor_bruto || 0), 0);
-
-    const valoresPendentes = lancamentos
-      .filter((l) => ["pendente", "parcial", "atrasado"].includes(l.status))
-      .reduce((sum, l) => sum + Number(l.valor_bruto || 0), 0);
-
-    const despesasTotal = despesas.reduce((sum, l) => sum + Number(l.valor_liquido || l.valor_bruto || 0), 0);
-    const acordosAbertos = lancamentos
-      .filter((l) => l.tipo === "acordo" && ["pendente", "parcial", "atrasado"].includes(l.status))
-      .reduce((sum, l) => sum + Number(l.valor_bruto || 0), 0);
-
-    return {
-      receitaPrevista,
-      receitaRecebida,
-      valoresPendentes,
-      despesas: despesasTotal,
-      saldoPeriodo: receitaRecebida - despesasTotal,
-      acordosAbertos,
-    };
-  }, [lancamentos]);
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!profile) return;
-
-    setSaving(true);
-    const { error } = await supabase.from("financeiro_lancamentos").insert({
-      escritorio_id: profile.escritorio_id,
-      criado_por: profile.id,
-      tipo: form.tipo,
-      descricao: form.descricao,
-      cliente_id: form.cliente_id || null,
-      processo_id: form.processo_id || null,
-      contrato_id: form.contrato_id || null,
-      categoria: form.categoria || null,
-      valor_bruto: normalizeMoney(form.valor_bruto),
-      valor_liquido: form.valor_liquido ? normalizeMoney(form.valor_liquido) : null,
-      data_vencimento: form.data_vencimento || null,
-      data_pagamento: form.data_pagamento || null,
-      forma_pagamento: form.forma_pagamento || null,
-      status: form.status,
-      observacoes: form.observacoes || null,
-    });
-
-    setSaving(false);
-    if (error) {
-      console.error("Erro ao salvar lançamento", error);
-      alert("Não foi possível salvar o lançamento financeiro.");
+  function openForm(registro?: RegistroFinanceiro) {
+    if (!registro) {
+      setForm(initialForm);
+      setModal(true);
       return;
     }
 
-    setModalOpen(false);
-    setForm(initialForm);
-    await loadLancamentos();
+    setForm({
+      id: registro.id,
+      processo_id: registro.processo_id || "",
+      natureza: registro.natureza || "acordo",
+      data_referencia: registro.data_referencia || "",
+      valor_bruto: normalizeInputValue(registro.valor_bruto),
+      deposito_ro: normalizeInputValue(registro.deposito_ro),
+      deposito_rr: normalizeInputValue(registro.deposito_rr),
+      deposito_embargos: normalizeInputValue(registro.deposito_embargos),
+      custas: normalizeInputValue(registro.custas),
+      fgts: normalizeInputValue(registro.fgts),
+      honorarios_sucumbenciais: normalizeInputValue(registro.honorarios_sucumbenciais),
+      honorarios_periciais: normalizeInputValue(registro.honorarios_periciais),
+      inss_reclamante: normalizeInputValue(registro.inss_reclamante),
+      inss_reclamada: normalizeInputValue(registro.inss_reclamada),
+      multa_inadimplemento: normalizeInputValue(registro.multa_inadimplemento),
+      forma_pagamento: registro.forma_pagamento || "avista",
+      numero_parcelas: String(registro.numero_parcelas || 1),
+      primeiro_vencimento: registro.primeiro_vencimento || "",
+      status_pagamento: registro.status_pagamento || "pendente",
+      seguro_garantia: !!registro.seguro_garantia,
+      apolice_numero: registro.apolice_numero || "",
+      apolice_inicio: registro.apolice_inicio || "",
+      apolice_fim: registro.apolice_fim || "",
+      valor_assegurado: normalizeInputValue(registro.valor_assegurado),
+      seguro_premio: normalizeInputValue(registro.seguro_premio),
+      observacoes: registro.observacoes || "",
+    });
+    setModal(true);
   }
 
-  async function handleDelete(id: string) {
-    const confirmed = window.confirm("Deseja excluir este lançamento financeiro?");
-    if (!confirmed) return;
+  async function atualizarResumoProcesso(processoId: string) {
+    if (!processoId) return;
+    const { data } = await supabase
+      .from("financeiro_processos")
+      .select("*")
+      .eq("escritorio_id", profile.escritorio_id)
+      .eq("processo_id", processoId);
 
-    const { error } = await supabase.from("financeiro_lancamentos").delete().eq("id", id);
-    if (error) {
-      console.error("Erro ao excluir lançamento", error);
-      alert("Não foi possível excluir o lançamento.");
-      return;
+    const financeiros = ((data || []) as RegistroFinanceiro[]).filter((registro) => !financeiroExcluido(registro));
+    const processo = processoById.get(processoId) || processos.find((item) => item.id === processoId);
+    const totalGasto = financeiros.reduce((sum, registro) => sum + totalRegistro(registro), 0);
+    const valorAcao = parseMoney(processo?.valor_acao);
+    const valorEconomizado = economiaElegivel(processo, financeiros) ? Math.max(valorAcao - totalGasto, 0) : 0;
+
+    await supabase.from("processos").update({ valor_gasto: totalGasto, valor_economizado: valorEconomizado }).eq("id", processoId);
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (form.id && !canEdit) return alert("Visitante possui acesso somente leitura.");
+    if (!form.id && !canCreate) return alert("Visitante possui acesso somente leitura.");
+    if (!form.processo_id) return alert("Selecione o processo vinculado.");
+
+    setSaving(true);
+    const parcelas = form.forma_pagamento === "parcelado" ? Math.max(2, Number(form.numero_parcelas || 2)) : 1;
+    const payload: Record<string, unknown> = {
+      ...form,
+      escritorio_id: profile.escritorio_id,
+      processo_id: form.processo_id,
+      numero_parcelas: parcelas,
+      primeiro_vencimento: form.primeiro_vencimento || null,
+      data_referencia: form.data_referencia || null,
+      seguro_garantia: !!form.seguro_garantia,
+      observacoes: form.observacoes || null,
+    };
+
+    delete payload.id;
+    if (!form.id) payload.criado_por = profile.id;
+    CAMPOS_VALOR.forEach((field) => {
+      payload[field] = parseMoney((form as any)[field]);
+    });
+
+    if (!form.seguro_garantia) {
+      payload.apolice_numero = null;
+      payload.apolice_inicio = null;
+      payload.apolice_fim = null;
+      payload.valor_assegurado = 0;
+      payload.seguro_premio = 0;
+    } else {
+      payload.apolice_inicio = form.apolice_inicio || null;
+      payload.apolice_fim = form.apolice_fim || null;
     }
 
-    await loadLancamentos();
+    const result = form.id
+      ? await supabase.from("financeiro_processos").update(payload).eq("id", form.id).eq("escritorio_id", profile.escritorio_id)
+      : await supabase.from("financeiro_processos").insert(payload);
+
+    setSaving(false);
+    if (result.error) return alert(result.error.message);
+
+    await atualizarResumoProcesso(form.processo_id);
+    setModal(false);
+    setForm(initialForm);
+    await load();
+  }
+
+  async function del(registro: RegistroFinanceiro) {
+    if (!canDelete) return alert("Sem permissão para excluir lançamentos financeiros.");
+    if (!window.confirm("Excluir este lançamento financeiro?")) return;
+
+    const observacoes = withDeletedMarker(registro.observacoes || "", {
+      acao: "registro_financeiro_ocultado",
+      registro_id: registro.id,
+      usuario_id: profile.id,
+      usuario_nome: profile.nome || profile.email || profile.id,
+      data: new Date().toISOString(),
+      valor_total: totalRegistro(registro),
+    });
+
+    const { error } = await supabase
+      .from("financeiro_processos")
+      .update({ observacoes })
+      .eq("id", registro.id)
+      .eq("escritorio_id", profile.escritorio_id);
+
+    if (error) return alert(error.message);
+    if (registro.processo_id) await atualizarResumoProcesso(registro.processo_id);
+    await load();
   }
 
   const cards = [
-    { title: "Receita prevista", value: resumo.receitaPrevista, icon: TrendingUp },
-    { title: "Receita recebida", value: resumo.receitaRecebida, icon: Wallet },
-    { title: "Valores pendentes", value: resumo.valoresPendentes, icon: AlertCircle },
-    { title: "Despesas", value: resumo.despesas, icon: TrendingDown },
-    { title: "Saldo do período", value: resumo.saldoPeriodo, icon: Scale },
-    { title: "Acordos em aberto", value: resumo.acordosAbertos, icon: FileText },
+    { title: "Total financeiro", value: resumo.total, icon: Wallet, color: C.text, sub: `${filtered.length} registro(s)` },
+    { title: "Principal", value: resumo.principal, icon: FileText, color: C.blue, sub: "acordos e execuções" },
+    { title: "Encargos", value: resumo.encargos, icon: AlertTriangle, color: C.amber, sub: "custas, depósitos e honorários" },
+    { title: "Pago / quitado", value: resumo.pago, icon: CheckCircle, color: C.green, sub: "status finalizado" },
+    { title: "Pendente", value: resumo.pendente, icon: AlertTriangle, color: resumo.pendente ? C.amber : C.green, sub: "em aberto" },
+    { title: "Seguro-garantia", value: resumo.apolices, icon: ShieldCheck, color: C.blue, sub: "apólice(s)", count: true },
   ];
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div style={{ padding: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Financeiro</h1>
-          <p className="text-sm text-slate-500">Controle de receitas, despesas, acordos e pagamentos do escritório.</p>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: C.text }}>Financeiro</h1>
+          <p style={{ color: C.muted, margin: "6px 0 0" }}>Acordos, execuções, encargos, pagamentos e seguro-garantia.</p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" />
-          Novo lançamento
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => navigate("/processos")} style={{ border: "1px solid " + C.border, background: C.white, color: C.text, borderRadius: 8, padding: "10px 14px", fontWeight: 800, cursor: "pointer" }}>
+            Processos
+          </button>
+          {canCreate && (
+            <button onClick={() => openForm()} style={{ background: C.navy, color: "white", border: 0, borderRadius: 8, padding: "10px 16px", fontWeight: 800, display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+              <Plus size={16} />Novo lançamento
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 14, marginTop: 22 }}>
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.title}</span>
-                <Icon className="h-4 w-4 text-slate-400" />
+            <div key={card.title} style={{ background: C.white, border: "1px solid " + C.border, borderRadius: 12, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.muted, textTransform: "uppercase", letterSpacing: ".06em" }}>{card.title}</div>
+                <Icon size={16} color={card.color} />
               </div>
-              <p className="mt-3 text-xl font-semibold text-slate-900">{formatCurrency(card.value)}</p>
+              <div style={{ fontSize: 22, fontWeight: 900, color: card.color, marginTop: 8 }}>{card.count ? card.value : money(card.value)}</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{card.sub}</div>
             </div>
           );
         })}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-          <label className="relative xl:col-span-2">
-            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+      <section style={{ background: C.white, border: "1px solid " + C.border, borderRadius: 12, padding: 14, marginTop: 22 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 10, alignItems: "center" }}>
+          <div style={{ position: "relative" }}>
+            <Search size={15} style={{ position: "absolute", left: 10, top: 13, color: C.muted }} />
             <input
+              style={{ ...INP, paddingLeft: 34 }}
+              placeholder="Buscar por processo, parte ou apólice"
               value={filters.search}
-              onChange={(e) => setFilters((old) => ({ ...old, search: e.target.value }))}
-              placeholder="Buscar descrição, cliente ou processo"
-              className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-400"
+              onChange={(event) => setFilters((old) => ({ ...old, search: event.target.value }))}
             />
-          </label>
-          <input type="date" value={filters.data_inicio} onChange={(e) => setFilters((old) => ({ ...old, data_inicio: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input type="date" value={filters.data_fim} onChange={(e) => setFilters((old) => ({ ...old, data_fim: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <select value={filters.cliente_id} onChange={(e) => setFilters((old) => ({ ...old, cliente_id: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-            <option value="">Cliente</option>
-            {clientes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </div>
+          <select style={INP} value={filters.natureza} onChange={(event) => setFilters((old) => ({ ...old, natureza: event.target.value }))}>
+            <option value="todos">Natureza</option>
+            {NATUREZAS.map(([value, labelText]) => <option key={value} value={value}>{labelText}</option>)}
           </select>
-          <select value={filters.processo_id} onChange={(e) => setFilters((old) => ({ ...old, processo_id: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-            <option value="">Processo</option>
-            {processos.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          <select style={INP} value={filters.status} onChange={(event) => setFilters((old) => ({ ...old, status: event.target.value }))}>
+            <option value="todos">Status</option>
+            {STATUS.map(([value, labelText]) => <option key={value} value={value}>{labelText}</option>)}
           </select>
-          <select value={filters.status} onChange={(e) => setFilters((old) => ({ ...old, status: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-            <option value="">Status</option>
-            <option value="pendente">Pendente</option>
-            <option value="pago">Pago</option>
-            <option value="atrasado">Atrasado</option>
-            <option value="cancelado">Cancelado</option>
-            <option value="parcial">Parcial</option>
+          <select style={INP} value={filters.categoria} onChange={(event) => setFilters((old) => ({ ...old, categoria: event.target.value }))}>
+            {CATEGORIAS.map(([value, labelText]) => <option key={value} value={value}>{labelText}</option>)}
           </select>
-          <select value={filters.tipo} onChange={(e) => setFilters((old) => ({ ...old, tipo: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-            <option value="">Tipo</option>
-            <option value="receita">Receita</option>
-            <option value="despesa">Despesa</option>
-            <option value="honorario">Honorário</option>
-            <option value="acordo">Acordo</option>
-            <option value="custas">Custas</option>
-            <option value="reembolso">Reembolso</option>
-            <option value="outro">Outro</option>
+          <select style={INP} value={filters.apolice} onChange={(event) => setFilters((old) => ({ ...old, apolice: event.target.value }))}>
+            <option value="todos">Apólice</option>
+            <option value="sim">Com apólice</option>
+            <option value="nao">Sem apólice</option>
           </select>
-          <select value={filters.forma_pagamento} onChange={(e) => setFilters((old) => ({ ...old, forma_pagamento: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-            <option value="">Forma de pagamento</option>
-            <option value="pix">Pix</option>
-            <option value="boleto">Boleto</option>
-            <option value="transferencia">Transferência</option>
-            <option value="cartao">Cartão</option>
-            <option value="dinheiro">Dinheiro</option>
-            <option value="outro">Outro</option>
-          </select>
+          <input type="date" style={INP} value={filters.data_inicio} onChange={(event) => setFilters((old) => ({ ...old, data_inicio: event.target.value }))} />
+          <input type="date" style={INP} value={filters.data_fim} onChange={(event) => setFilters((old) => ({ ...old, data_fim: event.target.value }))} />
         </div>
-      </div>
+      </section>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Data</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Descrição</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Processo vinculado</th>
-                <th className="px-4 py-3">Categoria</th>
-                <th className="px-4 py-3">Valor</th>
-                <th className="px-4 py-3">Forma</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Vencimento</th>
-                <th className="px-4 py-3 text-right">Ações</th>
+      <section style={{ background: C.white, border: "1px solid " + C.border, borderRadius: 12, marginTop: 22, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1180, fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: C.grayBg, color: C.muted, textTransform: "uppercase", fontSize: 11, letterSpacing: ".05em" }}>
+                <th style={{ padding: 12, textAlign: "left" }}>Processo</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Parte</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Natureza</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Referência</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Vencimento</th>
+                <th style={{ padding: 12, textAlign: "right" }}>Principal</th>
+                <th style={{ padding: 12, textAlign: "right" }}>Encargos</th>
+                <th style={{ padding: 12, textAlign: "right" }}>Total</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Status</th>
+                <th style={{ padding: 12, textAlign: "left" }}>Seguro</th>
+                <th style={{ padding: 12, textAlign: "right" }}>Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {loading ? (
-                <tr><td colSpan={11} className="px-4 py-10 text-center text-slate-500">Carregando financeiro...</td></tr>
-              ) : lancamentos.length === 0 ? (
-                <tr><td colSpan={11} className="px-4 py-10 text-center text-slate-500">Nenhum lançamento financeiro encontrado.</td></tr>
+                <tr><td colSpan={11} style={{ padding: 30, textAlign: "center", color: C.muted }}>Carregando financeiro...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={11} style={{ padding: 30, textAlign: "center", color: C.muted }}>Nenhum registro financeiro encontrado.</td></tr>
               ) : (
-                lancamentos.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/70">
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{item.data_pagamento || item.created_at?.slice(0, 10)}</td>
-                    <td className={`whitespace-nowrap px-4 py-3 font-medium ${tipoClass(item.tipo)}`}>{labelize(item.tipo)}</td>
-                    <td className="min-w-[220px] px-4 py-3 text-slate-900">{item.descricao}</td>
-                    <td className="px-4 py-3 text-slate-600">{item.clientes?.nome || "-"}</td>
-                    <td className="px-4 py-3 text-slate-600">{item.processos?.numero_processo || item.processos?.titulo || "-"}</td>
-                    <td className="px-4 py-3 text-slate-600">{item.categoria || "-"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">{formatCurrency(item.valor_liquido || item.valor_bruto)}</td>
-                    <td className="px-4 py-3 text-slate-600">{labelize(item.forma_pagamento)}</td>
-                    <td className="px-4 py-3"><span className={`rounded-full border px-2 py-1 text-xs font-medium ${statusClass(item.status)}`}>{labelize(item.status)}</span></td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{item.data_vencimento || "-"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button onClick={() => handleDelete(item.id)} className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Excluir</button>
-                    </td>
-                  </tr>
-                ))
+                filtered.map((registro) => {
+                  const processo = registro.processo_id ? processoById.get(registro.processo_id) : undefined;
+                  const atrasado = isAtrasado(registro);
+                  const pago = isPago(registro);
+                  return (
+                    <tr key={registro.id} style={{ borderTop: "1px solid " + C.border }}>
+                      <td style={{ padding: 12, verticalAlign: "top", color: C.text }}>
+                        <div style={{ fontFamily: "monospace", fontSize: 12, color: C.muted }}>{processo?.numero || "sem número"}</div>
+                        <b>{processo?.titulo || "Processo não localizado"}</b>
+                        <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{label(CATEGORIAS, processoCategoria(processo))}</div>
+                      </td>
+                      <td style={{ padding: 12, verticalAlign: "top", color: C.muted }}>{processo?.parte_contraria || "-"}</td>
+                      <td style={{ padding: 12, verticalAlign: "top", color: C.text }}>{label(NATUREZAS, registro.natureza)}</td>
+                      <td style={{ padding: 12, verticalAlign: "top", color: C.muted }}>{dateBR(registro.data_referencia)}</td>
+                      <td style={{ padding: 12, verticalAlign: "top", color: atrasado ? C.red : C.muted }}>{dateBR(registro.primeiro_vencimento)}</td>
+                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 800 }}>{money(registro.valor_bruto)}</td>
+                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", color: totalEncargos(registro) ? C.amber : C.muted }}>{money(totalEncargos(registro))}</td>
+                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 900 }}>{money(totalRegistro(registro))}</td>
+                      <td style={{ padding: 12, verticalAlign: "top" }}>
+                        <span style={{ display: "inline-flex", border: "1px solid " + (pago ? "#86efac" : atrasado ? "#fecaca" : "#fde68a"), background: pago ? C.greenBg : atrasado ? C.redBg : C.amberBg, color: pago ? C.green : atrasado ? C.red : C.amber, borderRadius: 999, padding: "4px 9px", fontSize: 12, fontWeight: 900 }}>
+                          {atrasado && !pago ? "Atrasado" : label(STATUS, registro.status_pagamento || "pendente")}
+                        </span>
+                      </td>
+                      <td style={{ padding: 12, verticalAlign: "top", color: C.muted }}>
+                        {registro.seguro_garantia || registro.apolice_numero ? (
+                          <>
+                            <b style={{ color: C.text }}>{registro.apolice_numero || "Sim"}</b>
+                            <div style={{ fontSize: 12 }}>{money(registro.valor_assegurado)}</div>
+                          </>
+                        ) : "-"}
+                      </td>
+                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: 6 }}>
+                          {canEdit && (
+                            <button title="Editar" onClick={() => openForm(registro)} style={{ border: "1px solid " + C.border, background: C.white, color: C.blue, borderRadius: 8, padding: 8, cursor: "pointer" }}>
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button title="Excluir" onClick={() => del(registro)} style={{ border: "1px solid #fecaca", background: C.redBg, color: C.red, borderRadius: 8, padding: 8, cursor: "pointer" }}>
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Novo lançamento</h2>
-                <p className="text-sm text-slate-500">Registre receitas, despesas, acordos, honorários ou custas.</p>
-              </div>
-              <button onClick={() => setModalOpen(false)} className="rounded-lg px-3 py-1 text-sm text-slate-500 hover:bg-slate-100">Fechar</button>
+      {modal && (
+        <Modal title={form.id ? "Editar lançamento financeiro" : "Novo lançamento financeiro"} onClose={() => setModal(false)}>
+          <form onSubmit={save}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
+              <F label="Processo vinculado">
+                <select required style={INP} value={form.processo_id} onChange={(event) => setForm((old) => ({ ...old, processo_id: event.target.value }))}>
+                  <option value="">Selecione</option>
+                  {processos.map((processo) => <option key={processo.id} value={processo.id}>{processoLabel(processo)}</option>)}
+                </select>
+              </F>
+              <F label="Natureza">
+                <select style={INP} value={form.natureza} onChange={(event) => setForm((old) => ({ ...old, natureza: event.target.value }))}>
+                  {NATUREZAS.map(([value, labelText]) => <option key={value} value={value}>{labelText}</option>)}
+                </select>
+              </F>
+              <F label="Data de referência">
+                <input type="date" style={INP} value={form.data_referencia} onChange={(event) => setForm((old) => ({ ...old, data_referencia: event.target.value }))} />
+              </F>
+              <F label="Status pagamento">
+                <select style={INP} value={form.status_pagamento} onChange={(event) => setForm((old) => ({ ...old, status_pagamento: event.target.value }))}>
+                  {STATUS.map(([value, labelText]) => <option key={value} value={value}>{labelText}</option>)}
+                </select>
+              </F>
             </div>
 
-            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-              <select required value={form.tipo} onChange={(e) => setForm((old) => ({ ...old, tipo: e.target.value as FinanceiroTipo }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                <option value="receita">Receita</option>
-                <option value="despesa">Despesa</option>
-                <option value="honorario">Honorário</option>
-                <option value="acordo">Acordo</option>
-                <option value="custas">Custas</option>
-                <option value="reembolso">Reembolso</option>
-                <option value="outro">Outro</option>
-              </select>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12 }}>
+              <F label="Valor bruto / acordo"><input type="number" step="0.01" min="0" style={INP} value={form.valor_bruto} onChange={(event) => setForm((old) => ({ ...old, valor_bruto: event.target.value }))} /></F>
+              <F label="Depósito RO"><input type="number" step="0.01" min="0" style={INP} value={form.deposito_ro} onChange={(event) => setForm((old) => ({ ...old, deposito_ro: event.target.value }))} /></F>
+              <F label="Depósito RR"><input type="number" step="0.01" min="0" style={INP} value={form.deposito_rr} onChange={(event) => setForm((old) => ({ ...old, deposito_rr: event.target.value }))} /></F>
+              <F label="Depósito embargos"><input type="number" step="0.01" min="0" style={INP} value={form.deposito_embargos} onChange={(event) => setForm((old) => ({ ...old, deposito_embargos: event.target.value }))} /></F>
+              <F label="Custas"><input type="number" step="0.01" min="0" style={INP} value={form.custas} onChange={(event) => setForm((old) => ({ ...old, custas: event.target.value }))} /></F>
+              <F label="FGTS"><input type="number" step="0.01" min="0" style={INP} value={form.fgts} onChange={(event) => setForm((old) => ({ ...old, fgts: event.target.value }))} /></F>
+              <F label="Honorários sucumbenciais"><input type="number" step="0.01" min="0" style={INP} value={form.honorarios_sucumbenciais} onChange={(event) => setForm((old) => ({ ...old, honorarios_sucumbenciais: event.target.value }))} /></F>
+              <F label="Honorários periciais"><input type="number" step="0.01" min="0" style={INP} value={form.honorarios_periciais} onChange={(event) => setForm((old) => ({ ...old, honorarios_periciais: event.target.value }))} /></F>
+              <F label="INSS reclamante"><input type="number" step="0.01" min="0" style={INP} value={form.inss_reclamante} onChange={(event) => setForm((old) => ({ ...old, inss_reclamante: event.target.value }))} /></F>
+              <F label="INSS reclamada"><input type="number" step="0.01" min="0" style={INP} value={form.inss_reclamada} onChange={(event) => setForm((old) => ({ ...old, inss_reclamada: event.target.value }))} /></F>
+              <F label="Multa"><input type="number" step="0.01" min="0" style={INP} value={form.multa_inadimplemento} onChange={(event) => setForm((old) => ({ ...old, multa_inadimplemento: event.target.value }))} /></F>
+            </div>
 
-              <input required value={form.descricao} onChange={(e) => setForm((old) => ({ ...old, descricao: e.target.value }))} placeholder="Descrição" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>
+              <F label="Forma de pagamento">
+                <select style={INP} value={form.forma_pagamento} onChange={(event) => setForm((old) => ({ ...old, forma_pagamento: event.target.value, numero_parcelas: event.target.value === "avista" ? "1" : old.numero_parcelas }))}>
+                  {FORMAS.map(([value, labelText]) => <option key={value} value={value}>{labelText}</option>)}
+                </select>
+              </F>
+              <F label="Número de parcelas"><input type="number" min={form.forma_pagamento === "parcelado" ? 2 : 1} style={INP} value={form.numero_parcelas} disabled={form.forma_pagamento === "avista"} onChange={(event) => setForm((old) => ({ ...old, numero_parcelas: event.target.value }))} /></F>
+              <F label="Primeiro vencimento"><input type="date" style={INP} value={form.primeiro_vencimento} onChange={(event) => setForm((old) => ({ ...old, primeiro_vencimento: event.target.value }))} /></F>
+              <F label="Seguro-garantia">
+                <select style={INP} value={form.seguro_garantia ? "sim" : "nao"} onChange={(event) => setForm((old) => ({ ...old, seguro_garantia: event.target.value === "sim" }))}>
+                  <option value="nao">Não</option>
+                  <option value="sim">Sim</option>
+                </select>
+              </F>
+            </div>
 
-              <select value={form.cliente_id} onChange={(e) => setForm((old) => ({ ...old, cliente_id: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                <option value="">Cliente vinculado</option>
-                {clientes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-
-              <select value={form.processo_id} onChange={(e) => setForm((old) => ({ ...old, processo_id: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                <option value="">Processo vinculado opcional</option>
-                {processos.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-
-              <select value={form.contrato_id} onChange={(e) => setForm((old) => ({ ...old, contrato_id: e.target.value }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                <option value="">Contrato vinculado opcional</option>
-                {contratos.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-
-              <input value={form.categoria} onChange={(e) => setForm((old) => ({ ...old, categoria: e.target.value }))} placeholder="Categoria" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-              <input required inputMode="decimal" value={form.valor_bruto} onChange={(e) => setForm((old) => ({ ...old, valor_bruto: e.target.value }))} placeholder="Valor bruto" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-              <input inputMode="decimal" value={form.valor_liquido} onChange={(e) => setForm((old) => ({ ...old, valor_liquido: e.target.value }))} placeholder="Valor líquido" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-
-              <label className="text-sm text-slate-600">Data de vencimento
-                <input type="date" value={form.data_vencimento} onChange={(e) => setForm((old) => ({ ...old, data_vencimento: e.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-              </label>
-              <label className="text-sm text-slate-600">Data de pagamento
-                <input type="date" value={form.data_pagamento} onChange={(e) => setForm((old) => ({ ...old, data_pagamento: e.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-              </label>
-
-              <select value={form.forma_pagamento} onChange={(e) => setForm((old) => ({ ...old, forma_pagamento: e.target.value as any }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                <option value="">Forma de pagamento</option>
-                <option value="pix">Pix</option>
-                <option value="boleto">Boleto</option>
-                <option value="transferencia">Transferência</option>
-                <option value="cartao">Cartão</option>
-                <option value="dinheiro">Dinheiro</option>
-                <option value="outro">Outro</option>
-              </select>
-
-              <select value={form.status} onChange={(e) => setForm((old) => ({ ...old, status: e.target.value as FinanceiroStatus }))} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                <option value="pendente">Pendente</option>
-                <option value="pago">Pago</option>
-                <option value="atrasado">Atrasado</option>
-                <option value="cancelado">Cancelado</option>
-                <option value="parcial">Parcial</option>
-              </select>
-
-              <textarea value={form.observacoes} onChange={(e) => setForm((old) => ({ ...old, observacoes: e.target.value }))} placeholder="Observações" className="md:col-span-2 min-h-24 rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-
-              <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
-                <button disabled={saving} type="submit" className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
-                  {saving ? "Salvando..." : "Salvar lançamento"}
-                </button>
+            {form.seguro_garantia && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12, background: C.grayBg, border: "1px solid " + C.border, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                <F label="Número da apólice"><input style={INP} value={form.apolice_numero} onChange={(event) => setForm((old) => ({ ...old, apolice_numero: event.target.value }))} /></F>
+                <F label="Início vigência"><input type="date" style={INP} value={form.apolice_inicio} onChange={(event) => setForm((old) => ({ ...old, apolice_inicio: event.target.value }))} /></F>
+                <F label="Fim vigência"><input type="date" style={INP} value={form.apolice_fim} onChange={(event) => setForm((old) => ({ ...old, apolice_fim: event.target.value }))} /></F>
+                <F label="Valor assegurado"><input type="number" step="0.01" min="0" style={INP} value={form.valor_assegurado} onChange={(event) => setForm((old) => ({ ...old, valor_assegurado: event.target.value }))} /></F>
+                <F label="Prêmio pago"><input type="number" step="0.01" min="0" style={INP} value={form.seguro_premio} onChange={(event) => setForm((old) => ({ ...old, seguro_premio: event.target.value }))} /></F>
               </div>
-            </form>
-          </div>
-        </div>
+            )}
+
+            <F label="Observações">
+              <textarea style={{ ...INP, minHeight: 90 }} value={form.observacoes} onChange={(event) => setForm((old) => ({ ...old, observacoes: event.target.value }))} />
+            </F>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setModal(false)} style={{ border: "1px solid " + C.border, background: C.white, color: C.text, borderRadius: 8, padding: "10px 14px", fontWeight: 800, cursor: "pointer" }}>Cancelar</button>
+              <button disabled={saving} type="submit" style={{ border: 0, background: C.navy, color: "white", borderRadius: 8, padding: "10px 16px", fontWeight: 800, cursor: "pointer", opacity: saving ? 0.65 : 1 }}>
+                {saving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

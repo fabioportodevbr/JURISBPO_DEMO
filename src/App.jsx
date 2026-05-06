@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, FileText, CheckSquare, Calendar,
   Brain, Users, Bell, LogOut, Menu, ChevronRight, Settings,
-  AlertTriangle, Loader, BarChart3, Building2, Archive,
+  AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import { supabase, signOut, can, ROLES } from './lib/supabase.js'
@@ -25,6 +25,7 @@ import MeuPerfil   from './components/MeuPerfil.jsx'
 import Relatorios   from './components/Relatorios.jsx'
 import PartesCRM   from './components/PartesCRM.jsx'
 import Acervo      from './components/Acervo.jsx'
+import Financeiro  from './pages/Financeiro.tsx'
 
 // ── Tema ─────────────────────────────────────────────────────────────────
 const C = {
@@ -43,6 +44,7 @@ function buildNav(profile) {
     { path: '/acervo',     label: 'Acervo',        Icon: Archive,   perm: 'processos.ver' },
     { path: '/atividades', label: 'Atividades',    Icon: CheckSquare },
     { path: '/calendario', label: 'Calendário',     Icon: Calendar   },
+    { path: '/financeiro', label: 'Financeiro',    Icon: Wallet,    perm: 'financeiro.ver' },
     { path: '/ia',         label: 'IA Jurídica',    Icon: Brain,     perm: 'ia.usar', accent: true },
     { path: '/notificacoes', label: 'Notificações', Icon: Bell },
     { path: '/relatorios', label: 'Relatórios', Icon: BarChart3, perm: 'processos.ver' },
@@ -215,6 +217,7 @@ function AppLayout() {
             <Route path="/atividades" element={<Atividades profile={profile} />} />
             <Route path="/tarefas" element={<Navigate to="/atividades" replace />} />
             <Route path="/calendario" element={<Calendario profile={profile} />} />
+            <Route path="/financeiro" element={can(profile,'financeiro.ver') ? <Financeiro profile={profile} /> : <Bloqueado />} />
             <Route path="/ia"         element={can(profile,'ia.usar')        ? <IaJuridica profile={profile} /> : <Bloqueado />} />
             <Route path="/notificacoes" element={<Notificacoes profile={profile} />} />
             <Route path="/relatorios" element={<Relatorios profile={profile} />} />
