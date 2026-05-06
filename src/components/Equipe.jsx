@@ -49,6 +49,7 @@ export default function Equipe({profile}){
       .from('usuarios_escritorios')
       .select('usuario_id,papel,ativo,created_at')
       .eq('escritorio_id',profile.escritorio_id)
+      .eq('ativo',true)
       .order('created_at',{ascending:true})
 
     if(linksError){ console.error(linksError); setM([]); setLoading(false); return }
@@ -172,7 +173,7 @@ export default function Equipe({profile}){
     if(data?.error) return alert('Erro ao remover membro: '+(typeof data.error==='string'?data.error:JSON.stringify(data.error)))
     if(selecionado?.usuario_id===x.usuario_id) setSelecionado(null)
     await load()
-    alert('Membro removido com sucesso.')
+    alert(data?.already_removed ? 'Membro ja estava removido e foi retirado da lista.' : 'Membro removido com sucesso.')
   }
 
   return <div style={{padding:24}}>
@@ -190,6 +191,7 @@ export default function Equipe({profile}){
     </div>}
 
     {loading&&<p style={{color:C.muted}}>Carregando equipe...</p>}
+    {!loading&&!m.length&&<p style={{color:C.muted,marginTop:18}}>Nenhum membro ativo encontrado.</p>}
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14,marginTop:18}}>
       {m.map(x=>{const p=x.profile; const name=p?.nome || p?.email || x.usuario_id; const role=ROLES[x.papel]?.label||x.papel
         return <div key={x.usuario_id} style={{background:C.white,border:'1px solid '+C.border,borderRadius:14,padding:16,display:'flex',gap:14,alignItems:'center',boxShadow:'0 1px 2px rgba(15,23,42,.04)'}}>

@@ -39,6 +39,18 @@ serve(async (req) => {
     if (gestorErr) throw gestorErr;
     if (gestor?.papel !== "gerente") return new Response(JSON.stringify({ error: "Apenas gerente pode remover membros." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    const { data: vinculo, error: vinculoErr } = await admin
+      .from("usuarios_escritorios")
+      .select("usuario_id, ativo")
+      .eq("usuario_id", usuario_id)
+      .eq("escritorio_id", escritorio_id)
+      .maybeSingle();
+    if (vinculoErr) throw vinculoErr;
+
+    if (!vinculo) {
+      return new Response(JSON.stringify({ success: true, already_removed: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { error: unlinkErr } = await admin
       .from("usuarios_escritorios")
       .update({ ativo: false })
@@ -47,6 +59,10 @@ serve(async (req) => {
     if (unlinkErr) throw unlinkErr;
 
     await admin.from("profiles").update({ ativo: false }).eq("id", usuario_id);
+
+    if (!vinculo.ativo) {
+      return new Response(JSON.stringify({ success: true, already_removed: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     if (deletar_auth) {
       const { error: delErr } = await admin.auth.admin.deleteUser(usuario_id);
