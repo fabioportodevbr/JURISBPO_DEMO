@@ -248,9 +248,13 @@ export default function Dashboard({profile}){
       <Card title="Alertas e mensagens" value={totalAvisos} sub="itens não lidos" color={totalAvisos?C.red:C.green}/>
     </div>
 
+    {/* 1. Push de acompanhamento processual */}
     <PushDashboardHeader novos={st.pushNovos} importantes={st.pushImportantes} ultimo={st.pushUltimo} onClick={()=>setPushModal(true)} />
-    <FinanceiroResumoDashboard profile={profile} />
 
+    {/* 2. Audiências na semana — logo abaixo do push */}
+    <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info"/>
+
+    {/* 3. Notificações e mensagens */}
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Notificações e mensagens não lidas</h2>
       {totalAvisos? <div>
@@ -259,6 +263,7 @@ export default function Dashboard({profile}){
       </div> : <div style={{padding:24,textAlign:'center',color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><CheckCircle size={16}/>Nenhuma notificação ou mensagem nova.</div>}
     </div>
 
+    {/* 4. Alertas de renovação contratual */}
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas de renovação contratual</h2>
       {st.ren.length?st.ren.map(c=><div key={c.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:c.renovacao.level==='vencido'?C.redBg:C.amberBg}}>
@@ -268,12 +273,20 @@ export default function Dashboard({profile}){
       </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>Nenhum alerta de renovação no momento.</div>}
     </div>
 
-    <ClippingJuridico />
-
+    {/* 5. Atividades pendentes */}
     <ListBlock title="Atividades pendentes" icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,6)} empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger"/>
+
+    {/* 6. Atividades futuras */}
     <ListBlock title="Atividades futuras" icon={<Clock size={16}/>} items={st.futuras.slice(0,6)} empty="Nenhuma tarefa ou prazo futuro agendado." kind="warning"/>
-    <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info"/>
+
+    {/* 7. Reuniões na semana */}
     <ListBlock title="Reuniões na semana" icon={<CalendarCheck size={16}/>} items={st.reunioesSemana.slice(0,6)} empty="Nenhuma reunião nos próximos 7 dias." kind="success"/>
+
+    {/* 8. Resumo financeiro — penúltimo */}
+    <FinanceiroResumoDashboard profile={profile} />
+
+    {/* 9. Clipping jurídico — por último */}
+    <ClippingJuridico />
 
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso}/>}
     {createPush&&<CriarProcessoPushModal push={createPush} form={createForm} setForm={setCreateForm} saving={savingProcess} onCancel={()=>setCreatePush(null)} onSave={salvarProcessoPush}/>}
