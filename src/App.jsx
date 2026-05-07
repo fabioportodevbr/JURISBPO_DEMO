@@ -74,12 +74,12 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+        <nav className="sidebar-nav" style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
           {nav.map(({ path, label, Icon, accent }) => {
             const active = currentPath === path
             return (
               <button key={path} onClick={() => { onNav(path); onClose() }}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 12px', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 2, textAlign: 'left', background: active ? C.navyL : (accent && !active ? 'rgba(6,78,59,0.16)' : 'transparent'), color: active ? C.gold : (accent ? '#86efac' : 'rgba(255,255,255,0.6)'), fontSize: 14, fontWeight: active ? 700 : 400, transition: 'all 0.12s' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 1, textAlign: 'left', background: active ? C.navyL : (accent && !active ? 'rgba(6,78,59,0.16)' : 'transparent'), color: active ? C.gold : (accent ? '#86efac' : 'rgba(255,255,255,0.6)'), fontSize: 14, fontWeight: active ? 700 : 400, transition: 'all 0.12s' }}>
                 <Icon size={16} />{label}
                 {path === '/notificacoes' && unreadCount > 0 && <span title={`${unreadCount} item(ns) não lido(s)`} style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999, background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
                 {active && path !== '/notificacoes' && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
@@ -165,7 +165,7 @@ function AppLayout() {
           <div style={{ width: 40, height: 40, border: '3px solid #050505', borderTopColor: C.gold, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
           <p style={{ color: C.muted, fontSize: 14 }}>Carregando...</p>
         </div>
-        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.sidebar-nav::-webkit-scrollbar{display:none}.sidebar-nav{scrollbar-width:none;-ms-overflow-style:none}`}</style>
       </div>
     )
   }
@@ -198,7 +198,7 @@ function AppLayout() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont,sans-serif', overflow: 'hidden' }}>
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.sidebar-nav::-webkit-scrollbar{display:none}.sidebar-nav{scrollbar-width:none;-ms-overflow-style:none}`}</style>
       <Sidebar nav={nav} currentPath={currentPath} onNav={navigate} open={sbOpen} onClose={() => mobile && setSbOpen(false)} profile={profile} onLogout={handleLogout} mobile={mobile} unreadCount={unreadCount} />
       <div style={{ flex: 1, marginLeft: mobile ? 0 : 224, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s' }}>
         {/* Topbar mobile */}
