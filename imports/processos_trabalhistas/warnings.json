@@ -1,0 +1,107 @@
+[
+  {
+    "severity": "warning",
+    "sheet": "Processos_Henneberg P L",
+    "row": 1067,
+    "numero": "0001459-24.2015.5.02.0004",
+    "message": "data invalida: 17/07/20015"
+  },
+  {
+    "severity": "warning",
+    "sheet": "Processos_Henneberg P L",
+    "row": 1175,
+    "numero": "1001895-79.2016.5.02.0052",
+    "message": "data invalida: 11/10/20016"
+  },
+  {
+    "severity": "warning",
+    "sheet": "Processos_Henneberg P L",
+    "row": 1268,
+    "numero": "1000003-28.2017.5.02.0044",
+    "message": "data invalida: 04/01/204"
+  },
+  {
+    "severity": "warning",
+    "sheet": "Processos_Henneberg P L",
+    "row": 1611,
+    "numero": "0000181-92.2020.5.05.0015",
+    "message": "data invalida: 17/109/2025"
+  },
+  {
+    "severity": "warning",
+    "sheet": "Processos_Henneberg P L",
+    "row": 1975,
+    "numero": "1001455-46.2025.5.02.0027",
+    "message": "data invalida: 26/018/2025"
+  },
+  {
+    "severity": "warning",
+    "sheet": "Processos_Henneberg P L",
+    "row": 2013,
+    "numero": "0000848-09.2026.5.18.0241",
+    "message": "titulo ausente; usado fallback com numero do processo"
+  },
+  {
+    "severity": "warning",
+    "sheet": "Processos_Henneberg P L",
+    "row": 2014,
+    "numero": "0000846-39.2026.5.18.0241",
+    "message": "titulo ausente; usado fallback com numero do processo"
+  },
+  {
+    "severity": "warning",
+    "sheet": "Processos_Rubens",
+    "row": 26,
+    "numero": "1000967-17.2016.5.02.0089",
+    "message": "data invalida: 08/06/216"
+  },
+  {
+    "severity": "error",
+    "sheet": "Processos_Rubens",
+    "row": 830,
+    "numero": "",
+    "message": "linha sem numero de processo reconhecivel"
+  },
+  {
+    "severity": "info",
+    "sheet": "Processos_Henneberg P L",
+    "row": 214,
+    "numero": "0002186-41.2012.5.02.0051",
+    "message": "2 linhas consolidadas no mesmo numero CNJ"
+  },
+  {
+    "severity": "info",
+    "sheet": "Processos_Henneberg P L",
+    "row": 1735,
+    "numero": "0000412-98.2022.5.10.0019",
+    "message": "2 linhas consolidadas no mesmo numero CNJ"
+  },
+  {
+    "severity": "info",
+    "sheet": "Processos_Rubens",
+    "row": 112,
+    "numero": "1000917-94.2017.5.02.0011",
+    "message": "2 linhas consolidadas no mesmo numero CNJ"
+  },
+  {
+    "severity": "info",
+    "sheet": "Processos_Henneberg P L",
+    "row": 2004,
+    "numero": "0000288-76.2026.5.11.0010",
+    "message": "ja existe no banco: 562dc541-2f11-4c01-acd6-3ca57c57c4d7"
+  },
+  {
+    "severity": "info",
+    "sheet": "Processos_Henneberg P L",
+    "row": 2006,
+    "numero": "1000373-10.2026.5.02.0038",
+    "message": "ja existe no banco: 976e3b34-3473-43b1-b287-aa652fa66659"
+  },
+  {
+    "severity": "info",
+    "sheet": "Processos_Henneberg P L",
+    "row": 2007,
+    "numero": "1000576-05.2026.5.02.0609",
+    "message": "ja existe no banco: d92a9e56-6617-4d5a-8a0f-9ebd11079eb8"
+  }
+]

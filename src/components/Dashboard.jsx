@@ -26,19 +26,17 @@ function pushText(p){return [p.movimento,p.assunto_email,p.corpo_email_resumo,p.
 function isImportantPush(p){return PUSH_IMPORTANTE.test(pushText(p))}
 
 function ListBlock({title,icon,items,empty,kind='default'}){
-  const bg = kind==='danger'?C.redBg:kind==='warning'?C.amberBg:kind==='info'?C.blueBg:kind==='success'?C.greenBg:C.white
+  const bg=kind==='danger'?C.redBg:kind==='warning'?C.amberBg:kind==='info'?C.blueBg:kind==='success'?C.greenBg:C.white
   return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
     <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}>{icon}{title}</h2>
     {items.length?items.map(t=><div key={t.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:bg}}>
       <b>{t.titulo}</b>
-      <div style={{fontSize:12,color:C.muted,marginTop:3}}>
-        {t.tipo} · {brDate(t.prazo)}{t.horario?` às ${t.horario}`:''}{t.status?` · ${t.status}`:''}
-      </div>
+      <div style={{fontSize:12,color:C.muted,marginTop:3}}>{t.tipo} · {brDate(t.prazo)}{t.horario?` às ${t.horario}`:''}{t.status?` · ${t.status}`:''}</div>
     </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>{empty}</div>}
   </div>
 }
 
-function PushDashboardHeader({novos, importantes, ultimo, onClick}){
+function PushDashboardHeader({novos,importantes,ultimo,onClick}){
   return <button type="button" onClick={onClick} style={{width:'100%',textAlign:'left',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap',padding:'14px 16px',border:'1px solid '+C.border,borderRadius:14,background:importantes?C.amberBg:C.blueBg,marginTop:22,marginBottom:10,cursor:'pointer'}}>
     <div>
       <div style={{fontSize:13,fontWeight:900,color:C.text,display:'flex',alignItems:'center',gap:8}}><Mail size={16}/>Acompanhamento processual via push</div>
@@ -52,7 +50,7 @@ function PushDashboardHeader({novos, importantes, ultimo, onClick}){
   </button>
 }
 
-function PushModal({items, profile, onClose, onOpenProcess, onCreateProcess}){
+function PushModal({items,profile,onClose,onOpenProcess,onCreateProcess}){
   const podeCriar=can(profile,'processos.criar')
   return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:920,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -90,7 +88,7 @@ function PushModal({items, profile, onClose, onOpenProcess, onCreateProcess}){
 
 function Field({label,children}){return <div style={{marginBottom:12}}><label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:5}}>{label}</label>{children}</div>}
 
-function CriarProcessoPushModal({push, form, setForm, saving, onCancel, onSave}){
+function CriarProcessoPushModal({push,form,setForm,saving,onCancel,onSave}){
   return <div onClick={e=>e.target===e.currentTarget&&onCancel()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:680,padding:18}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,borderBottom:'1px solid '+C.border,paddingBottom:12,marginBottom:14}}>
@@ -110,10 +108,10 @@ function CriarProcessoPushModal({push, form, setForm, saving, onCancel, onSave})
   </div>
 }
 
-function saudacaoHorario() {
-  const h = new Date().getHours()
-  if (h >= 5 && h < 12) return 'Bom dia'
-  if (h >= 12 && h < 18) return 'Boa tarde'
+function saudacaoHorario(){
+  const h=new Date().getHours()
+  if(h>=5&&h<12)return 'Bom dia'
+  if(h>=12&&h<18)return 'Boa tarde'
   return 'Boa noite'
 }
 
@@ -123,12 +121,7 @@ export default function Dashboard({profile}){
   const[createPush,setCreatePush]=useState(null)
   const[createForm,setCreateForm]=useState({numero:'',titulo:'',tribunal:'',categoria:'trabalhista',parte_contraria:'',resumo_processo:''})
   const[savingProcess,setSavingProcess]=useState(false)
-  const[st,setSt]=useState({
-    p:0,c:0,
-    pendentes:[], futuras:[], audienciasSemana:[], reunioesSemana:[],
-    ren:[], notificacoes:[], mensagens:[],
-    pushNovos:0, pushImportantes:0, pushUltimo:null, pushItems:[]
-  })
+  const[st,setSt]=useState({p:0,c:0,pendentes:[],futuras:[],audienciasSemana:[],reunioesSemana:[],ren:[],notificacoes:[],mensagens:[],pushNovos:0,pushImportantes:0,pushUltimo:null,pushItems:[]})
 
   useEffect(()=>{(async()=>{
     const eid=profile.escritorio_id
@@ -136,26 +129,16 @@ export default function Dashboard({profile}){
     const amanha=addDaysISO(1)
     const fimSemana=addDaysISO(7)
     const desde24h=new Date(Date.now()-24*60*60*1000).toISOString()
-
-    let atividadesQuery=supabase
-      .from('atividades')
-      .select('*')
-      .eq('escritorio_id',eid)
-      .neq('status','concluida')
-
-    if(profile.role!=='gerente'){
-      atividadesQuery=atividadesQuery.or(`tipo.in.(audiencia,reuniao),and(tipo.in.(tarefa,prazo_processual),responsavel_id.eq.${profile.id})`)
-    }
-
+    let atividadesQuery=supabase.from('atividades').select('*').eq('escritorio_id',eid).neq('status','concluida')
+    if(profile.role!=='gerente'){atividadesQuery=atividadesQuery.or(`tipo.in.(audiencia,reuniao),and(tipo.in.(tarefa,prazo_processual),responsavel_id.eq.${profile.id})`)}
     const[{data:p},{data:c},{data:a},{data:n},{data:m},{data:push}]=await Promise.all([
       supabase.from('processos').select('*').eq('escritorio_id',eid),
       supabase.from('contratos').select('*').eq('escritorio_id',eid),
       atividadesQuery,
       supabase.from('notificacoes').select('*').eq('usuario_id',profile.id).eq('lida',false).eq('arquivada',false).order('created_at',{ascending:false}).limit(5),
       supabase.from('mensagens').select('*').eq('destinatario_id',profile.id).eq('lida',false).not('arquivada_por','cs',`{${profile.id}}`).order('created_at',{ascending:false}).limit(5),
-      supabase.from('andamentos_processuais_push').select('id, processo_id, cliente_id, numero_processo, tribunal, movimento, assunto_email, corpo_email_resumo, corpo_resumo, corpo_email_limpo, remetente, data_movimento, criado_em, status_associacao').eq('escritorio_id',eid).neq('status_associacao','ignorado').gte('criado_em',desde24h).order('criado_em',{ascending:false}).limit(100),
+      supabase.from('andamentos_processuais_push').select('id,processo_id,cliente_id,numero_processo,tribunal,movimento,assunto_email,corpo_email_resumo,corpo_resumo,corpo_email_limpo,remetente,data_movimento,criado_em,status_associacao').eq('escritorio_id',eid).neq('status_associacao','ignorado').gte('criado_em',desde24h).order('criado_em',{ascending:false}).limit(100),
     ])
-
     const atividades=(a||[]).filter(isOpen)
     const pendentes=atividades.filter(x=>isTaskOrDeadline(x)&&x.prazo&&x.prazo<=hoje).sort(compareByDate)
     const futuras=atividades.filter(x=>isTaskOrDeadline(x)&&x.prazo&&x.prazo>=amanha).sort(compareByDate)
@@ -163,80 +146,37 @@ export default function Dashboard({profile}){
     const reunioesSemana=atividades.filter(x=>isMeeting(x)&&x.prazo&&x.prazo>=hoje&&x.prazo<=fimSemana).sort(compareByDate)
     const ren=(c||[]).map(x=>({...x,renovacao:renewalState(x)})).filter(x=>x.renovacao).sort((x,y)=>x.renovacao.days-y.renovacao.days).slice(0,5)
     const pushItems=push||[]
-
-    setSt({
-      p:(p||[]).filter(x=>x.status==='ativo').length,
-      c:(c||[]).filter(x=>x.status==='ativo'||x.status==='a_vencer').length,
-      pendentes,
-      futuras,
-      audienciasSemana,
-      reunioesSemana,
-      ren,
-      notificacoes:n||[],
-      mensagens:m||[],
-      pushNovos:pushItems.length,
-      pushImportantes:pushItems.filter(isImportantPush).length,
-      pushUltimo:pushItems[0]||null,
-      pushItems
-    })
+    setSt({p:(p||[]).filter(x=>x.status==='ativo').length,c:(c||[]).filter(x=>x.status==='ativo'||x.status==='a_vencer').length,pendentes,futuras,audienciasSemana,reunioesSemana,ren,notificacoes:n||[],mensagens:m||[],pushNovos:pushItems.length,pushImportantes:pushItems.filter(isImportantPush).length,pushUltimo:pushItems[0]||null,pushItems})
   })()},[profile.escritorio_id,profile.id,profile.role])
 
   const totalAvisos=useMemo(()=>st.notificacoes.length+st.mensagens.length,[st.notificacoes,st.mensagens])
 
-  const abrirProcesso=(processoId)=>{
-    if(!processoId)return
-    setPushModal(false)
-    navigate(`/processos?processo_id=${processoId}`)
-  }
+  const abrirProcesso=(processoId)=>{if(!processoId)return;setPushModal(false);navigate(`/processos?processo_id=${processoId}`)}
 
   const iniciarCriacaoProcesso=(push)=>{
     setCreatePush(push)
-    setCreateForm({
-      numero:push.numero_processo||'',
-      titulo:push.numero_processo?`Processo ${push.numero_processo}`:(push.movimento||'Novo processo'),
-      tribunal:push.tribunal||'',
-      categoria:'trabalhista',
-      parte_contraria:'',
-      resumo_processo:shortText(pushText(push),700)
-    })
+    setCreateForm({numero:push.numero_processo||'',titulo:push.numero_processo?`Processo ${push.numero_processo}`:(push.movimento||'Novo processo'),tribunal:push.tribunal||'',categoria:'trabalhista',parte_contraria:'',resumo_processo:shortText(pushText(push),700)})
   }
 
   const salvarProcessoPush=async()=>{
     if(!createPush)return
     if(!createForm.titulo.trim())return alert('Informe o título do processo.')
     setSavingProcess(true)
-    const {data,error}=await supabase.from('processos').insert({
-      escritorio_id:profile.escritorio_id,
-      numero:createForm.numero||null,
-      titulo:createForm.titulo.trim(),
-      parte_contraria:createForm.parte_contraria||null,
-      tribunal:createForm.tribunal||null,
-      categoria:createForm.categoria||'trabalhista',
-      resumo_processo:createForm.resumo_processo||null,
-      status:'ativo',
-      fase:'conhecimento',
-      responsavel_id:profile.id,
-      created_by:profile.id
-    }).select('id').single()
+    const {data,error}=await supabase.from('processos').insert({escritorio_id:profile.escritorio_id,numero:createForm.numero||null,titulo:createForm.titulo.trim(),parte_contraria:createForm.parte_contraria||null,tribunal:createForm.tribunal||null,categoria:createForm.categoria||'trabalhista',resumo_processo:createForm.resumo_processo||null,status:'ativo',fase:'conhecimento',responsavel_id:profile.id,created_by:profile.id}).select('id').single()
     if(error){setSavingProcess(false);return alert(error.message)}
-
-    const {error:linkError}=await supabase.from('andamentos_processuais_push').update({
-      processo_id:data.id,
-      cliente_id:null,
-      escritorio_id:profile.escritorio_id,
-      status_associacao:'associado'
-    }).eq('id',createPush.id)
+    const {error:linkError}=await supabase.from('andamentos_processuais_push').update({processo_id:data.id,cliente_id:null,escritorio_id:profile.escritorio_id,status_associacao:'associado'}).eq('id',createPush.id)
     setSavingProcess(false)
     if(linkError)return alert('Processo criado, mas não foi possível vincular o push: '+linkError.message)
-
     setCreatePush(null)
     setPushModal(false)
     abrirProcesso(data.id)
   }
 
   return <div style={{padding:24}}>
-    <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
-    <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
+    <div>
+      <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
+      <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
+    </div>
 
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14,marginTop:22}}>
       <Card title="Processos ativos" value={st.p} sub="em andamento" color={C.blue}/>
@@ -248,22 +188,17 @@ export default function Dashboard({profile}){
       <Card title="Alertas e mensagens" value={totalAvisos} sub="itens não lidos" color={totalAvisos?C.red:C.green}/>
     </div>
 
-    {/* 1. Push de acompanhamento processual */}
-    <PushDashboardHeader novos={st.pushNovos} importantes={st.pushImportantes} ultimo={st.pushUltimo} onClick={()=>setPushModal(true)} />
-
-    {/* 2. Audiências na semana — logo abaixo do push */}
+    <PushDashboardHeader novos={st.pushNovos} importantes={st.pushImportantes} ultimo={st.pushUltimo} onClick={()=>setPushModal(true)}/>
     <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info"/>
 
-    {/* 3. Notificações e mensagens */}
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Notificações e mensagens não lidas</h2>
-      {totalAvisos? <div>
+      {totalAvisos?<div>
         {st.notificacoes.map(n=><div key={'n-'+n.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:'#fffbeb'}}><b>{n.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{n.descricao||'Notificação interna'} · {new Date(n.created_at).toLocaleString('pt-BR')}</div></div>)}
         {st.mensagens.map(m=><div key={'m-'+m.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:C.blueBg}}><b style={{display:'flex',alignItems:'center',gap:6}}><Mail size={14}/> {m.assunto}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{m.corpo?.slice(0,160)}{m.corpo?.length>160?'...':''} · {new Date(m.created_at).toLocaleString('pt-BR')}</div></div>)}
-      </div> : <div style={{padding:24,textAlign:'center',color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><CheckCircle size={16}/>Nenhuma notificação ou mensagem nova.</div>}
+      </div>:<div style={{padding:24,textAlign:'center',color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><CheckCircle size={16}/>Nenhuma notificação ou mensagem nova.</div>}
     </div>
 
-    {/* 4. Alertas de renovação contratual */}
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas de renovação contratual</h2>
       {st.ren.length?st.ren.map(c=><div key={c.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:c.renovacao.level==='vencido'?C.redBg:C.amberBg}}>
@@ -273,20 +208,11 @@ export default function Dashboard({profile}){
       </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>Nenhum alerta de renovação no momento.</div>}
     </div>
 
-    {/* 5. Atividades pendentes */}
     <ListBlock title="Atividades pendentes" icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,6)} empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger"/>
-
-    {/* 6. Atividades futuras */}
     <ListBlock title="Atividades futuras" icon={<Clock size={16}/>} items={st.futuras.slice(0,6)} empty="Nenhuma tarefa ou prazo futuro agendado." kind="warning"/>
-
-    {/* 7. Reuniões na semana */}
     <ListBlock title="Reuniões na semana" icon={<CalendarCheck size={16}/>} items={st.reunioesSemana.slice(0,6)} empty="Nenhuma reunião nos próximos 7 dias." kind="success"/>
-
-    {/* 8. Resumo financeiro — penúltimo */}
-    <FinanceiroResumoDashboard profile={profile} />
-
-    {/* 9. Clipping jurídico — por último */}
-    <ClippingJuridico />
+    <FinanceiroResumoDashboard profile={profile}/>
+    <ClippingJuridico/>
 
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso}/>}
     {createPush&&<CriarProcessoPushModal push={createPush} form={createForm} setForm={setCreateForm} saving={savingProcess} onCancel={()=>setCreatePush(null)} onSave={salvarProcessoPush}/>}

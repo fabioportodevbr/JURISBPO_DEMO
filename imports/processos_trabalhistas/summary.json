@@ -1,0 +1,70 @@
+{
+  "input": ".codex-spreadsheet\\relatorio_processos_trabalhistas.xlsx",
+  "batch_id": "20260506155908",
+  "primary_sheets": [
+    "Processos_Henneberg P L",
+    "Processos_Rubens",
+    "Nelson Wilians",
+    "Magela e Noronha"
+  ],
+  "ignored_sheets": {
+    "RJ": "subconjunto/copia da aba Processos_Henneberg P L",
+    "Plan2": "subconjunto de processos ja presentes nas abas principais",
+    "PMSP": "resumo quantitativo, nao detalhe processual",
+    "CEF": "resumo quantitativo, nao detalhe processual",
+    "Brasilcap": "resumo quantitativo, nao detalhe processual",
+    "Defensoria": "resumo quantitativo, nao detalhe processual",
+    "Prodesp": "resumo quantitativo, nao detalhe processual",
+    "Folha1": "lista auxiliar sem cabecalho completo de importacao"
+  },
+  "sheet_stats": [
+    {
+      "sheet": "Processos_Henneberg P L",
+      "rows": 2013,
+      "skipped": 0,
+      "importable_rows": 2013
+    },
+    {
+      "sheet": "Processos_Rubens",
+      "rows": 130,
+      "skipped": 1,
+      "importable_rows": 129
+    },
+    {
+      "sheet": "Nelson Wilians",
+      "rows": 114,
+      "skipped": 0,
+      "importable_rows": 114
+    },
+    {
+      "sheet": "Magela e Noronha",
+      "rows": 1,
+      "skipped": 0,
+      "importable_rows": 1
+    }
+  ],
+  "raw_importable_rows": 2257,
+  "unique_processes": 2254,
+  "duplicate_numbers_in_file": 3,
+  "multi_number_rows": 69,
+  "warnings_total": 12,
+  "warnings_by_severity": {
+    "warning": 8,
+    "error": 1,
+    "info": 3
+  },
+  "mode": "commit",
+  "escritorio_id": "d363cfc8-16ff-49f2-9860-94106656859b",
+  "created_by": "f697022e-0ee7-466e-9cc8-1c68d96b452c",
+  "parte_contraria": "BRBPO TECNOLOGIA E SERVIÇOS S.A",
+  "parte_contraria_id": "7b0d2055-df4d-494f-9728-6b7411b3d79a",
+  "existing_in_database": 3,
+  "to_insert": 2251,
+  "hearings_to_create": 20,
+  "warnings_total_after_db_check": 15,
+  "warnings_by_severity_after_db_check": {
+    "warning": 8,
+    "error": 1,
+    "info": 6
+  }
+}

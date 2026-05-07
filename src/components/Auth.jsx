@@ -11,7 +11,7 @@ const C = {
 }
 
 export default function Auth() {
-  const [mode,     setMode]     = useState('login')   // 'login' | 'forgot'
+  const [mode,     setMode]     = useState('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -48,7 +48,6 @@ export default function Auth() {
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
 
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
             <Scale size={26} color={C.gold} />
@@ -57,7 +56,6 @@ export default function Auth() {
           <p style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{APP_CONFIG.descricao}</p>
         </div>
 
-        {/* Card */}
         <div style={{ background: C.white, borderRadius: 16, padding: '32px 28px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid ' + C.border }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 22 }}>
             {mode === 'login' ? 'Entrar na sua conta' : 'Redefinir senha'}
@@ -75,7 +73,6 @@ export default function Auth() {
           )}
 
           <form onSubmit={mode === 'login' ? handleLogin : handleForgot}>
-            {/* E-mail */}
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: C.muted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-mail</label>
               <div style={{ position: 'relative' }}>
@@ -84,7 +81,6 @@ export default function Auth() {
               </div>
             </div>
 
-            {/* Senha (apenas no login) */}
             {mode === 'login' && (
               <div style={{ marginBottom: 20 }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: C.muted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Senha</label>

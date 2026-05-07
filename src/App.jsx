@@ -26,6 +26,7 @@ import Relatorios   from './components/Relatorios.jsx'
 import PartesCRM   from './components/PartesCRM.jsx'
 import Acervo      from './components/Acervo.jsx'
 import Financeiro  from './pages/Financeiro.tsx'
+import ConfiguracaoCalendario from './pages/ConfiguracaoCalendario.jsx'
 
 // ── Tema ─────────────────────────────────────────────────────────────────
 const C = {
@@ -223,6 +224,7 @@ function AppLayout() {
             <Route path="/relatorios" element={<Relatorios profile={profile} />} />
             <Route path="/equipe"     element={can(profile,'equipe.ver')     ? <Equipe     profile={profile} /> : <Bloqueado />} />
             <Route path="/perfil"     element={<MeuPerfil  profile={profile} />} />
+            <Route path="/configuracao-calendario" element={profile?.role === 'gerente' ? <ConfiguracaoCalendario profile={profile} /> : <Bloqueado />} />
             <Route path="*"           element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
