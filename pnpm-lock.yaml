@@ -63,19 +63,19 @@ importers:
       node-cron:
         specifier: latest
         version: 4.2.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
       zod:
         specifier: latest
         version: 4.4.3
     devDependencies:
       '@types/node':
-        specifier: latest
+        specifier: ^25.6.0
         version: 25.6.0
       tsx:
-        specifier: latest
+        specifier: ^4.21.0
         version: 4.21.0
-      typescript:
-        specifier: latest
-        version: 6.0.3
 
 packages:
 
