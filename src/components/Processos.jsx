@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, can } from '../lib/supabase.js'
-import { Plus, Search, Edit2, Trash2, X, FolderOpen, Clock, CheckSquare, DollarSign, Download } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, X, FolderOpen, Clock, CheckSquare, DollarSign, Download, Upload, AlertCircle, CheckCircle } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
 import AndamentosProcessuaisPush from './AndamentosProcessuaisPush.jsx'
 import { SeguroGarantiaCampos, TransitoJulgadoCampo, calcularResumoFinanceiroProcesso } from './FinanceiroSeguroGarantia.jsx'
@@ -291,9 +291,30 @@ function resumoFinanceiroProcesso(proc, financeiros=[]){
 
 const emptyFinance={natureza:'acordo',data_referencia:'',valor_bruto:'',deposito_ro:'',deposito_rr:'',deposito_embargos:'',valor_restituido:'',forma_pagamento:'avista',numero_parcelas:1,atualizar_selic:false,primeiro_vencimento:'',custas:'',fgts:'',honorarios_sucumbenciais:'',honorarios_periciais:'',inss_reclamante:'',inss_reclamada:'',multa_inadimplemento:'',status_pagamento:'pendente',pagamentos_campos:{},auditoria_pagamentos:[],seguro_garantia:false,apolice_numero:'',apolice_inicio:'',apolice_fim:'',valor_assegurado:'',seguro_premio:'',observacoes:'',vencimentos_parcelas:[''],dividir_valor_parcelas:true,valores_parcelas:['']}
 
+
+function parseCSV(text){
+  const lines=text.split(/\r?\n/).filter(Boolean)
+  if(!lines.length)return[]
+  const headers=lines[0].split(',').map(h=>h.replace(/^\uFEFF/,'').trim().replace(/^"|"$/g,''))
+  return lines.slice(1).map(line=>{
+    const cols=[];let cur='',inQ=false
+    for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'&&!inQ)inQ=true;else if(ch==='"'&&inQ&&line[i+1]==='"'){cur+='"';i++}else if(ch==='"'&&inQ)inQ=false;else if(ch===','&&!inQ){cols.push(cur);cur=''}else cur+=ch}
+    cols.push(cur)
+    return Object.fromEntries(headers.map((h,i)=>[h,(cols[i]||'').trim()]))
+  }).filter(r=>r.numero&&r.numero!=='numero')
+}
+function inferirCategoria(row){
+  const t=String(`${row.tribunal||''} ${row.orgao||''} ${row.resumo_processo||''}`).toUpperCase()
+  if(t.includes('TRABALH')||t.includes('TRT ')||t.includes('TST'))return 'trabalhista'
+  if(t.includes('TRIBUTAR')||t.includes('FAZENDA')||t.includes('RECEITA')||t.includes('FISCAL'))return 'tributario'
+  if(t.includes('CRIMINAL')||t.includes('PENAL'))return 'criminal'
+  if(t.includes('ADMINISTRATIV')||t.includes('TCU')||t.includes('TCE')||t.includes('TCM')||t.includes('MPT')||t.includes('MINISTÉRIO DO TRABALHO')||t.includes('MINISTERIO DO TRABALHO'))return 'administrativo'
+  return 'civel'
+}
+
 export default function Processos({profile}){
   const [items,setItems]=useState([]),[team,setTeam]=useState([]),[atividades,setAtividades]=useState([]),[financeiros,setFinanceiros]=useState([]),[partes,setPartes]=useState([])
-  const [q,setQ]=useState(''),[showAll,setShowAll]=useState(false),[statusFilter,setStatusFilter]=useState('ativos'),[catFilter,setCatFilter]=useState('todas'),[advOpen,setAdvOpen]=useState(false),[adv,setAdv]=useState({transito:'todos',audiencia:'todos',deposito_ro:'todos',deposito_rr:'todos',deposito_embargos:'todos',custas:'todos',honorarios:'todos',multa:'todos',apolice:'todos',acordo:'todos',execucao:'todos'}),[modal,setModal]=useState(false),[tab,setTab]=useState('dados'),[form,setForm]=useState({}),[task,setTask]=useState({tipo:'tarefa',status:'a_fazer',titulo:'',descricao:'',prioridade:'media',responsavel_id:'',prazo:'',horario:'',local:'',audiencia_modalidade:'presencial',audiencia_tipo:'inicial'}),[fin,setFin]=useState(emptyFinance),[editingFinanceId,setEditingFinanceId]=useState(null),[paidModal,setPaidModal]=useState(null),[gastoModal,setGastoModal]=useState(false),[apFinanceiro,setApFinanceiro]=useState(null),[loading,setLoading]=useState(true)
+  const [q,setQ]=useState(''),[showAll,setShowAll]=useState(false),[statusFilter,setStatusFilter]=useState('ativos'),[catFilter,setCatFilter]=useState('todas'),[advOpen,setAdvOpen]=useState(false),[adv,setAdv]=useState({transito:'todos',audiencia:'todos',deposito_ro:'todos',deposito_rr:'todos',deposito_embargos:'todos',custas:'todos',honorarios:'todos',multa:'todos',apolice:'todos',acordo:'todos',execucao:'todos'}),[modal,setModal]=useState(false),[tab,setTab]=useState('dados'),[form,setForm]=useState({}),[task,setTask]=useState({tipo:'tarefa',status:'a_fazer',titulo:'',descricao:'',prioridade:'media',responsavel_id:'',prazo:'',horario:'',local:'',audiencia_modalidade:'presencial',audiencia_tipo:'inicial'}),[fin,setFin]=useState(emptyFinance),[editingFinanceId,setEditingFinanceId]=useState(null),[paidModal,setPaidModal]=useState(null),[gastoModal,setGastoModal]=useState(false),[apFinanceiro,setApFinanceiro]=useState(null),[loading,setLoading]=useState(true),[importModal,setImportModal]=useState(false),[importRows,setImportRows]=useState([]),[importLog,setImportLog]=useState([]),[importing,setImporting]=useState(false)
   const accessKey='jurisbpo_recent_processos_v2'
   const load=async()=>{const eid=profile.escritorio_id;const[{data:p},{data:l},{data:a},{data:f},{data:pc}]=await Promise.all([supabase.from('processos').select('*').eq('escritorio_id',eid).order('updated_at',{ascending:false}),supabase.from('usuarios_escritorios').select('usuario_id,papel,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),supabase.from('atividades').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false}),supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false}),supabase.from('partes_crm').select('*').eq('escritorio_id',eid).eq('status','ativo').order('nome')]);setItems(p||[]);setTeam((l||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id})));setAtividades(a||[]);setFinanceiros(f||[]);setPartes(pc||[]);setLoading(false)}
   useEffect(()=>{load()},[profile.escritorio_id])
@@ -353,9 +374,25 @@ export default function Processos({profile}){
   const cancelarRegistroPagamento=async()=>{if(!paidModal)return;const ok=window.confirm('Esta ação será registrada no histórico de auditoria com os dados do usuário executor. Tem certeza que deseja remover este registro de pagamento?');if(!ok)return;const pagos={...(fin.pagamentos_campos||{})};const anterior=pagos[paidModal.campo]||{};delete pagos[paidModal.campo];const evento={acao:'cancelamento_registro_pagamento',campo:paidModal.campo,label:paidModal.label,data:new Date().toISOString(),data_pagamento:paidModal.data_pagamento||new Date().toISOString().slice(0,10),usuario_id:profile.id,usuario_nome:profile.nome||profile.email||profile.id,registro_anterior:anterior,observacao:paidModal.cancelObs||''};const atualizado={...fin,pagamentos_campos:pagos,auditoria_pagamentos:[...(fin.auditoria_pagamentos||[]),evento]};setFin(atualizado);const okPersist=await persistFinance(atualizado,{manterFormulario:true,acao:'cancelamento_registro_pagamento'});if(okPersist)setPaidModal(null)}
   const deleteFinance=async(f)=>{if(!f?.id)return;if(temPagamentoCampoAtivo(f))return alert('Este registro possui campo marcado como pago. Cancele o registro de pagamento antes de editar ou excluir.');const ok=window.confirm('Excluir este pagamento/parcelamento? A exclusão será registrada no histórico com usuário, data e hora e o registro será ocultado da lista.');if(!ok)return;const auditoria=[...extrairAuditoriaPagamentos(f),{acao:'exclusao_registro_financeiro',...usuarioAuditoria(profile),registro_id:f.id,resumo:tituloAPFinanceiro(f),valor_total:totalAP(f)}];const obs=juntarRegistroExcluido(juntarAuditoriaPagamentos(f.observacoes||'',auditoria),{...usuarioAuditoria(profile),acao:'registro_financeiro_ocultado',registro_id:f.id});const {error}=await supabase.from('financeiro_processos').update({observacoes:obs}).eq('id',f.id).eq('escritorio_id',profile.escritorio_id);if(error)return alert('Erro ao excluir pagamento/parcelamento: '+error.message);if(editingFinanceId===f.id)cancelEditFinance();await atualizarResumoFinanceiroProcesso(form.id);load()}
   const gerarAutorizacao=(f)=>setApFinanceiro(f)
-  const del=async(p)=>{if(confirm('Excluir processo?')){await supabase.from('processos').delete().eq('id',p.id);load()}}
+  const importarProcessos=async()=>{
+    if(!importRows.length)return
+    setImporting(true);const log=[];let ok=0,skip=0,err=0
+    for(const row of importRows){
+      const num=(row.numero||'').trim()
+      if(!num){skip++;continue}
+      const {data:existing}=await supabase.from('processos').select('id').eq('escritorio_id',profile.escritorio_id).eq('numero',num).maybeSingle()
+      if(existing){log.push({numero:num,status:'skip',msg:'Já existe'});skip++;continue}
+      const payload={escritorio_id:profile.escritorio_id,numero:num,titulo:row.titulo||'—',parte_contraria:row.parte_contraria||'',tribunal:row.tribunal||'',orgao:row.orgao||'',data_ajuizamento:row.data_ajuizamento||null,valor_acao:row.valor_acao?Number(row.valor_acao):null,status:row.status||'ativo',fase:row.fase||'conhecimento',resultado:row.resultado||null,resumo_processo:row.resumo_processo||'',categoria:inferirCategoria(row)}
+      const {error}=await supabase.from('processos').insert(payload)
+      if(error){log.push({numero:num,status:'err',msg:error.message});err++}
+      else{log.push({numero:num,status:'ok',msg:'Importado'});ok++}
+    }
+    setImportLog(log);setImporting(false)
+    if(ok>0){load()}
+  }
+    const del=async(p)=>{if(confirm('Excluir processo?')){await supabase.from('processos').delete().eq('id',p.id);load()}}
   if(loading)return <div style={{padding:40,color:C.muted}}>Carregando processos...</div>
-  return <div style={{padding:24}}><AndamentosProcessuaisPush profile={profile} compact /><div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><h1 style={{margin:0,fontSize:22}}>Processos</h1><p style={{color:C.muted}}>{active.length} ativos · {closed.length} arquivados/encerrados</p></div>{can(profile,'processos.criar')&&<button onClick={()=>open()} style={{background:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,display:'flex',gap:8,alignItems:'center'}}><Plus size={16}/>Novo Processo</button>}</div>
+  return <div style={{padding:24}}><AndamentosProcessuaisPush profile={profile} compact /><div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><h1 style={{margin:0,fontSize:22}}>Processos</h1><p style={{color:C.muted}}>{active.length} ativos · {closed.length} arquivados/encerrados</p></div>{can(profile,'processos.criar')&&<div style={{display:'flex',gap:8}}><button onClick={()=>{setImportModal(true);setImportRows([]);setImportLog([])}} style={{background:C.white,color:C.navy,border:'1px solid '+C.border,borderRadius:8,padding:'10px 16px',fontWeight:800,display:'flex',gap:8,alignItems:'center',cursor:'pointer'}}><Upload size={16}/>Importar CSV</button><button onClick={()=>open()} style={{background:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,display:'flex',gap:8,alignItems:'center'}}><Plus size={16}/>Novo Processo</button></div>}</div>
     <div style={{display:'flex',gap:10,margin:'18px 0 8px',flexWrap:'wrap'}}><div style={{position:'relative',flex:1,minWidth:260}}><Search size={15} style={{position:'absolute',left:10,top:13,color:C.muted}}/><input style={{...INP,paddingLeft:34}} placeholder="Buscar por número, parte, resumo, tribunal ou órgão administrativo" value={q} onChange={e=>setQ(e.target.value)}/></div><button onClick={()=>setAdvOpen(v=>!v)} style={{background:advOpen?C.navy:C.white,color:advOpen?'white':C.navy,border:'1px solid '+C.border,borderRadius:8,padding:'10px 14px',fontWeight:900,cursor:'pointer'}}>Busca avançada</button></div>
     {advOpen&&<section style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:14,marginBottom:16}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center',marginBottom:10}}><b>Busca avançada</b><button onClick={()=>setAdv({transito:'todos',audiencia:'todos',deposito_ro:'todos',deposito_rr:'todos',deposito_embargos:'todos',custas:'todos',honorarios:'todos',multa:'todos',apolice:'todos',acordo:'todos',execucao:'todos'})} style={{border:'1px solid '+C.border,background:C.white,borderRadius:8,padding:'7px 10px',fontWeight:800,cursor:'pointer'}}>Limpar filtros</button></div>
@@ -418,6 +455,63 @@ export default function Processos({profile}){
         <div style={{display:'flex',gap:10}}><button onClick={()=>setPaidModal(null)} style={{background:C.white,border:'1px solid '+C.border,borderRadius:8,padding:'10px 14px',fontWeight:800}}>Fechar</button><button onClick={salvarPagamentoCampo} style={{background:C.green,color:'white',border:0,borderRadius:8,padding:'10px 14px',fontWeight:800}}>Salvar pagamento</button></div>
       </div>
     </Modal>}
-    {apFinanceiro&&<AutorizacaoPagamentoModal processo={form} financeiro={apFinanceiro} profile={profile} onClose={()=>setApFinanceiro(null)}/>}
+    {apFinanceiro&&<AutorizacaoPagamentoModal processo={form} financeiro={apFinanceiro} profile={profile} onClose={()=>setApFinanceiro(null)}/>
+    {importModal&&<Modal title="Importar processos em lote (CSV)" onClose={()=>!importing&&setImportModal(false)}>
+      <div style={{marginBottom:16}}>
+        <p style={{margin:'0 0 8px',fontSize:13,color:C.muted}}>Faça upload de um CSV com as colunas: <b>numero, titulo, parte_contraria, tribunal, orgao, data_ajuizamento, valor_acao, status, fase, resultado, resumo_processo</b></p>
+        <input type="file" accept=".csv" disabled={importing} onChange={e=>{
+          const file=e.target.files?.[0];if(!file)return
+          const reader=new FileReader()
+          reader.onload=ev=>{const rows=parseCSV(ev.target.result||'');setImportRows(rows);setImportLog([])}
+          reader.readAsText(file,'utf-8')
+        }} style={{...INP,padding:'8px'}}/>
+      </div>
+      {importRows.length>0&&!importLog.length&&<>
+        <div style={{background:C.grayBg,borderRadius:10,padding:'10px 14px',marginBottom:12,fontSize:13}}>
+          <b>{importRows.length} processos</b> encontrados no arquivo. Revise abaixo antes de importar.
+        </div>
+        <div style={{maxHeight:320,overflow:'auto',border:'1px solid '+C.border,borderRadius:10,marginBottom:16}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead><tr style={{background:C.grayBg,position:'sticky',top:0}}>
+              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Número</th>
+              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Título</th>
+              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Tribunal</th>
+              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Status</th>
+              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Valor</th>
+            </tr></thead>
+            <tbody>{importRows.map((r,i)=><tr key={i} style={{borderBottom:'1px solid '+C.border}}>
+              <td style={{padding:'7px 10px',fontFamily:'monospace',fontSize:11}}>{r.numero}</td>
+              <td style={{padding:'7px 10px',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titulo}</td>
+              <td style={{padding:'7px 10px',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.tribunal}</td>
+              <td style={{padding:'7px 10px'}}><Chip kind={r.status==='encerrado'?'gray':'blue'}>{r.status}</Chip></td>
+              <td style={{padding:'7px 10px'}}>{r.valor_acao?money(Number(r.valor_acao)):'-'}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:10}}>
+          <button onClick={()=>setImportModal(false)} style={{border:'1px solid '+C.border,background:C.white,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>Cancelar</button>
+          <button onClick={importarProcessos} disabled={importing} style={{background:importing?C.muted:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer',display:'flex',gap:8,alignItems:'center'}}><Upload size={15}/>{importing?'Importando...':'Importar '+importRows.length+' processos'}</button>
+        </div>
+      </>}
+      {importLog.length>0&&<>
+        <div style={{marginBottom:12,display:'flex',gap:16,fontSize:13}}>
+          <span style={{color:C.green,fontWeight:800}}><CheckCircle size={14} style={{verticalAlign:'middle'}}/> {importLog.filter(r=>r.status==='ok').length} importados</span>
+          <span style={{color:C.amber,fontWeight:800}}>{importLog.filter(r=>r.status==='skip').length} pulados (já existem)</span>
+          <span style={{color:C.red,fontWeight:800}}>{importLog.filter(r=>r.status==='err').length} com erro</span>
+        </div>
+        <div style={{maxHeight:320,overflow:'auto',border:'1px solid '+C.border,borderRadius:10,marginBottom:16}}>
+          {importLog.map((r,i)=><div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderBottom:'1px solid '+C.border,background:r.status==='err'?C.redBg:r.status==='skip'?C.amberBg:'transparent'}}>
+            {r.status==='ok'&&<CheckCircle size={14} style={{color:C.green,flexShrink:0}}/>}
+            {r.status==='err'&&<AlertCircle size={14} style={{color:C.red,flexShrink:0}}/>}
+            {r.status==='skip'&&<span style={{fontSize:12,color:C.amber,flexShrink:0}}>⏭</span>}
+            <span style={{fontFamily:'monospace',fontSize:11,flexShrink:0}}>{r.numero}</span>
+            <span style={{fontSize:12,color:C.muted}}>{r.msg}</span>
+          </div>)}
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end'}}>
+          <button onClick={()=>setImportModal(false)} style={{background:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>Fechar</button>
+        </div>
+      </>}
+    </Modal>}
   </div>
 }
