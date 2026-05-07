@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, can } from '../lib/supabase.js'
-import { Plus, Search, Edit2, Trash2, X, FolderOpen, Clock, CheckSquare, DollarSign, Download, Upload, AlertCircle, CheckCircle } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, X, FolderOpen, Clock, CheckSquare, DollarSign, Download, Upload } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
 import AndamentosProcessuaisPush from './AndamentosProcessuaisPush.jsx'
 import { SeguroGarantiaCampos, TransitoJulgadoCampo, calcularResumoFinanceiroProcesso } from './FinanceiroSeguroGarantia.jsx'
@@ -308,7 +308,7 @@ function inferirCategoria(row){
   if(t.includes('TRABALH')||t.includes('TRT ')||t.includes('TST'))return 'trabalhista'
   if(t.includes('TRIBUTAR')||t.includes('FAZENDA')||t.includes('RECEITA')||t.includes('FISCAL'))return 'tributario'
   if(t.includes('CRIMINAL')||t.includes('PENAL'))return 'criminal'
-  if(t.includes('ADMINISTRATIV')||t.includes('TCU')||t.includes('TCE')||t.includes('TCM')||t.includes('MPT')||t.includes('MINISTÉRIO DO TRABALHO')||t.includes('MINISTERIO DO TRABALHO'))return 'administrativo'
+  if(t.includes('ADMINISTRATIV')||t.includes('TCU')||t.includes('TCE')||t.includes('TCM')||t.includes('MPT')||t.includes('MINISTERIO DO TRABALHO'))return 'administrativo'
   return 'civel'
 }
 
@@ -455,63 +455,7 @@ export default function Processos({profile}){
         <div style={{display:'flex',gap:10}}><button onClick={()=>setPaidModal(null)} style={{background:C.white,border:'1px solid '+C.border,borderRadius:8,padding:'10px 14px',fontWeight:800}}>Fechar</button><button onClick={salvarPagamentoCampo} style={{background:C.green,color:'white',border:0,borderRadius:8,padding:'10px 14px',fontWeight:800}}>Salvar pagamento</button></div>
       </div>
     </Modal>}
-    {apFinanceiro&&<AutorizacaoPagamentoModal processo={form} financeiro={apFinanceiro} profile={profile} onClose={()=>setApFinanceiro(null)}/>
-    {importModal&&<Modal title="Importar processos em lote (CSV)" onClose={()=>!importing&&setImportModal(false)}>
-      <div style={{marginBottom:16}}>
-        <p style={{margin:'0 0 8px',fontSize:13,color:C.muted}}>Faça upload de um CSV com as colunas: <b>numero, titulo, parte_contraria, tribunal, orgao, data_ajuizamento, valor_acao, status, fase, resultado, resumo_processo</b></p>
-        <input type="file" accept=".csv" disabled={importing} onChange={e=>{
-          const file=e.target.files?.[0];if(!file)return
-          const reader=new FileReader()
-          reader.onload=ev=>{const rows=parseCSV(ev.target.result||'');setImportRows(rows);setImportLog([])}
-          reader.readAsText(file,'utf-8')
-        }} style={{...INP,padding:'8px'}}/>
-      </div>
-      {importRows.length>0&&!importLog.length&&<>
-        <div style={{background:C.grayBg,borderRadius:10,padding:'10px 14px',marginBottom:12,fontSize:13}}>
-          <b>{importRows.length} processos</b> encontrados no arquivo. Revise abaixo antes de importar.
-        </div>
-        <div style={{maxHeight:320,overflow:'auto',border:'1px solid '+C.border,borderRadius:10,marginBottom:16}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-            <thead><tr style={{background:C.grayBg,position:'sticky',top:0}}>
-              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Número</th>
-              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Título</th>
-              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Tribunal</th>
-              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Status</th>
-              <th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Valor</th>
-            </tr></thead>
-            <tbody>{importRows.map((r,i)=><tr key={i} style={{borderBottom:'1px solid '+C.border}}>
-              <td style={{padding:'7px 10px',fontFamily:'monospace',fontSize:11}}>{r.numero}</td>
-              <td style={{padding:'7px 10px',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titulo}</td>
-              <td style={{padding:'7px 10px',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.tribunal}</td>
-              <td style={{padding:'7px 10px'}}><Chip kind={r.status==='encerrado'?'gray':'blue'}>{r.status}</Chip></td>
-              <td style={{padding:'7px 10px'}}>{r.valor_acao?money(Number(r.valor_acao)):'-'}</td>
-            </tr>)}</tbody>
-          </table>
-        </div>
-        <div style={{display:'flex',justifyContent:'flex-end',gap:10}}>
-          <button onClick={()=>setImportModal(false)} style={{border:'1px solid '+C.border,background:C.white,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>Cancelar</button>
-          <button onClick={importarProcessos} disabled={importing} style={{background:importing?C.muted:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer',display:'flex',gap:8,alignItems:'center'}}><Upload size={15}/>{importing?'Importando...':'Importar '+importRows.length+' processos'}</button>
-        </div>
-      </>}
-      {importLog.length>0&&<>
-        <div style={{marginBottom:12,display:'flex',gap:16,fontSize:13}}>
-          <span style={{color:C.green,fontWeight:800}}><CheckCircle size={14} style={{verticalAlign:'middle'}}/> {importLog.filter(r=>r.status==='ok').length} importados</span>
-          <span style={{color:C.amber,fontWeight:800}}>{importLog.filter(r=>r.status==='skip').length} pulados (já existem)</span>
-          <span style={{color:C.red,fontWeight:800}}>{importLog.filter(r=>r.status==='err').length} com erro</span>
-        </div>
-        <div style={{maxHeight:320,overflow:'auto',border:'1px solid '+C.border,borderRadius:10,marginBottom:16}}>
-          {importLog.map((r,i)=><div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderBottom:'1px solid '+C.border,background:r.status==='err'?C.redBg:r.status==='skip'?C.amberBg:'transparent'}}>
-            {r.status==='ok'&&<CheckCircle size={14} style={{color:C.green,flexShrink:0}}/>}
-            {r.status==='err'&&<AlertCircle size={14} style={{color:C.red,flexShrink:0}}/>}
-            {r.status==='skip'&&<span style={{fontSize:12,color:C.amber,flexShrink:0}}>⏭</span>}
-            <span style={{fontFamily:'monospace',fontSize:11,flexShrink:0}}>{r.numero}</span>
-            <span style={{fontSize:12,color:C.muted}}>{r.msg}</span>
-          </div>)}
-        </div>
-        <div style={{display:'flex',justifyContent:'flex-end'}}>
-          <button onClick={()=>setImportModal(false)} style={{background:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>Fechar</button>
-        </div>
-      </>}
-    </Modal>}
+    {apFinanceiro&&<AutorizacaoPagamentoModal processo={form} financeiro={apFinanceiro} profile={profile} onClose={()=>setApFinanceiro(null)}/>}
+    {importModal&&<Modal title="Importar processos em lote (CSV)" onClose={()=>!importing&&setImportModal(false)}><div style={{marginBottom:16}}><p style={{margin:'0 0 8px',fontSize:13,color:C.muted}}>CSV com as colunas: <b>numero, titulo, parte_contraria, tribunal, orgao, data_ajuizamento, valor_acao, status, fase, resultado, resumo_processo</b></p><input type="file" accept=".csv" disabled={importing} onChange={e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{setImportRows(parseCSV(ev.target.result||''));setImportLog([])};reader.readAsText(file,'utf-8')}} style={{...INP,padding:'8px'}}/></div>{importRows.length>0&&!importLog.length&&<div><div style={{background:C.grayBg,borderRadius:10,padding:'10px 14px',marginBottom:12,fontSize:13}}><b>{importRows.length} processos</b> encontrados. Revise antes de importar.</div><div style={{maxHeight:300,overflow:'auto',border:'1px solid '+C.border,borderRadius:10,marginBottom:16}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}><thead><tr style={{background:C.grayBg}}><th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Número</th><th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Título</th><th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Tribunal</th><th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Status</th><th style={{padding:'8px 10px',textAlign:'left',borderBottom:'1px solid '+C.border}}>Valor</th></tr></thead><tbody>{importRows.map((r,i)=><tr key={i} style={{borderBottom:'1px solid '+C.border}}><td style={{padding:'7px 10px',fontFamily:'monospace',fontSize:11}}>{r.numero}</td><td style={{padding:'7px 10px',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titulo}</td><td style={{padding:'7px 10px',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.tribunal}</td><td style={{padding:'7px 10px'}}>{r.status}</td><td style={{padding:'7px 10px'}}>{r.valor_acao?money(Number(r.valor_acao)):'-'}</td></tr>)}</tbody></table></div><div style={{display:'flex',justifyContent:'flex-end',gap:10}}><button onClick={()=>setImportModal(false)} style={{border:'1px solid '+C.border,background:C.white,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>Cancelar</button><button onClick={importarProcessos} disabled={importing} style={{background:importing?C.muted:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>{importing?'Importando...':'Importar '+importRows.length+' processos'}</button></div></div>}{importLog.length>0&&<div><div style={{marginBottom:12,display:'flex',gap:16,fontSize:13}}><span style={{color:C.green,fontWeight:800}}>{importLog.filter(r=>r.status==='ok').length} importados</span><span style={{color:C.amber,fontWeight:800}}>{importLog.filter(r=>r.status==='skip').length} pulados</span><span style={{color:C.red,fontWeight:800}}>{importLog.filter(r=>r.status==='err').length} com erro</span></div><div style={{maxHeight:300,overflow:'auto',border:'1px solid '+C.border,borderRadius:10,marginBottom:16}}>{importLog.map((r,i)=><div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderBottom:'1px solid '+C.border,background:r.status==='err'?C.redBg:r.status==='skip'?C.amberBg:'transparent'}}><span style={{fontFamily:'monospace',fontSize:11,flexShrink:0}}>{r.numero}</span><span style={{fontSize:12,color:C.muted}}>{r.msg}</span></div>)}</div><div style={{display:'flex',justifyContent:'flex-end'}}><button onClick={()=>setImportModal(false)} style={{background:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>Fechar</button></div></div>}</Modal>}
   </div>
 }
