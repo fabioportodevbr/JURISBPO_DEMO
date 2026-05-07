@@ -1,943 +1,593 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { supabase } from '../lib/supabase'
 import {
   FileText, Send, Plus, Search, Edit2, Trash2, Download,
   ChevronRight, X, Paperclip, Eye, Building2, BookOpen,
-  Clock, User, AlertCircle, Check, ChevronDown, Upload
-} from 'lucide-react';
+  Check, ChevronDown, Upload, AlertCircle,
+} from 'lucide-react'
 
-// ─────────────────────────────────────────────
-// Utilidades
-// ─────────────────────────────────────────────
+// ── Cores (mesmas do App.jsx) ─────────────────────────────────────────────
+const C = {
+  bg:           '#f8fafc',
+  white:        '#ffffff',
+  text:         '#0f172a',
+  muted:        '#64748b',
+  border:       '#e5e7eb',
+  primary:      '#064e3b',
+  primaryLight: '#d1fae5',
+  primaryMid:   '#059669',
+  danger:       '#dc2626',
+  dangerLight:  '#fee2e2',
+  warning:      '#f59e0b',
+}
+
+// ── Utilitários ───────────────────────────────────────────────────────────
 function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR');
+  if (!d) return '—'
+  return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')
 }
 function fmtTs(ts) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleString('pt-BR');
+  if (!ts) return '—'
+  return new Date(ts).toLocaleString('pt-BR')
 }
 
-// ─────────────────────────────────────────────
-// Modal genérico
-// ─────────────────────────────────────────────
+// ── Modal base ────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children, wide }) {
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}>
-      <div className={`border border-gray-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden ${wide ? 'w-full max-w-5xl' : 'w-full max-w-xl'}`}
-        style={{ maxHeight: '90vh', background: '#1e2535' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-          <h2 className="text-white font-semibold text-lg">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-            <X size={20} />
+    <div onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: C.white, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.18)', width: '100%', maxWidth: wide ? 860 : 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid ' + C.border, flexShrink: 0 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>{title}</h2>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, padding: 4, borderRadius: 6, display: 'flex' }}>
+            <X size={18} />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 p-6">{children}</div>
+        <div style={{ overflowY: 'auto', flex: 1, padding: 24 }}>{children}</div>
       </div>
     </div>
-  );
+  )
 }
 
-// ─────────────────────────────────────────────
-// Dropdown com criação de novo item
-// ─────────────────────────────────────────────
+// ── Dropdown com criação ──────────────────────────────────────────────────
 function CreatableSelect({ options, value, onChange, placeholder, onCreateNew }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const ref = useRef(null);
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef(null)
 
   useEffect(() => {
-    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    function h(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
 
-  const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
-  const canCreate = search.trim() && !options.some(o => o.toLowerCase() === search.toLowerCase().trim());
+  const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()))
+  const canCreate = search.trim() && !options.some(o => o.toLowerCase() === search.trim().toLowerCase())
 
   return (
-    <div ref={ref} className="relative">
-      <button type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-white hover:border-gray-500 transition-colors"
-        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }}>
-        <span className={value ? 'text-white' : 'text-gray-400'}>{value || placeholder}</span>
-        <ChevronDown size={14} className="text-gray-400" />
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button type="button" onClick={() => setOpen(!open)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, cursor: 'pointer', fontSize: 14, color: value ? C.text : C.muted, fontFamily: 'inherit' }}>
+        <span>{value || placeholder}</span>
+        <ChevronDown size={14} color={C.muted} />
       </button>
       {open && (
-        <div className="absolute z-50 top-full mt-1 w-full rounded-xl shadow-2xl overflow-hidden"
-          style={{ background: '#1e2535', border: '1px solid rgba(255,255,255,0.15)' }}>
-          <div className="p-2">
+        <div style={{ position: 'absolute', zIndex: 200, top: '100%', marginTop: 4, width: '100%', background: C.white, border: '1px solid ' + C.border, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
+          <div style={{ padding: 8 }}>
             <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar ou digitar novo..."
-              className="w-full rounded-lg px-3 py-1.5 text-sm text-white outline-none"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} />
+              style={{ width: '100%', padding: '6px 10px', border: '1px solid ' + C.border, borderRadius: 6, fontSize: 13, color: C.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
           </div>
-          <div className="max-h-48 overflow-y-auto">
+          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
             {filtered.map(opt => (
-              <button key={opt} type="button"
-                onClick={() => { onChange(opt); setOpen(false); setSearch(''); }}
-                className={`w-full text-left px-4 py-2 text-sm transition-colors ${value === opt ? 'text-emerald-400' : 'text-gray-200'}`}
-                style={{ ':hover': { background: 'rgba(255,255,255,0.05)' } }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <button key={opt} type="button" onClick={() => { onChange(opt); setOpen(false); setSearch('') }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none', background: value === opt ? C.primaryLight : 'none', color: value === opt ? C.primary : C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>
                 {opt}
               </button>
             ))}
             {canCreate && (
-              <button type="button"
-                onClick={() => { onCreateNew(search.trim()); onChange(search.trim()); setOpen(false); setSearch(''); }}
-                className="w-full text-left px-4 py-2 text-sm text-emerald-400 flex items-center gap-2"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,185,129,0.08)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <Plus size={13} />
-                Adicionar "{search.trim()}"
+              <button type="button" onClick={() => { onCreateNew(search.trim()); onChange(search.trim()); setOpen(false); setSearch('') }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none', borderTop: '1px solid ' + C.border, background: 'none', color: C.primaryMid, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
+                <Plus size={13} /> Adicionar "{search.trim()}"
               </button>
             )}
           </div>
         </div>
       )}
     </div>
-  );
+  )
 }
 
-// ─────────────────────────────────────────────
-// Campo de formulário
-// ─────────────────────────────────────────────
+// ── Campo label ───────────────────────────────────────────────────────────
 function Field({ label, children, required }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-400 mb-1.5">
-        {label}{required && <span className="text-red-400 ml-1">*</span>}
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: C.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {label}{required && <span style={{ color: C.danger, marginLeft: 3 }}>*</span>}
       </label>
       {children}
     </div>
-  );
+  )
 }
-function Input({ ...props }) {
-  return (
-    <input {...props}
-      className="w-full rounded-lg px-3 py-2 text-sm text-white outline-none transition-colors"
-      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'white' }} />
-  );
-}
-function Textarea({ ...props }) {
-  return (
-    <textarea {...props} rows={3}
-      className="w-full rounded-lg px-3 py-2 text-sm text-white outline-none transition-colors resize-none"
-      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'white' }} />
-  );
-}
+const inp = { width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, color: '#0f172a', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }
 
-// ─────────────────────────────────────────────
-// Modal: Novo/Editar Ofício
-// ─────────────────────────────────────────────
-function OficioModal({ oficio, empresa, destinatarios, onSave, onClose, currentUser }) {
-  const isEdit = !!oficio;
+// ── Modal: Novo / Editar Ofício ───────────────────────────────────────────
+function OficioModal({ oficio, empresa, destinatarios, onSave, onClose, profile }) {
+  const isEdit = !!oficio
   const [form, setForm] = useState({
-    numero: oficio?.numero || '',
+    numero:       oficio?.numero       || '',
     departamento: oficio?.departamento || '',
-    responsavel: oficio?.responsavel || '',
-    data: oficio?.data || new Date().toISOString().split('T')[0],
+    responsavel:  oficio?.responsavel  || '',
+    data:         oficio?.data         || new Date().toISOString().split('T')[0],
     destinatario: oficio?.destinatario || '',
-    referencia: oficio?.referencia || '',
-    remetente: oficio?.remetente || '',
-    forma_envio: oficio?.forma_envio || '',
-    arquivado: oficio?.arquivado || '',
-    observacoes: oficio?.observacoes || '',
-  });
-  const [destOpts, setDestOpts] = useState(destinatarios.map(d => d.nome));
-  const [files, setFiles] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState('');
-  const fileRef = useRef(null);
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+    referencia:   oficio?.referencia   || '',
+    remetente:    oficio?.remetente    || '',
+    forma_envio:  oficio?.forma_envio  || '',
+    arquivado:    oficio?.arquivado    || '',
+    observacoes:  oficio?.observacoes  || '',
+  })
+  const [destOpts, setDestOpts] = useState(destinatarios.map(d => d.nome))
+  const [files, setFiles] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const fileRef = useRef(null)
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   async function addDestinatario(nome) {
-    await supabase.from('oficios_destinatarios').insert({ empresa_id: empresa.id, nome });
-    setDestOpts(prev => [...prev, nome].sort());
+    await supabase.from('oficios_destinatarios').insert({ empresa_id: empresa.id, nome })
+    setDestOpts(prev => [...prev, nome].sort())
   }
 
   async function handleSubmit(e) {
-    e.preventDefault();
-    if (!form.numero || !form.destinatario || !form.data) {
-      setErr('Preencha Número, Destinatário e Data.'); return;
-    }
-    setSaving(true);
+    e.preventDefault()
+    if (!form.numero || !form.destinatario || !form.data) { setErr('Preencha Número, Destinatário e Data.'); return }
+    setSaving(true)
     try {
-      const payload = {
-        ...form,
-        empresa_id: empresa.id,
-        ano: new Date(form.data).getFullYear(),
-        updated_at: new Date().toISOString(),
-        updated_by: currentUser?.id,
-        updated_by_nome: currentUser?.nome || currentUser?.email,
-      };
-
-      let ofId = oficio?.id;
-      let action = 'editado';
-
+      const payload = { ...form, empresa_id: empresa.id, ano: new Date(form.data).getFullYear(), updated_at: new Date().toISOString(), updated_by: profile?.id, updated_by_nome: profile?.nome || profile?.email }
+      let ofId = oficio?.id, action = 'editado'
       if (isEdit) {
-        await supabase.from('oficios').update(payload).eq('id', oficio.id);
+        await supabase.from('oficios').update(payload).eq('id', oficio.id)
       } else {
-        payload.created_by = currentUser?.id;
-        payload.created_by_nome = currentUser?.nome || currentUser?.email;
-        const { data } = await supabase.from('oficios').insert(payload).select().single();
-        ofId = data.id;
-        action = 'criado';
+        payload.created_by = profile?.id; payload.created_by_nome = profile?.nome || profile?.email
+        const { data } = await supabase.from('oficios').insert(payload).select().single()
+        ofId = data.id; action = 'criado'
       }
-
-      // Auditoria
-      await supabase.from('oficios_auditoria').insert({
-        oficio_id: ofId,
-        empresa_id: empresa.id,
-        numero_oficio: form.numero,
-        acao: action,
-        usuario_id: currentUser?.id,
-        usuario_nome: currentUser?.nome || currentUser?.email,
-        dados_json: payload,
-      });
-
-      // Upload de anexos
+      await supabase.from('oficios_auditoria').insert({ oficio_id: ofId, empresa_id: empresa.id, numero_oficio: form.numero, acao: action, usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: payload })
       for (const file of files) {
-        const path = `oficios/${ofId}/${Date.now()}_${file.name}`;
-        const { data: up } = await supabase.storage.from('documentos').upload(path, file);
+        const path = `oficios/${ofId}/${Date.now()}_${file.name}`
+        const { data: up } = await supabase.storage.from('documentos').upload(path, file)
         if (up) {
-          const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path);
-          await supabase.from('oficios_anexos').insert({
-            oficio_id: ofId,
-            nome_arquivo: file.name,
-            url: publicUrl,
-            created_by: currentUser?.id,
-            created_by_nome: currentUser?.nome || currentUser?.email,
-          });
+          const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path)
+          await supabase.from('oficios_anexos').insert({ oficio_id: ofId, nome_arquivo: file.name, url: publicUrl, created_by: profile?.id, created_by_nome: profile?.nome || profile?.email })
         }
       }
-
-      onSave();
-    } catch (e) {
-      setErr('Erro ao salvar: ' + e.message);
-    } finally {
-      setSaving(false);
-    }
+      onSave()
+    } catch (e2) { setErr('Erro ao salvar: ' + e2.message) }
+    finally { setSaving(false) }
   }
 
   return (
-    <Modal title={isEdit ? `Editar Ofício ${oficio.numero}` : 'Novo Ofício'} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Número" required>
-            <Input value={form.numero} onChange={e => set('numero', e.target.value)}
-              placeholder="ex: 124/2026" />
-          </Field>
-          <Field label="Data" required>
-            <Input type="date" value={form.data} onChange={e => set('data', e.target.value)} />
-          </Field>
+    <Modal title={isEdit ? `Editar — ${oficio.numero}` : `Novo Ofício — ${empresa.nome}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Número" required><input style={inp} value={form.numero} onChange={e => set('numero', e.target.value)} placeholder="ex: 124/2026" /></Field>
+          <Field label="Data" required><input type="date" style={inp} value={form.data} onChange={e => set('data', e.target.value)} /></Field>
         </div>
-
         <Field label="Órgão de Destino" required>
-          <CreatableSelect options={destOpts} value={form.destinatario}
-            onChange={v => set('destinatario', v)} placeholder="Selecionar ou adicionar..."
-            onCreateNew={addDestinatario} />
+          <CreatableSelect options={destOpts} value={form.destinatario} onChange={v => set('destinatario', v)} placeholder="Selecionar ou adicionar..." onCreateNew={addDestinatario} />
         </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Departamento Responsável">
-            <Input value={form.departamento} onChange={e => set('departamento', e.target.value)}
-              placeholder="ex: Jurídico" />
-          </Field>
-          <Field label="Responsável pelo Ofício/Carta">
-            <Input value={form.responsavel} onChange={e => set('responsavel', e.target.value)}
-              placeholder="Nome do responsável" />
-          </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Departamento"><input style={inp} value={form.departamento} onChange={e => set('departamento', e.target.value)} placeholder="ex: Jurídico" /></Field>
+          <Field label="Responsável pelo Ofício"><input style={inp} value={form.responsavel} onChange={e => set('responsavel', e.target.value)} /></Field>
         </div>
-
         <Field label="Referência / Assunto">
-          <Textarea value={form.referencia} onChange={e => set('referencia', e.target.value)}
-            placeholder="Assunto do ofício..." />
+          <textarea style={{ ...inp, resize: 'none', height: 68 }} value={form.referencia} onChange={e => set('referencia', e.target.value)} placeholder="Assunto do ofício..." />
         </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Remetente Responsável pelo Envio">
-            <Input value={form.remetente} onChange={e => set('remetente', e.target.value)} />
-          </Field>
-          <Field label="Forma de Envio">
-            <Input value={form.forma_envio} onChange={e => set('forma_envio', e.target.value)}
-              placeholder="ex: SEI, E-mail..." />
-          </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Remetente Responsável pelo Envio"><input style={inp} value={form.remetente} onChange={e => set('remetente', e.target.value)} /></Field>
+          <Field label="Forma de Envio"><input style={inp} value={form.forma_envio} onChange={e => set('forma_envio', e.target.value)} placeholder="ex: SEI, E-mail..." /></Field>
         </div>
-
-        <div className="grid grid-cols-2 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Arquivado na Pasta?">
-            <CreatableSelect options={['SIM', 'NÃO']} value={form.arquivado}
-              onChange={v => set('arquivado', v)} placeholder="SIM / NÃO"
-              onCreateNew={() => {}} />
+            <CreatableSelect options={['SIM', 'NÃO']} value={form.arquivado} onChange={v => set('arquivado', v)} placeholder="SIM / NÃO" onCreateNew={() => {}} />
           </Field>
-          <Field label="Observações">
-            <Input value={form.observacoes} onChange={e => set('observacoes', e.target.value)} />
-          </Field>
+          <Field label="Observações"><input style={inp} value={form.observacoes} onChange={e => set('observacoes', e.target.value)} /></Field>
         </div>
-
-        {/* Anexos */}
-        <div>
-          <label className="block text-xs font-medium text-gray-400 mb-2">Documentos Anexos</label>
-          <div className="rounded-xl p-4 text-center cursor-pointer transition-colors"
-            style={{ border: '2px dashed rgba(255,255,255,0.15)' }}
-            onClick={() => fileRef.current?.click()}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}>
-            <Upload size={20} className="mx-auto text-gray-500 mb-2" />
-            <p className="text-sm text-gray-400">Clique para selecionar arquivos</p>
-            <input ref={fileRef} type="file" multiple className="hidden"
-              onChange={e => setFiles(Array.from(e.target.files))} />
+        <Field label="Documentos Anexos">
+          <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed ' + C.border, borderRadius: 10, padding: 14, textAlign: 'center', cursor: 'pointer' }}>
+            <Upload size={18} color={C.muted} style={{ display: 'block', margin: '0 auto 4px' }} />
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Clique para selecionar arquivos</p>
+            <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => setFiles(Array.from(e.target.files))} />
           </div>
-          {files.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {files.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-gray-300 rounded-lg px-3 py-1.5"
-                  style={{ background: 'rgba(255,255,255,0.06)' }}>
-                  <Paperclip size={12} />
-                  <span>{f.name}</span>
-                  <button type="button" onClick={() => setFiles(ff => ff.filter((_, ii) => ii !== i))}
-                    className="ml-auto text-gray-500 hover:text-red-400">
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
+          {files.map((f, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: C.bg, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}>
+              <Paperclip size={12} color={C.muted} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+              <button type="button" onClick={() => setFiles(ff => ff.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 0 }}><X size={13} /></button>
             </div>
-          )}
-        </div>
-
-        {err && (
-          <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-sm">
-            <AlertCircle size={14} /> {err}
-          </div>
-        )}
-
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors">
-            Cancelar
-          </button>
-          <button type="submit" disabled={saving}
-            className="px-5 py-2 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-400 text-white disabled:opacity-50 transition-colors flex items-center gap-2">
-            {saving ? <><span className="animate-spin">⟳</span> Salvando...</> : <><Check size={14} /> Salvar</>}
-          </button>
+          ))}
+        </Field>
+        {err && <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.dangerLight, border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}><AlertCircle size={14} />{err}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
+          <button type="button" onClick={onClose} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
+          <button type="submit" disabled={saving} style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1, fontFamily: 'inherit' }}>{saving ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Registrar ofício'}</button>
         </div>
       </form>
     </Modal>
-  );
+  )
 }
 
-// ─────────────────────────────────────────────
-// Modal: Consultar Todos os Ofícios
-// ─────────────────────────────────────────────
-function ConsultarModal({ empresa, onClose, currentUser, onEdit }) {
-  const [oficios, setOficios] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState(null);
-  const [anexos, setAnexos] = useState([]);
-  const [auditoria, setAuditoria] = useState([]);
-  const [deleting, setDeleting] = useState(false);
+// ── Modal: Consultar Todos ────────────────────────────────────────────────
+function ConsultarModal({ empresa, onClose, profile, onEdit }) {
+  const [oficios, setOficios] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState(null)
+  const [anexos, setAnexos] = useState([])
+  const [auditoria, setAuditoria] = useState([])
+  const [deleting, setDeleting] = useState(false)
 
   const fetchAll = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase.from('oficios')
-      .select('*').eq('empresa_id', empresa.id)
-      .order('created_at', { ascending: false });
-    setOficios(data || []);
-    setLoading(false);
-  }, [empresa.id]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+    setLoading(true)
+    const { data } = await supabase.from('oficios').select('*').eq('empresa_id', empresa.id).order('created_at', { ascending: false })
+    setOficios(data || []); setLoading(false)
+  }, [empresa.id])
+  useEffect(() => { fetchAll() }, [fetchAll])
 
   async function selectOficio(of) {
-    setSelected(of);
+    setSelected(of)
     const [{ data: a }, { data: au }] = await Promise.all([
       supabase.from('oficios_anexos').select('*').eq('oficio_id', of.id),
       supabase.from('oficios_auditoria').select('*').eq('oficio_id', of.id).order('timestamp', { ascending: false }),
-    ]);
-    setAnexos(a || []);
-    setAuditoria(au || []);
+    ])
+    setAnexos(a || []); setAuditoria(au || [])
   }
 
   async function handleDelete(of) {
-    if (!confirm(`Excluir ofício ${of.numero}? Esta ação não pode ser desfeita.`)) return;
-    setDeleting(true);
-    await supabase.from('oficios').delete().eq('id', of.id);
-    await supabase.from('oficios_auditoria').insert({
-      oficio_id: of.id,
-      empresa_id: empresa.id,
-      numero_oficio: of.numero,
-      acao: 'excluído',
-      usuario_id: currentUser?.id,
-      usuario_nome: currentUser?.nome || currentUser?.email,
-      dados_json: of,
-    });
-    setSelected(null);
-    fetchAll();
-    setDeleting(false);
+    if (!confirm(`Excluir ofício ${of.numero}?`)) return
+    setDeleting(true)
+    await supabase.from('oficios').delete().eq('id', of.id)
+    await supabase.from('oficios_auditoria').insert({ oficio_id: of.id, empresa_id: empresa.id, numero_oficio: of.numero, acao: 'excluído', usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: of })
+    setSelected(null); fetchAll(); setDeleting(false)
   }
 
-  const filtered = oficios.filter(o =>
-    (o.numero + o.destinatario + o.referencia + o.responsavel + o.departamento)
-      .toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = oficios.filter(o => (o.numero + o.destinatario + o.referencia + o.responsavel + o.departamento).toLowerCase().includes(search.toLowerCase()))
 
   return (
     <Modal title={`Todos os Ofícios — ${empresa.nome}`} onClose={onClose} wide>
-      <div className="flex gap-4 h-full" style={{ minHeight: 400 }}>
-        {/* Lista */}
-        <div className="w-1/2 flex flex-col gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar ofícios..."
-              className="w-full rounded-xl pl-9 pr-3 py-2 text-sm text-white outline-none"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }} />
+      <div style={{ display: 'flex', gap: 20, minHeight: 440 }}>
+        <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={13} color={C.muted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." style={{ ...inp, paddingLeft: 30 }} />
           </div>
-          <div className="text-xs text-gray-400 font-medium">{filtered.length} registro(s)</div>
-          <div className="overflow-y-auto space-y-1.5 flex-1" style={{ maxHeight: 440 }}>
-            {loading ? (
-              <div className="text-gray-400 text-sm text-center py-8">Carregando...</div>
-            ) : filtered.map(of => (
+          <div style={{ fontSize: 12, color: C.muted }}>{filtered.length} registro(s)</div>
+          <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, flex: 1, maxHeight: 380 }}>
+            {loading ? <p style={{ color: C.muted, fontSize: 13 }}>Carregando...</p>
+              : filtered.map(of => (
               <button key={of.id} onClick={() => selectOficio(of)}
-                className="w-full text-left rounded-xl px-3 py-3 transition-all"
-                style={{
-                  background: selected?.id === of.id ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
-                  border: selected?.id === of.id ? '1px solid rgba(16,185,129,0.35)' : '1px solid rgba(255,255,255,0.08)'
-                }}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-emerald-400">{of.numero}</span>
-                  <span className="text-xs text-gray-400">{fmtDate(of.data)}</span>
+                style={{ textAlign: 'left', border: '1px solid ' + (selected?.id === of.id ? C.primary : C.border), borderRadius: 8, padding: '10px 12px', background: selected?.id === of.id ? C.primaryLight : C.white, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 11, color: C.primary }}>{of.numero}</span>
+                  <span style={{ fontSize: 11, color: C.muted }}>{fmtDate(of.data)}</span>
                 </div>
-                <div className="text-sm text-gray-200 mt-0.5 truncate">{of.destinatario}</div>
-                <div className="text-xs text-gray-400 truncate mt-0.5">{of.referencia}</div>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{of.destinatario}</div>
+                <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{of.referencia}</div>
               </button>
             ))}
           </div>
         </div>
-
-        {/* Detalhe */}
-        <div className="w-1/2 pl-4 flex flex-col" style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ flex: 1, borderLeft: '1px solid ' + C.border, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', maxHeight: 440 }}>
           {!selected ? (
-            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
-              ← Selecione um ofício
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-mono font-bold text-emerald-400">{selected.numero}</span>
-                <div className="flex gap-2">
-                  <button onClick={() => { onEdit(selected); onClose(); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-300 hover:text-white text-xs transition-colors"
-                    style={{ background: 'rgba(255,255,255,0.07)' }}>
-                    <Edit2 size={12} /> Editar
-                  </button>
-                  <button onClick={() => handleDelete(selected)} disabled={deleting}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-red-400 text-xs transition-colors"
-                    style={{ background: 'rgba(239,68,68,0.1)' }}>
-                    <Trash2 size={12} /> Excluir
-                  </button>
-                </div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 14 }}>← Selecione um ofício</div>
+          ) : (<>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: C.primary }}>{selected.numero}</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { onEdit(selected); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Edit2 size={13} />Editar</button>
+                <button onClick={() => handleDelete(selected)} disabled={deleting} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid #fca5a5', borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Trash2 size={13} />Excluir</button>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {[
-                  ['Data', fmtDate(selected.data)],
-                  ['Departamento', selected.departamento],
-                  ['Responsável', selected.responsavel],
-                  ['Remetente', selected.remetente],
-                  ['Forma de Envio', selected.forma_envio],
-                  ['Arquivado', selected.arquivado],
-                ].map(([k, v]) => (
-                  <div key={k}>
-                    <div className="text-xs text-gray-400 mb-0.5">{k}</div>
-                    <div className="text-gray-200">{v || '—'}</div>
-                  </div>
-                ))}
-              </div>
-
-              {selected.referencia && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-1">Referência / Assunto</div>
-                  <div className="text-sm text-gray-200 rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.05)' }}>{selected.referencia}</div>
-                </div>
-              )}
-              {selected.observacoes && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-1">Observações</div>
-                  <div className="text-sm text-gray-400 italic">{selected.observacoes}</div>
-                </div>
-              )}
-
-              {/* Anexos */}
-              {anexos.length > 0 && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-2">Anexos ({anexos.length})</div>
-                  <div className="space-y-1">
-                    {anexos.map(a => (
-                      <a key={a.id} href={a.url} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 rounded-lg px-3 py-2 transition-colors"
-                        style={{ background: 'rgba(16,185,129,0.08)' }}>
-                        <Paperclip size={11} />
-                        <span className="truncate">{a.nome_arquivo}</span>
-                        <Download size={11} className="ml-auto" />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Auditoria */}
-              {auditoria.length > 0 && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-2">Histórico de alterações</div>
-                  <div className="space-y-1.5 max-h-28 overflow-y-auto">
-                    {auditoria.map(a => (
-                      <div key={a.id}
-                        className="flex items-center gap-2 text-xs rounded-lg px-3 py-1.5"
-                        style={{ background: 'rgba(255,255,255,0.04)' }}>
-                        <span className={`font-medium ${a.acao === 'excluído' ? 'text-red-400' : a.acao === 'criado' ? 'text-emerald-400' : 'text-blue-400'}`}>
-                          {a.acao}
-                        </span>
-                        <span className="text-gray-500">por</span>
-                        <span className="text-gray-300">{a.usuario_nome || '—'}</span>
-                        <span className="ml-auto text-gray-500">{fmtTs(a.timestamp)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
-          )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[['Data', fmtDate(selected.data)], ['Departamento', selected.departamento], ['Responsável', selected.responsavel], ['Remetente', selected.remetente], ['Forma de Envio', selected.forma_envio], ['Arquivado', selected.arquivado]].map(([k, v]) => (
+                <div key={k}><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>{k}</div><div style={{ fontSize: 14, color: C.text }}>{v || '—'}</div></div>
+              ))}
+            </div>
+            {selected.referencia && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Referência / Assunto</div><div style={{ fontSize: 14, color: C.text, background: C.bg, borderRadius: 8, padding: '10px 14px', lineHeight: 1.5 }}>{selected.referencia}</div></div>}
+            {selected.observacoes && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Observações</div><div style={{ fontSize: 13, color: C.muted, fontStyle: 'italic' }}>{selected.observacoes}</div></div>}
+            {anexos.length > 0 && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Anexos ({anexos.length})</div>{anexos.map(a => <a key={a.id} href={a.url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.primary, background: C.primaryLight, borderRadius: 6, padding: '6px 10px', textDecoration: 'none', fontWeight: 600, marginBottom: 4 }}><Paperclip size={12} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span><Download size={12} /></a>)}</div>}
+            {auditoria.length > 0 && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Histórico</div><div style={{ maxHeight: 110, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>{auditoria.map(a => <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, background: C.bg, borderRadius: 6, padding: '5px 10px' }}><span style={{ fontWeight: 700, color: a.acao === 'excluído' ? C.danger : a.acao === 'criado' ? C.primaryMid : C.warning }}>{a.acao}</span><span style={{ color: C.muted }}>por</span><span style={{ color: C.text, fontWeight: 600 }}>{a.usuario_nome || '—'}</span><span style={{ marginLeft: 'auto', color: C.muted }}>{fmtTs(a.timestamp)}</span></div>)}</div></div>}
+          </>)}
         </div>
       </div>
     </Modal>
-  );
+  )
 }
 
-// ─────────────────────────────────────────────
-// Modal: Nova Empresa
-// ─────────────────────────────────────────────
+// ── Modal: Nova Empresa ───────────────────────────────────────────────────
 function NovaEmpresaModal({ onSave, onClose }) {
-  const [nome, setNome] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [nome, setNome] = useState('')
+  const [saving, setSaving] = useState(false)
   async function handleSubmit(e) {
-    e.preventDefault();
-    if (!nome.trim()) return;
-    setSaving(true);
-    await supabase.from('oficios_empresas').insert({ nome: nome.trim() });
-    onSave();
-    setSaving(false);
+    e.preventDefault()
+    if (!nome.trim()) return
+    setSaving(true)
+    await supabase.from('oficios_empresas').insert({ nome: nome.trim() })
+    onSave(); setSaving(false)
   }
   return (
-    <Modal title="Nova Empresa / Controle" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Nome da Empresa" required>
-          <Input value={nome} onChange={e => setNome(e.target.value)}
-            placeholder="ex: NOVA EMPRESA LTDA" autoFocus />
-        </Field>
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors">
-            Cancelar
-          </button>
-          <button type="submit" disabled={saving}
-            className="px-5 py-2 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-400 text-white disabled:opacity-50 transition-colors">
-            {saving ? 'Salvando...' : 'Criar'}
-          </button>
+    <Modal title="Novo Controle de Ofícios" onClose={onClose}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Field label="Nome da empresa / contrato" required><input autoFocus style={inp} value={nome} onChange={e => setNome(e.target.value)} placeholder="ex: NOVA EMPRESA LTDA" /></Field>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" onClick={onClose} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
+          <button type="submit" disabled={saving} style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>{saving ? 'Criando...' : 'Criar'}</button>
         </div>
       </form>
     </Modal>
-  );
+  )
 }
 
-// ─────────────────────────────────────────────
-// Modal: Ver Mais Modelos
-// ─────────────────────────────────────────────
+// ── Modal: Todos os Modelos ───────────────────────────────────────────────
 function TodosModelosModal({ modelos, onClose }) {
-  const [search, setSearch] = useState('');
-  const filtered = modelos.filter(m =>
-    (m.nome + (m.tipo || '') + (m.area || '')).toLowerCase().includes(search.toLowerCase())
-  );
+  const [search, setSearch] = useState('')
+  const filtered = modelos.filter(m => (m.nome + (m.tipo || '') + (m.area || '')).toLowerCase().includes(search.toLowerCase()))
   return (
     <Modal title="Todos os Modelos" onClose={onClose} wide>
-      <div className="space-y-4">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar modelos..."
-            className="w-full rounded-xl pl-9 pr-3 py-2 text-sm text-white outline-none"
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} color={C.muted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar modelos..." style={{ ...inp, paddingLeft: 30 }} />
         </div>
-        <div className="text-xs text-gray-400">{filtered.length} modelo(s)</div>
-        <div className="overflow-y-auto space-y-2" style={{ maxHeight: 480 }}>
+        <div style={{ fontSize: 12, color: C.muted }}>{filtered.length} modelo(s)</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', maxHeight: 480 }}>
           {filtered.map(m => (
-            <div key={m.id}
-              className="flex items-center justify-between rounded-xl px-4 py-3 transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)' }}>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-white font-medium text-sm">{m.nome}</span>
-                  {m.tipo && <span className="text-xs px-1.5 py-0.5 rounded text-gray-400" style={{ background: 'rgba(255,255,255,0.08)' }}>{m.tipo}</span>}
-                  {m.area && <span className="text-xs px-1.5 py-0.5 rounded text-emerald-400" style={{ background: 'rgba(16,185,129,0.15)' }}>{m.area}</span>}
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: C.bg, borderRadius: 8, border: '1px solid ' + C.border }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{m.nome}</span>
+                  {m.tipo && <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 99, background: C.border, color: C.muted }}>{m.tipo}</span>}
+                  {m.area && <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 99, background: C.primaryLight, color: C.primary, fontWeight: 600 }}>{m.area}</span>}
                 </div>
-                {m.descricao && <div className="text-xs text-gray-400 mt-0.5">{m.descricao}</div>}
-                {m.arquivo_nome && <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Paperclip size={10} />{m.arquivo_nome}</div>}
+                {m.descricao && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{m.descricao}</div>}
+                {m.arquivo_nome && <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><Paperclip size={10} />{m.arquivo_nome}</div>}
               </div>
-              <div className="text-xs text-gray-500 ml-4 whitespace-nowrap">
-                {m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}
-              </div>
+              <div style={{ fontSize: 12, color: C.muted, marginLeft: 16, whiteSpace: 'nowrap' }}>{m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}</div>
             </div>
           ))}
-          {filtered.length === 0 && (
-            <div className="text-gray-400 text-sm text-center py-8">Nenhum modelo encontrado.</div>
-          )}
+          {filtered.length === 0 && <p style={{ color: C.muted, fontSize: 14, textAlign: 'center', padding: 24 }}>Nenhum modelo encontrado.</p>}
         </div>
       </div>
     </Modal>
-  );
+  )
 }
 
-// ─────────────────────────────────────────────
-// Componente Principal
-// ─────────────────────────────────────────────
-export default function Acervo() {
-  const [activeSection, setActiveSection] = useState('modelos'); // 'modelos' | 'oficios'
-  const [currentUser, setCurrentUser] = useState(null);
+// ── Componente Principal ──────────────────────────────────────────────────
+export default function Acervo({ profile }) {
+  const [activeSection, setActiveSection] = useState('modelos')
+  const [modelos, setModelos] = useState([])
+  const [loadingModelos, setLoadingModelos] = useState(true)
+  const [showTodosModelos, setShowTodosModelos] = useState(false)
+  const [empresas, setEmpresas] = useState([])
+  const [selectedEmpresa, setSelectedEmpresa] = useState(null)
+  const [oficiosList, setOficiosList] = useState([])
+  const [destinatarios, setDestinatarios] = useState([])
+  const [loadingOficios, setLoadingOficios] = useState(false)
+  const [showNovoOficio, setShowNovoOficio] = useState(false)
+  const [showConsultar, setShowConsultar] = useState(false)
+  const [showNovaEmpresa, setShowNovaEmpresa] = useState(false)
+  const [editingOficio, setEditingOficio] = useState(null)
 
-  // Modelos
-  const [modelos, setModelos] = useState([]);
-  const [loadingModelos, setLoadingModelos] = useState(true);
-  const [showTodosModelos, setShowTodosModelos] = useState(false);
-
-  // Ofícios
-  const [empresas, setEmpresas] = useState([]);
-  const [selectedEmpresa, setSelectedEmpresa] = useState(null);
-  const [oficiosList, setOficiosList] = useState([]);
-  const [destinatarios, setDestinatarios] = useState([]);
-  const [loadingOficios, setLoadingOficios] = useState(false);
-  const [showNovoOficio, setShowNovoOficio] = useState(false);
-  const [showConsultar, setShowConsultar] = useState(false);
-  const [showNovaEmpresa, setShowNovaEmpresa] = useState(false);
-  const [editingOficio, setEditingOficio] = useState(null);
-
-  // Auth
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        setCurrentUser({ ...user, ...profile });
-      }
-    });
-  }, []);
+    supabase.from('modelos').select('*').order('updated_at', { ascending: false })
+      .then(({ data }) => { setModelos(data || []); setLoadingModelos(false) })
+  }, [])
 
-  // Modelos
-  useEffect(() => {
-    supabase.from('modelos')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .then(({ data }) => { setModelos(data || []); setLoadingModelos(false); });
-  }, []);
-
-  // Empresas
   useEffect(() => {
     supabase.from('oficios_empresas').select('*').order('nome').then(({ data }) => {
-      setEmpresas(data || []);
-      if (data && data.length > 0 && !selectedEmpresa) setSelectedEmpresa(data[0]);
-    });
-  }, []);
+      setEmpresas(data || [])
+      if (data?.length && !selectedEmpresa) setSelectedEmpresa(data[0])
+    })
+  }, [])
 
-  // Ofícios da empresa selecionada (ano corrente)
   const fetchOficios = useCallback(async (empresa) => {
-    if (!empresa) return;
-    setLoadingOficios(true);
-    const currentYear = new Date().getFullYear();
-    const { data } = await supabase.from('oficios')
-      .select('*')
-      .eq('empresa_id', empresa.id)
-      .eq('ano', currentYear)
-      .order('created_at', { ascending: true });
-    setOficiosList(data || []);
-    setLoadingOficios(false);
-  }, []);
+    if (!empresa) return
+    setLoadingOficios(true)
+    const { data } = await supabase.from('oficios').select('*').eq('empresa_id', empresa.id).eq('ano', new Date().getFullYear()).order('created_at', { ascending: true })
+    setOficiosList(data || []); setLoadingOficios(false)
+  }, [])
 
   useEffect(() => {
-    if (selectedEmpresa) {
-      fetchOficios(selectedEmpresa);
-      supabase.from('oficios_destinatarios')
-        .select('*').eq('empresa_id', selectedEmpresa.id).order('nome')
-        .then(({ data }) => setDestinatarios(data || []));
-    }
-  }, [selectedEmpresa, fetchOficios]);
+    if (!selectedEmpresa) return
+    fetchOficios(selectedEmpresa)
+    supabase.from('oficios_destinatarios').select('*').eq('empresa_id', selectedEmpresa.id).order('nome').then(({ data }) => setDestinatarios(data || []))
+  }, [selectedEmpresa, fetchOficios])
 
-  // Próximo número sequencial
   function nextNumero() {
-    const year = new Date().getFullYear();
-    const nums = oficiosList
-      .map(o => parseInt(o.numero?.split('/')[0]))
-      .filter(n => !isNaN(n));
-    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-    return `${String(next).padStart(3, '0')}/${year}`;
+    const year = new Date().getFullYear()
+    const nums = oficiosList.map(o => parseInt(o.numero?.split('/')[0])).filter(n => !isNaN(n))
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
+    return `${String(next).padStart(3, '0')}/${year}`
   }
 
-  const recentModelos = modelos.slice(0, 5);
+  const recentModelos = modelos.slice(0, 5)
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white tracking-tight">Acervo</h1>
-        <p className="text-gray-400 mt-1 text-sm">Modelos editáveis e controle de expedição de ofícios</p>
+    <div style={{ padding: 32, background: C.bg, minHeight: '100%' }}>
+      {/* Cabeçalho */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, margin: 0, letterSpacing: '-0.02em' }}>Acervo</h1>
+        <p style={{ fontSize: 14, color: C.muted, margin: '4px 0 0' }}>Modelos editáveis e controle de expedição de ofícios</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-8">
-        {[
-          { id: 'modelos', label: 'Modelos', icon: BookOpen },
-          { id: 'oficios', label: 'Expedição de Ofícios e Cartas', icon: Send },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveSection(tab.id)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-              activeSection === tab.id
-                ? 'bg-emerald-500 text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
-            style={activeSection !== tab.id ? { background: 'rgba(255,255,255,0.06)' } : {}}>
-            <tab.icon size={15} />
-            {tab.label}
-          </button>
-        ))}
+      {/* Abas */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        {[{ id: 'modelos', label: 'Modelos', Icon: BookOpen }, { id: 'oficios', label: 'Expedição de Ofícios e Cartas', Icon: Send }].map(({ id, label, Icon }) => {
+          const active = activeSection === id
+          return (
+            <button key={id} onClick={() => setActiveSection(id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', border: '1px solid ' + (active ? C.primary : C.border), borderRadius: 8, background: active ? C.primary : C.white, color: active ? 'white' : C.text, cursor: 'pointer', fontSize: 14, fontWeight: active ? 700 : 400, fontFamily: 'inherit' }}>
+              <Icon size={15} />{label}
+            </button>
+          )
+        })}
       </div>
 
-      {/* ── SEÇÃO MODELOS ── */}
+      {/* ── MODELOS ── */}
       {activeSection === 'modelos' && (
-        <div className="max-w-2xl">
-          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)' }}>
-                  <BookOpen size={16} className="text-emerald-400" />
+        <div style={{ maxWidth: 620 }}>
+          <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid ' + C.border }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BookOpen size={16} color={C.primary} />
                 </div>
                 <div>
-                  <div className="text-white font-semibold">Modelos de Documentos</div>
-                  <div className="text-xs text-gray-400">{modelos.length} modelo(s) no acervo</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Modelos de Documentos</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{modelos.length} modelo(s) no acervo</div>
                 </div>
               </div>
-              <button onClick={() => setShowTodosModelos(true)}
-                className="flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300 transition-colors">
+              <button onClick={() => setShowTodosModelos(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none', cursor: 'pointer', color: C.primary, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
                 Ver mais <ChevronRight size={14} />
               </button>
             </div>
-            <div style={{ divideColor: 'rgba(255,255,255,0.05)' }}>
-              {loadingModelos ? (
-                <div className="px-6 py-8 text-center text-gray-400 text-sm">Carregando...</div>
-              ) : recentModelos.length === 0 ? (
-                <div className="px-6 py-8 text-center text-gray-400 text-sm">Nenhum modelo encontrado.</div>
-              ) : recentModelos.map((m, i) => (
-                <div key={m.id} className="flex items-center justify-between px-6 py-3.5"
-                  style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.07)' }}>
-                      <FileText size={13} className="text-gray-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm text-white font-medium truncate">{m.nome}</div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {m.tipo && <span className="text-xs text-gray-400">{m.tipo}</span>}
-                        {m.area && <span className="text-xs text-emerald-400">{m.area}</span>}
-                        {m.arquivo_nome && (
-                          <span className="text-xs text-gray-500 flex items-center gap-1">
-                            <Paperclip size={9} />{m.arquivo_nome}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+            {loadingModelos ? <div style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</div>
+              : recentModelos.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum modelo encontrado.</div>
+              : recentModelos.map((m, i) => (
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: i === 0 ? 'none' : '1px solid ' + C.border }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 7, background: C.bg, border: '1px solid ' + C.border, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={13} color={C.muted} />
                   </div>
-                  <div className="text-xs text-gray-500 ml-4 whitespace-nowrap">
-                    {m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                      {m.tipo && <span style={{ fontSize: 11, color: C.muted }}>{m.tipo}</span>}
+                      {m.area && <span style={{ fontSize: 11, color: C.primary, fontWeight: 600 }}>{m.area}</span>}
+                      {m.arquivo_nome && <span style={{ fontSize: 11, color: C.muted, display: 'flex', alignItems: 'center', gap: 3 }}><Paperclip size={9} />{m.arquivo_nome}</span>}
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                <div style={{ fontSize: 12, color: C.muted, marginLeft: 12, whiteSpace: 'nowrap' }}>{m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}</div>
+              </div>
+            ))}
             {modelos.length > 5 && (
-              <div className="px-6 py-3 flex justify-center" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <button onClick={() => setShowTodosModelos(true)}
-                  className="text-sm text-gray-400 hover:text-emerald-400 transition-colors">
-                  Ver todos os {modelos.length} modelos →
-                </button>
+              <div style={{ padding: '12px 20px', borderTop: '1px solid ' + C.border, textAlign: 'center' }}>
+                <button onClick={() => setShowTodosModelos(true)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.primary, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Ver todos os {modelos.length} modelos →</button>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ── SEÇÃO OFÍCIOS ── */}
+      {/* ── OFÍCIOS ── */}
       {activeSection === 'oficios' && (
-        <div className="space-y-6">
-          {/* Empresas */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
-              {empresas.map(emp => (
-                <button key={emp.id} onClick={() => setSelectedEmpresa(emp)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all`}
-                  style={{
-                    background: selectedEmpresa?.id === emp.id ? 'white' : 'transparent',
-                    color: selectedEmpresa?.id === emp.id ? '#0d1117' : 'rgba(255,255,255,0.5)',
-                  }}>
-                  <Building2 size={13} className="inline mr-1.5 opacity-60" />
-                  {emp.nome}
-                </button>
-              ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Seletor empresa */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4, background: C.bg, border: '1px solid ' + C.border, borderRadius: 10, padding: 4 }}>
+              {empresas.map(emp => {
+                const sel = selectedEmpresa?.id === emp.id
+                return (
+                  <button key={emp.id} onClick={() => setSelectedEmpresa(emp)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: sel ? 700 : 400, background: sel ? C.white : 'transparent', color: sel ? C.primary : C.muted, boxShadow: sel ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', fontFamily: 'inherit' }}>
+                    <Building2 size={13} />{emp.nome}
+                  </button>
+                )
+              })}
             </div>
             <button onClick={() => setShowNovaEmpresa(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-gray-400 hover:text-white text-sm transition-colors"
-              style={{ border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent' }}>
-              <Plus size={13} /> Nova empresa
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px dashed ' + C.border, borderRadius: 8, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
+              <Plus size={13} />Nova empresa
             </button>
           </div>
 
-          {selectedEmpresa && (
-            <>
-              {/* Header do controle */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-white">
-                    Controle de Ofícios — {selectedEmpresa.nome}
-                  </h2>
-                  <p className="text-sm text-gray-400 mt-0.5">
-                    Ano {new Date().getFullYear()} · {oficiosList.length} ofício(s) registrado(s)
-                    {oficiosList.length > 0 && ` · Próximo: ${nextNumero()}`}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setShowConsultar(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-gray-300 hover:text-white text-sm transition-colors"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <Eye size={14} /> Consultar todos
-                  </button>
-                  <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors">
-                    <Plus size={14} /> Novo Ofício
-                  </button>
-                </div>
+          {selectedEmpresa && (<>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h2 style={{ fontSize: 19, fontWeight: 800, color: C.text, margin: 0 }}>Controle de Ofícios — {selectedEmpresa.nome}</h2>
+                <p style={{ fontSize: 13, color: C.muted, margin: '4px 0 0' }}>
+                  Ano {new Date().getFullYear()} · {oficiosList.length} ofício(s) · Próximo: <strong style={{ color: C.primary }}>{nextNumero()}</strong>
+                </p>
               </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setShowConsultar(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
+                  <Eye size={14} />Consultar todos
+                </button>
+                <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
+                  <Plus size={14} />Novo Ofício
+                </button>
+              </div>
+            </div>
 
-              {/* Tabela */}
-              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                        {['Número', 'Data', 'Departamento', 'Responsável', 'Destinatário', 'Referência/Assunto', 'Forma Envio', 'Pasta', ''].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingOficios ? (
-                        <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">Carregando...</td></tr>
-                      ) : oficiosList.length === 0 ? (
-                        <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">
-                          Nenhum ofício registrado em {new Date().getFullYear()}.
-                        </td></tr>
-                      ) : oficiosList.map((of, i) => (
-                        <tr key={of.id} className="group transition-colors"
-                          style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <td className="px-4 py-3">
-                            <span className="font-mono font-bold text-emerald-400 text-xs">{of.numero}</span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">{fmtDate(of.data)}</td>
-                          <td className="px-4 py-3 text-gray-300 text-xs">{of.departamento || '—'}</td>
-                          <td className="px-4 py-3 text-gray-300 text-xs whitespace-nowrap">{of.responsavel || '—'}</td>
-                          <td className="px-4 py-3">
-                            <span className="text-xs font-medium text-gray-200 rounded-lg px-2 py-1"
-                              style={{ background: 'rgba(255,255,255,0.08)' }}>{of.destinatario || '—'}</span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-400 text-xs max-w-xs">
-                            <div className="truncate max-w-[260px]" title={of.referencia}>{of.referencia || '—'}</div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{of.forma_envio || '—'}</td>
-                          <td className="px-4 py-3">
-                            {of.arquivado === 'SIM'
-                              ? <span className="text-xs text-emerald-400 flex items-center gap-1"><Check size={11} />SIM</span>
-                              : <span className="text-xs text-gray-500">{of.arquivado || '—'}</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true); }}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                              style={{ background: 'rgba(255,255,255,0.06)' }}>
-                              <Edit2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
+            <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: C.bg, borderBottom: '1px solid ' + C.border }}>
+                      {['Número', 'Data', 'Departamento', 'Responsável', 'Destinatário', 'Referência / Assunto', 'Forma Envio', 'Pasta', ''].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingOficios ? <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</td></tr>
+                      : oficiosList.length === 0 ? <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum ofício registrado em {new Date().getFullYear()}.</td></tr>
+                      : oficiosList.map((of, i) => (
+                      <tr key={of.id} style={{ borderTop: i === 0 ? 'none' : '1px solid ' + C.border }}
+                        onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '10px 14px' }}><span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 12, color: C.primary }}>{of.numero}</span></td>
+                        <td style={{ padding: '10px 14px', color: C.muted, whiteSpace: 'nowrap' }}>{fmtDate(of.data)}</td>
+                        <td style={{ padding: '10px 14px', color: C.text }}>{of.departamento || '—'}</td>
+                        <td style={{ padding: '10px 14px', color: C.text, whiteSpace: 'nowrap' }}>{of.responsavel || '—'}</td>
+                        <td style={{ padding: '10px 14px' }}><span style={{ background: C.primaryLight, color: C.primary, padding: '3px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{of.destinatario || '—'}</span></td>
+                        <td style={{ padding: '10px 14px', color: C.muted, maxWidth: 260 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.referencia}>{of.referencia || '—'}</div></td>
+                        <td style={{ padding: '10px 14px', color: C.muted, whiteSpace: 'nowrap' }}>{of.forma_envio || '—'}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          {of.arquivado === 'SIM'
+                            ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 12, fontWeight: 700 }}><Check size={12} />SIM</span>
+                            : <span style={{ color: C.muted, fontSize: 12 }}>{of.arquivado || '—'}</span>}
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true) }}
+                            style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
+                            <Edit2 size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </>
-          )}
+            </div>
+          </>)}
         </div>
       )}
 
-      {/* ── MODAIS ── */}
-      {showTodosModelos && (
-        <TodosModelosModal modelos={modelos} onClose={() => setShowTodosModelos(false)} />
-      )}
-
+      {/* Modais */}
+      {showTodosModelos && <TodosModelosModal modelos={modelos} onClose={() => setShowTodosModelos(false)} />}
       {showNovoOficio && selectedEmpresa && (
-        <OficioModal
-          oficio={editingOficio}
-          empresa={selectedEmpresa}
-          destinatarios={destinatarios}
-          currentUser={currentUser}
-          onSave={() => {
-            setShowNovoOficio(false);
-            setEditingOficio(null);
-            fetchOficios(selectedEmpresa);
-            supabase.from('oficios_destinatarios')
-              .select('*').eq('empresa_id', selectedEmpresa.id).order('nome')
-              .then(({ data }) => setDestinatarios(data || []));
-          }}
-          onClose={() => { setShowNovoOficio(false); setEditingOficio(null); }}
-        />
+        <OficioModal oficio={editingOficio} empresa={selectedEmpresa} destinatarios={destinatarios} profile={profile}
+          onSave={() => { setShowNovoOficio(false); setEditingOficio(null); fetchOficios(selectedEmpresa); supabase.from('oficios_destinatarios').select('*').eq('empresa_id', selectedEmpresa.id).order('nome').then(({ data }) => setDestinatarios(data || [])) }}
+          onClose={() => { setShowNovoOficio(false); setEditingOficio(null) }} />
       )}
-
       {showConsultar && selectedEmpresa && (
-        <ConsultarModal
-          empresa={selectedEmpresa}
-          currentUser={currentUser}
+        <ConsultarModal empresa={selectedEmpresa} profile={profile}
           onClose={() => setShowConsultar(false)}
-          onEdit={(of) => { setEditingOficio(of); setShowNovoOficio(true); }}
-        />
+          onEdit={of => { setEditingOficio(of); setShowNovoOficio(true) }} />
       )}
-
       {showNovaEmpresa && (
         <NovaEmpresaModal
-          onSave={() => {
-            setShowNovaEmpresa(false);
-            supabase.from('oficios_empresas').select('*').order('nome').then(({ data }) => {
-              setEmpresas(data || []);
-            });
-          }}
-          onClose={() => setShowNovaEmpresa(false)}
-        />
+          onSave={() => { setShowNovaEmpresa(false); supabase.from('oficios_empresas').select('*').order('nome').then(({ data }) => setEmpresas(data || [])) }}
+          onClose={() => setShowNovaEmpresa(false)} />
       )}
     </div>
-  );
+  )
 }
