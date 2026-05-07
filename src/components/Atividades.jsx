@@ -34,7 +34,8 @@ export default function Atividades({profile}){
   const canDelete = can(profile, 'atividades.excluir')
   const canArchive = can(profile, 'atividades.criar') || canEdit
   const loadRotinas=async()=>{
-    const{data}=await supabase.from('rotinas').select('*,profiles:usuario_id(nome,email)').eq('escritorio_id',profile.escritorio_id).order('criado_em',{ascending:true})
+    const{data,error}=await supabase.from('rotinas').select('id,usuario_id,texto,recorrencia,cor,itens,criado_em').eq('escritorio_id',profile.escritorio_id).order('criado_em',{ascending:true})
+    if(error)console.error('rotinas error',error)
     setRotinas(data||[])
   }
   const saveRotina=async()=>{
@@ -114,7 +115,7 @@ export default function Atividades({profile}){
     setLoading(false)
     loadRotinas()
   }
-  useEffect(()=>{load()},[profile.escritorio_id,profile.id,profile.role])
+  useEffect(()=>{load();loadRotinas()},[profile.escritorio_id,profile.id,profile.role])
   const ativos=useMemo(()=>items.filter(i=>!isArquivada(i)&&i.status!=='cancelada'),[items])
   const arquivados=useMemo(()=>items.filter(isArquivada),[items])
   const grouped=useMemo(()=>Object.fromEntries(TIPOS.map(([t])=>[t,ativos.filter(i=>i.tipo===t).slice(0,3)])),[ativos])
@@ -187,7 +188,7 @@ export default function Atividades({profile}){
         </div>)}
       </div>
       {isGerente&&<details style={{marginTop:12}}><summary style={{fontSize:12,fontWeight:700,color:C.muted,cursor:'pointer',userSelect:'none'}}>Ver rotinas da equipe</summary>
-        <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8}}>{Object.entries(rotinas.filter(r=>r.usuario_id!==profile.id).reduce((acc,r)=>{const n=r.profiles?.nome||r.profiles?.email||r.usuario_id;if(!acc[n])acc[n]=[];acc[n].push(r);return acc},{})).map(([nome,rs])=><div key={nome}><div style={{fontSize:12,fontWeight:800,color:C.muted,marginBottom:4}}>{nome}</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{rs.map(r=><div key={r.id} style={{background:'white',border:'1.5px solid '+(r.cor||C.green),borderRadius:8,padding:'8px 12px',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:8,flexShrink:0}}><span style={{flex:1}}>{r.texto}</span><span style={{fontSize:10,fontWeight:700,color:'white',background:r.cor||C.green,borderRadius:20,padding:'1px 8px',whiteSpace:'nowrap'}}>{r.recorrencia}</span><button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:2,display:'flex'}}><Trash2 size={12}/></button></div>)}</div></div>)}{rotinas.filter(r=>r.usuario_id!==profile.id).length===0&&<p style={{margin:0,fontSize:12,color:C.muted}}>Nenhum membro da equipe cadastrou rotinas ainda.</p>}</div>
+        <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8}}>{Object.entries(rotinas.filter(r=>r.usuario_id!==profile.id).reduce((acc,r)=>{const n=(team||[]).find(t=>t.id===r.usuario_id)?.nome||r.usuario_id;if(!acc[n])acc[n]=[];acc[n].push(r);return acc},{})).map(([nome,rs])=><div key={nome}><div style={{fontSize:12,fontWeight:800,color:C.muted,marginBottom:4}}>{nome}</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{rs.map(r=><div key={r.id} style={{background:'white',border:'1.5px solid '+(r.cor||C.green),borderRadius:8,padding:'8px 12px',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:8,flexShrink:0}}><span style={{flex:1}}>{r.texto}</span><span style={{fontSize:10,fontWeight:700,color:'white',background:r.cor||C.green,borderRadius:20,padding:'1px 8px',whiteSpace:'nowrap'}}>{r.recorrencia}</span><button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:2,display:'flex'}}><Trash2 size={12}/></button></div>)}</div></div>)}{rotinas.filter(r=>r.usuario_id!==profile.id).length===0&&<p style={{margin:0,fontSize:12,color:C.muted}}>Nenhum membro da equipe cadastrou rotinas ainda.</p>}</div>
       </details>}
     </div>
     {/* ── Botão para gerente criar rotina para outro membro ── */}
