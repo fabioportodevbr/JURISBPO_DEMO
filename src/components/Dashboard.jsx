@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, can } from '../lib/supabase.js'
+import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Bell, AlertTriangle, Mail, CheckCircle, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X } from 'lucide-react'
 import ClippingJuridico from './ClippingJuridico.jsx'
 import MuralRecados from './MuralRecados.jsx'
@@ -130,12 +130,11 @@ export default function Dashboard({profile}){
     const amanha=addDaysISO(1)
     const fimSemana=addDaysISO(7)
     const desde24h=new Date(Date.now()-24*60*60*1000).toISOString()
-    let atividadesQuery=supabase.from('atividades').select('*').eq('escritorio_id',eid).neq('status','concluida')
-    if(profile.role!=='gerente'){atividadesQuery=atividadesQuery.or(`tipo.in.(audiencia,reuniao),and(tipo.in.(tarefa,prazo_processual),responsavel_id.eq.${profile.id})`)}
-    const[{data:p},{data:c},{data:a},{data:n},{data:m},{data:push}]=await Promise.all([
-      supabase.from('processos').select('*').eq('escritorio_id',eid),
-      supabase.from('contratos').select('*').eq('escritorio_id',eid),
-      atividadesQuery,
+    const atividadesQueryFactory=()=>{let query=supabase.from('atividades').select('*').eq('escritorio_id',eid).neq('status','concluida');if(profile.role!=='gerente'){query=query.or(`tipo.in.(audiencia,reuniao),and(tipo.in.(tarefa,prazo_processual),responsavel_id.eq.${profile.id})`)}return query}
+    const[p,c,a,{data:n},{data:m},{data:push}]=await Promise.all([
+      fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
+      fetchAllRows(()=>supabase.from('contratos').select('*').eq('escritorio_id',eid)),
+      fetchAllRows(atividadesQueryFactory),
       supabase.from('notificacoes').select('*').eq('usuario_id',profile.id).eq('lida',false).eq('arquivada',false).order('created_at',{ascending:false}).limit(5),
       supabase.from('mensagens').select('*').eq('destinatario_id',profile.id).eq('lida',false).not('arquivada_por','cs',`{${profile.id}}`).order('created_at',{ascending:false}).limit(5),
       supabase.from('andamentos_processuais_push').select('id,processo_id,cliente_id,numero_processo,tribunal,movimento,assunto_email,corpo_email_resumo,corpo_resumo,corpo_email_limpo,remetente,data_movimento,criado_em,status_associacao').eq('escritorio_id',eid).neq('status_associacao','ignorado').gte('criado_em',desde24h).order('criado_em',{ascending:false}).limit(100),

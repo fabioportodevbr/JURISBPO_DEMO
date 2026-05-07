@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { fetchAllRows, supabase } from '../lib/supabase.js'
 import { BarChart3, FileText, DollarSign, Scale, Download, Printer, SlidersHorizontal, ArrowLeft, CalendarDays, CheckSquare } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig.js'
 
@@ -95,18 +95,18 @@ export default function Relatorios({profile}){
 
   useEffect(()=>{(async()=>{
     const eid=profile.escritorio_id
-    const [procRes, finRes, ativRes, contRes, equipeRes]=await Promise.all([
-      supabase.from('processos').select('*').eq('escritorio_id',eid),
-      supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid),
-      supabase.from('atividades').select('*').eq('escritorio_id',eid),
-      supabase.from('contratos').select('*').eq('escritorio_id',eid),
+    const [processos, financeiros, atividades, contratos, equipeRes]=await Promise.all([
+      fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
+      fetchAllRows(()=>supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid)),
+      fetchAllRows(()=>supabase.from('atividades').select('*').eq('escritorio_id',eid)),
+      fetchAllRows(()=>supabase.from('contratos').select('*').eq('escritorio_id',eid)),
       supabase.from('usuarios_escritorios').select('usuario_id,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),
     ])
     setData({
-      processos:procRes.data||[],
-      financeiros:finRes.data||[],
-      atividades:ativRes.data||[],
-      contratos:contRes.data||[],
+      processos:processos||[],
+      financeiros:financeiros||[],
+      atividades:atividades||[],
+      contratos:contratos||[],
       equipe:(equipeRes.data||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id,email:x.profiles?.email||''}))
     })
     setLoading(false)

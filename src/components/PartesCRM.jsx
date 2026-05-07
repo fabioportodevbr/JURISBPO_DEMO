@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Building2, Plus, Search, X, Save, Edit2, Trash2 } from 'lucide-react'
-import { supabase, can } from '../lib/supabase.js'
+import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 
 const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',green:'#064e3b',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',amber:'#b45309',amberBg:'#fef3c7',grayBg:'#f1f5f9'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
@@ -16,10 +16,10 @@ const empty={nome:'',nome_fantasia:'',cnpj:'',tipo:'parte_contraria',grupo_econo
 export default function PartesCRM({profile}){
   const [partes,setPartes]=useState([]),[processos,setProcessos]=useState([]),[q,setQ]=useState(''),[tipo,setTipo]=useState('todos'),[modal,setModal]=useState(false),[form,setForm]=useState(empty),[loading,setLoading]=useState(true)
   const canEditPartes = can(profile, 'processos.editar')
-  const load=async()=>{setLoading(true);const eid=profile.escritorio_id;const[{data:p,error:e1},{data:proc,error:e2}]=await Promise.all([
-    supabase.from('partes_crm').select('*').eq('escritorio_id',eid).order('nome'),
-    supabase.from('processos').select('id,numero,titulo,parte_contraria_id,parte_contraria,status,categoria,valor_acao,valor_gasto,valor_economizado').eq('escritorio_id',eid)
-  ]);if(e1)console.error(e1);if(e2)console.error(e2);setPartes(p||[]);setProcessos(proc||[]);setLoading(false)}
+  const load=async()=>{setLoading(true);const eid=profile.escritorio_id;const[p,proc]=await Promise.all([
+    fetchAllRows(()=>supabase.from('partes_crm').select('*').eq('escritorio_id',eid).order('nome')),
+    fetchAllRows(()=>supabase.from('processos').select('id,numero,titulo,parte_contraria_id,parte_contraria,status,categoria,valor_acao,valor_gasto,valor_economizado').eq('escritorio_id',eid))
+  ]);setPartes(p||[]);setProcessos(proc||[]);setLoading(false)}
   useEffect(()=>{load()},[profile.escritorio_id])
   const filtradas=useMemo(()=>{const term=q.trim().toLowerCase();return partes.filter(p=>(tipo==='todos'||p.tipo===tipo)&&(!term||[p.nome,p.nome_fantasia,p.cnpj,p.grupo_economico,p.email,p.contato_principal].some(v=>String(v||'').toLowerCase().includes(term))))},[partes,q,tipo])
   const stats=(p)=>{const vinculados=processos.filter(x=>x.parte_contraria_id===p.id||(!x.parte_contraria_id&&x.parte_contraria===p.nome));const valorCausa=vinculados.reduce((s,x)=>s+Number(x.valor_acao||0),0);const gasto=vinculados.reduce((s,x)=>s+Number(x.valor_gasto||0),0);const economia=vinculados.reduce((s,x)=>s+Number(x.valor_economizado||0),0);return {qtd:vinculados.length,ativos:vinculados.filter(x=>x.status!=='encerrado').length,valorCausa,gasto,economia}}

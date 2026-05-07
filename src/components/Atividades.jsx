@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase, can } from '../lib/supabase.js'
+import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Plus, Edit2, Trash2, X, CalendarDays, History, Paperclip, ArrowRight } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
 
@@ -29,40 +29,36 @@ export default function Atividades({profile}){
     let atividades=[]
 
     if(profile.role==='gerente'){
-      const {data,error}=await supabase
+      atividades=await fetchAllRows(()=>supabase
         .from('atividades')
         .select('*, processos(id,numero,titulo,tribunal)')
         .eq('escritorio_id',eid)
-        .order('created_at',{ascending:false})
-      if(error) console.error('Erro ao carregar atividades:', error)
-      atividades=data||[]
+        .order('created_at',{ascending:false}))
     }else{
       const [privadas, compartilhadas]=await Promise.all([
-        supabase
+        fetchAllRows(()=>supabase
           .from('atividades')
           .select('*, processos(id,numero,titulo,tribunal)')
           .eq('escritorio_id',eid)
           .in('tipo',['tarefa','prazo_processual'])
           .eq('responsavel_id',profile.id)
-          .order('created_at',{ascending:false}),
-        supabase
+          .order('created_at',{ascending:false})),
+        fetchAllRows(()=>supabase
           .from('atividades')
           .select('*, processos(id,numero,titulo,tribunal)')
           .eq('escritorio_id',eid)
           .in('tipo',['audiencia','reuniao'])
-          .order('created_at',{ascending:false})
+          .order('created_at',{ascending:false}))
       ])
-      if(privadas.error) console.error('Erro ao carregar atividades privadas:', privadas.error)
-      if(compartilhadas.error) console.error('Erro ao carregar atividades compartilhadas:', compartilhadas.error)
       const mapa=new Map()
-      ;[...(privadas.data||[]),...(compartilhadas.data||[])].forEach(x=>mapa.set(x.id,x))
+      ;[...(privadas||[]),...(compartilhadas||[])].forEach(x=>mapa.set(x.id,x))
       atividades=Array.from(mapa.values()).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))
     }
 
-    const[{data:l},{data:p},{data:c}]=await Promise.all([
+    const[{data:l},p,c]=await Promise.all([
       supabase.from('usuarios_escritorios').select('usuario_id,papel,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),
-      supabase.from('processos').select('id,numero,titulo').eq('escritorio_id',eid).order('created_at',{ascending:false}),
-      supabase.from('contratos').select('id,numero,titulo,contratante,contratada').eq('escritorio_id',eid).order('created_at',{ascending:false})
+      fetchAllRows(()=>supabase.from('processos').select('id,numero,titulo').eq('escritorio_id',eid).order('created_at',{ascending:false})),
+      fetchAllRows(()=>supabase.from('contratos').select('id,numero,titulo,contratante,contratada').eq('escritorio_id',eid).order('created_at',{ascending:false}))
     ])
 
     setItems(atividades)

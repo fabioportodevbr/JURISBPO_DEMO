@@ -11,7 +11,7 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
-import { can, supabase } from "@/lib/supabase.js";
+import { can, fetchAllRows, supabase } from "@/lib/supabase.js";
 
 type Processo = {
   id: string;
@@ -345,21 +345,18 @@ export default function Financeiro({ profile }: { profile: any }) {
   async function load() {
     if (!profile?.escritorio_id) return;
     setLoading(true);
-    const [{ data: financeiros, error: finError }, { data: processosData, error: procError }] = await Promise.all([
-      supabase
+    const [financeiros, processosData] = await Promise.all([
+      fetchAllRows(() => supabase
         .from("financeiro_processos")
         .select("*")
         .eq("escritorio_id", profile.escritorio_id)
-        .order("created_at", { ascending: false }),
-      supabase
+        .order("created_at", { ascending: false })),
+      fetchAllRows(() => supabase
         .from("processos")
         .select("id, numero, titulo, parte_contraria, categoria, status, valor_acao, transito_julgado")
         .eq("escritorio_id", profile.escritorio_id)
-        .order("updated_at", { ascending: false }),
+        .order("updated_at", { ascending: false })),
     ]);
-
-    if (finError) console.error("Erro ao carregar financeiro", finError);
-    if (procError) console.error("Erro ao carregar processos", procError);
 
     const registrosFinanceiros = (financeiros || []) as RegistroFinanceiro[];
     setHasValorRestituidoColumn(registrosFinanceiros.some((registro) => Object.prototype.hasOwnProperty.call(registro, "valor_restituido")));

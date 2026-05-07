@@ -9,6 +9,23 @@ export const signIn = (email, password) => supabase.auth.signInWithPassword({ em
 export const signOut = () => supabase.auth.signOut()
 export const resetPassword = (email) => supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })
 
+export async function fetchAllRows(queryFactory, pageSize = 1000) {
+  const rows = []
+  let from = 0
+
+  while (true) {
+    const to = from + pageSize - 1
+    const { data, error } = await queryFactory().range(from, to)
+    if (error) throw error
+    const page = data || []
+    rows.push(...page)
+    if (page.length < pageSize) break
+    from += pageSize
+  }
+
+  return rows
+}
+
 export const ROLES = {
   gerente: { label: 'Gerente Jurídico', nivel: 4 },
   advogado: { label: 'Advogado(a)', nivel: 3 },
