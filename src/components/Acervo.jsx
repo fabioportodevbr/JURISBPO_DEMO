@@ -30,6 +30,22 @@ function fmtTs(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleString('pt-BR')
 }
+function numSeq(numero) {
+  const n = parseInt(String(numero || '').split('/')[0], 10)
+  return Number.isFinite(n) ? n : 0
+}
+function ultimoOficio(oficios = []) {
+  return [...oficios].sort((a, b) => {
+    const byAno = Number(a.ano || 0) - Number(b.ano || 0)
+    if (byAno) return byAno
+    const bySeq = numSeq(a.numero) - numSeq(b.numero)
+    if (bySeq) return bySeq
+    return new Date(a.created_at || a.data || 0) - new Date(b.created_at || b.data || 0)
+  }).at(-1) || null
+}
+function uniq(values = []) {
+  return [...new Set(values.map(v => String(v || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
 
 // ── Modal base ────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children, wide }) {
@@ -116,10 +132,10 @@ function Field({ label, children, required }) {
 const inp = { width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, color: '#0f172a', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }
 
 // ── Modal: Novo / Editar Ofício ───────────────────────────────────────────
-function OficioModal({ oficio, empresa, destinatarios, onSave, onClose, profile }) {
+function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, onSave, onClose, profile }) {
   const isEdit = !!oficio
   const [form, setForm] = useState({
-    numero:       oficio?.numero       || '',
+    numero:       oficio?.numero       || numeroSugerido || '',
     departamento: oficio?.departamento || '',
     responsavel:  oficio?.responsavel  || '',
     data:         oficio?.data         || new Date().toISOString().split('T')[0],
@@ -131,6 +147,12 @@ function OficioModal({ oficio, empresa, destinatarios, onSave, onClose, profile 
     observacoes:  oficio?.observacoes  || '',
   })
   const [destOpts, setDestOpts] = useState(destinatarios.map(d => d.nome))
+  const [localOpts, setLocalOpts] = useState({
+    departamentos: opcoes?.departamentos || [],
+    responsaveis: opcoes?.responsaveis || [],
+    remetentes: opcoes?.remetentes || [],
+    formasEnvio: opcoes?.formasEnvio || [],
+  })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -140,6 +162,9 @@ function OficioModal({ oficio, empresa, destinatarios, onSave, onClose, profile 
   async function addDestinatario(nome) {
     await supabase.from('oficios_destinatarios').insert({ empresa_id: empresa.id, nome })
     setDestOpts(prev => [...prev, nome].sort())
+  }
+  function addLocalOption(key, nome) {
+    setLocalOpts(prev => ({ ...prev, [key]: uniq([...(prev[key] || []), nome]) }))
   }
 
   async function handleSubmit(e) {
@@ -181,15 +206,15 @@ function OficioModal({ oficio, empresa, destinatarios, onSave, onClose, profile 
           <CreatableSelect options={destOpts} value={form.destinatario} onChange={v => set('destinatario', v)} placeholder="Selecionar ou adicionar..." onCreateNew={addDestinatario} />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Departamento"><input style={inp} value={form.departamento} onChange={e => set('departamento', e.target.value)} placeholder="ex: Jurídico" /></Field>
-          <Field label="Responsável pelo Ofício"><input style={inp} value={form.responsavel} onChange={e => set('responsavel', e.target.value)} /></Field>
+          <Field label="Departamento"><CreatableSelect options={localOpts.departamentos} value={form.departamento} onChange={v => set('departamento', v)} placeholder="Selecionar ou adicionar..." onCreateNew={v => addLocalOption('departamentos', v)} /></Field>
+          <Field label="Responsável pelo Ofício"><CreatableSelect options={localOpts.responsaveis} value={form.responsavel} onChange={v => set('responsavel', v)} placeholder="Selecionar ou adicionar..." onCreateNew={v => addLocalOption('responsaveis', v)} /></Field>
         </div>
         <Field label="Referência / Assunto">
           <textarea style={{ ...inp, resize: 'none', height: 68 }} value={form.referencia} onChange={e => set('referencia', e.target.value)} placeholder="Assunto do ofício..." />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Remetente Responsável pelo Envio"><input style={inp} value={form.remetente} onChange={e => set('remetente', e.target.value)} /></Field>
-          <Field label="Forma de Envio"><input style={inp} value={form.forma_envio} onChange={e => set('forma_envio', e.target.value)} placeholder="ex: SEI, E-mail..." /></Field>
+          <Field label="Remetente Responsável pelo Envio"><CreatableSelect options={localOpts.remetentes} value={form.remetente} onChange={v => set('remetente', v)} placeholder="Selecionar ou adicionar..." onCreateNew={v => addLocalOption('remetentes', v)} /></Field>
+          <Field label="Forma de Envio"><CreatableSelect options={localOpts.formasEnvio} value={form.forma_envio} onChange={v => set('forma_envio', v)} placeholder="Selecionar ou adicionar..." onCreateNew={v => addLocalOption('formasEnvio', v)} /></Field>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Arquivado na Pasta?">
@@ -250,8 +275,8 @@ function ConsultarModal({ empresa, onClose, profile, onEdit }) {
   async function handleDelete(of) {
     if (!confirm(`Excluir ofício ${of.numero}?`)) return
     setDeleting(true)
-    await supabase.from('oficios').delete().eq('id', of.id)
     await supabase.from('oficios_auditoria').insert({ oficio_id: of.id, empresa_id: empresa.id, numero_oficio: of.numero, acao: 'excluído', usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: of })
+    await supabase.from('oficios').delete().eq('id', of.id)
     setSelected(null); fetchAll(); setDeleting(false)
   }
 
@@ -354,7 +379,9 @@ function TodosModelosModal({ modelos, onClose }) {
                   {m.area && <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 99, background: C.primaryLight, color: C.primary, fontWeight: 600 }}>{m.area}</span>}
                 </div>
                 {m.descricao && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{m.descricao}</div>}
-                {m.arquivo_nome && <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><Paperclip size={10} />{m.arquivo_nome}</div>}
+                {m.arquivo_nome && (m.arquivo_url || m.url)
+                  ? <a href={m.arquivo_url || m.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.primary, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontWeight: 700 }}><Paperclip size={10} />{m.arquivo_nome}</a>
+                  : m.arquivo_nome && <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><Paperclip size={10} />{m.arquivo_nome}</div>}
               </div>
               <div style={{ fontSize: 12, color: C.muted, marginLeft: 16, whiteSpace: 'nowrap' }}>{m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}</div>
             </div>
@@ -367,25 +394,113 @@ function TodosModelosModal({ modelos, onClose }) {
 }
 
 // ── Componente Principal ──────────────────────────────────────────────────
+function ModeloUploadModal({ profile, onSave, onClose }) {
+  const [form, setForm] = useState({ nome: '', tipo: '', area: '', descricao: '' })
+  const [files, setFiles] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const fileRef = useRef(null)
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  async function insertModelo(payload) {
+    const attempts = [
+      payload,
+      { nome: payload.nome, tipo: payload.tipo, area: payload.area, descricao: payload.descricao, arquivo_nome: payload.arquivo_nome, arquivo_url: payload.arquivo_url, storage_path: payload.storage_path, storage_bucket: payload.storage_bucket },
+      { nome: payload.nome, tipo: payload.tipo, area: payload.area, descricao: payload.descricao, arquivo_nome: payload.arquivo_nome, arquivo_url: payload.arquivo_url },
+      { nome: payload.nome, tipo: payload.tipo, area: payload.area, descricao: payload.descricao, arquivo_nome: payload.arquivo_nome },
+    ]
+    let lastError = null
+    for (const body of attempts) {
+      const { error } = await supabase.from('modelos').insert(body)
+      if (!error) return
+      lastError = error
+      if (!/column|schema|cache|not found/i.test(error.message || '')) break
+    }
+    throw lastError
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.nome.trim()) { setErr('Informe o nome do modelo.'); return }
+    if (!files.length) { setErr('Anexe ao menos um arquivo.'); return }
+    setSaving(true); setErr('')
+    try {
+      for (const file of files) {
+        const safeName = file.name.replace(/[^\w.\-]+/g, '_')
+        const path = `${profile?.escritorio_id || 'modelos'}/modelos/${Date.now()}_${safeName}`
+        const { error: upErr } = await supabase.storage.from('modelos').upload(path, file, { upsert: false })
+        if (upErr) throw upErr
+        const { data: { publicUrl } } = supabase.storage.from('modelos').getPublicUrl(path)
+        await insertModelo({
+          escritorio_id: profile?.escritorio_id,
+          nome: files.length > 1 ? `${form.nome.trim()} - ${file.name}` : form.nome.trim(),
+          tipo: form.tipo || null,
+          area: form.area || null,
+          descricao: form.descricao || null,
+          arquivo_nome: file.name,
+          arquivo_url: publicUrl,
+          storage_bucket: 'modelos',
+          storage_path: path,
+          created_by: profile?.id,
+          updated_at: new Date().toISOString(),
+        })
+      }
+      onSave()
+    } catch (e2) { setErr('Erro ao anexar modelo: ' + (e2?.message || e2)) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Modal title="Anexar modelo" onClose={onClose}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field label="Nome do modelo" required><input autoFocus style={inp} value={form.nome} onChange={e => set('nome', e.target.value)} placeholder="ex: Ofício de resposta ao órgão" /></Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Tipo"><input style={inp} value={form.tipo} onChange={e => set('tipo', e.target.value)} placeholder="ex: Ofício" /></Field>
+          <Field label="Área"><input style={inp} value={form.area} onChange={e => set('area', e.target.value)} placeholder="ex: Jurídico" /></Field>
+        </div>
+        <Field label="Descrição"><textarea style={{ ...inp, resize: 'none', height: 70 }} value={form.descricao} onChange={e => set('descricao', e.target.value)} placeholder="Observações sobre uso do modelo..." /></Field>
+        <Field label="Arquivo do modelo" required>
+          <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed ' + C.border, borderRadius: 10, padding: 14, textAlign: 'center', cursor: 'pointer' }}>
+            <Upload size={18} color={C.muted} style={{ display: 'block', margin: '0 auto 4px' }} />
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Clique para selecionar arquivos</p>
+            <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => setFiles(Array.from(e.target.files || []))} />
+          </div>
+          {files.map((f, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: C.bg, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}><Paperclip size={12} color={C.muted} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span><button type="button" onClick={() => setFiles(ff => ff.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 0 }}><X size={13} /></button></div>)}
+        </Field>
+        {err && <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.dangerLight, border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}><AlertCircle size={14} />{err}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" onClick={onClose} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
+          <button type="submit" disabled={saving} style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>{saving ? 'Anexando...' : 'Anexar modelo'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 export default function Acervo({ profile }) {
   const [activeSection, setActiveSection] = useState('modelos')
   const [modelos, setModelos] = useState([])
   const [loadingModelos, setLoadingModelos] = useState(true)
   const [showTodosModelos, setShowTodosModelos] = useState(false)
+  const [showUploadModelo, setShowUploadModelo] = useState(false)
   const [empresas, setEmpresas] = useState([])
   const [selectedEmpresa, setSelectedEmpresa] = useState(null)
   const [oficiosList, setOficiosList] = useState([])
   const [destinatarios, setDestinatarios] = useState([])
+  const [opcoesOficios, setOpcoesOficios] = useState({ departamentos: [], responsaveis: [], remetentes: [], formasEnvio: [] })
   const [loadingOficios, setLoadingOficios] = useState(false)
   const [showNovoOficio, setShowNovoOficio] = useState(false)
   const [showConsultar, setShowConsultar] = useState(false)
   const [showNovaEmpresa, setShowNovaEmpresa] = useState(false)
   const [editingOficio, setEditingOficio] = useState(null)
 
-  useEffect(() => {
+  const fetchModelos = useCallback(() => {
+    setLoadingModelos(true)
     supabase.from('modelos').select('*').order('updated_at', { ascending: false })
       .then(({ data }) => { setModelos(data || []); setLoadingModelos(false) })
   }, [])
+
+  useEffect(() => { fetchModelos() }, [fetchModelos])
 
   useEffect(() => {
     supabase.from('oficios_empresas').select('*').order('nome').then(({ data }) => {
@@ -401,20 +516,43 @@ export default function Acervo({ profile }) {
     setOficiosList(data || []); setLoadingOficios(false)
   }, [])
 
+  const fetchOpcoesOficios = useCallback(async (empresa) => {
+    if (!empresa) return
+    const { data } = await supabase.from('oficios').select('departamento,responsavel,remetente,forma_envio').eq('empresa_id', empresa.id)
+    setOpcoesOficios({
+      departamentos: uniq((data || []).map(x => x.departamento)),
+      responsaveis: uniq((data || []).map(x => x.responsavel)),
+      remetentes: uniq((data || []).map(x => x.remetente)),
+      formasEnvio: uniq((data || []).map(x => x.forma_envio)),
+    })
+  }, [])
+
   useEffect(() => {
     if (!selectedEmpresa) return
     fetchOficios(selectedEmpresa)
+    fetchOpcoesOficios(selectedEmpresa)
     supabase.from('oficios_destinatarios').select('*').eq('empresa_id', selectedEmpresa.id).order('nome').then(({ data }) => setDestinatarios(data || []))
-  }, [selectedEmpresa, fetchOficios])
+  }, [selectedEmpresa, fetchOficios, fetchOpcoesOficios])
 
   function nextNumero() {
     const year = new Date().getFullYear()
-    const nums = oficiosList.map(o => parseInt(o.numero?.split('/')[0])).filter(n => !isNaN(n))
+    const nums = oficiosList.map(o => numSeq(o.numero)).filter(n => !isNaN(n))
     const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
     return `${String(next).padStart(3, '0')}/${year}`
   }
 
+  async function excluirUltimoOficio() {
+    const alvo = ultimoOficio(oficiosList)
+    if (!alvo) return
+    if (!confirm(`Excluir o último ofício registrado (${alvo.numero})?`)) return
+    await supabase.from('oficios_auditoria').insert({ oficio_id: alvo.id, empresa_id: selectedEmpresa.id, numero_oficio: alvo.numero, acao: 'excluído', usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: alvo })
+    await supabase.from('oficios').delete().eq('id', alvo.id)
+    fetchOficios(selectedEmpresa)
+    fetchOpcoesOficios(selectedEmpresa)
+  }
+
   const recentModelos = modelos.slice(0, 5)
+  const ultimoRegistro = ultimoOficio(oficiosList)
 
   return (
     <div style={{ padding: 32, background: C.bg, minHeight: '100%' }}>
@@ -451,9 +589,14 @@ export default function Acervo({ profile }) {
                   <div style={{ fontSize: 12, color: C.muted }}>{modelos.length} modelo(s) no acervo</div>
                 </div>
               </div>
-              <button onClick={() => setShowTodosModelos(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none', cursor: 'pointer', color: C.primary, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
-                Ver mais <ChevronRight size={14} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setShowUploadModelo(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, cursor: 'pointer', color: C.primary, borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
+                  <Upload size={14} />Anexar modelo
+                </button>
+                <button onClick={() => setShowTodosModelos(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none', cursor: 'pointer', color: C.primary, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+                  Ver mais <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
             {loadingModelos ? <div style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</div>
               : recentModelos.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum modelo encontrado.</div>
@@ -468,7 +611,9 @@ export default function Acervo({ profile }) {
                     <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
                       {m.tipo && <span style={{ fontSize: 11, color: C.muted }}>{m.tipo}</span>}
                       {m.area && <span style={{ fontSize: 11, color: C.primary, fontWeight: 600 }}>{m.area}</span>}
-                      {m.arquivo_nome && <span style={{ fontSize: 11, color: C.muted, display: 'flex', alignItems: 'center', gap: 3 }}><Paperclip size={9} />{m.arquivo_nome}</span>}
+                      {m.arquivo_nome && (m.arquivo_url || m.url)
+                        ? <a href={m.arquivo_url || m.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.primary, display: 'flex', alignItems: 'center', gap: 3, textDecoration: 'none', fontWeight: 700 }}><Paperclip size={9} />{m.arquivo_nome}</a>
+                        : m.arquivo_nome && <span style={{ fontSize: 11, color: C.muted, display: 'flex', alignItems: 'center', gap: 3 }}><Paperclip size={9} />{m.arquivo_nome}</span>}
                     </div>
                   </div>
                 </div>
@@ -518,6 +663,11 @@ export default function Acervo({ profile }) {
                 <button onClick={() => setShowConsultar(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
                   <Eye size={14} />Consultar todos
+                </button>
+                <button onClick={excluirUltimoOficio} disabled={!ultimoRegistro}
+                  title={ultimoRegistro ? `Excluir ${ultimoRegistro.numero}` : 'Nenhum ofício para excluir'}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #fca5a5', borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: ultimoRegistro ? 'pointer' : 'not-allowed', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', opacity: ultimoRegistro ? 1 : 0.55 }}>
+                  <Trash2 size={14} />Excluir último
                 </button>
                 <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true) }}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
@@ -573,9 +723,10 @@ export default function Acervo({ profile }) {
 
       {/* Modais */}
       {showTodosModelos && <TodosModelosModal modelos={modelos} onClose={() => setShowTodosModelos(false)} />}
+      {showUploadModelo && <ModeloUploadModal profile={profile} onSave={() => { setShowUploadModelo(false); fetchModelos() }} onClose={() => setShowUploadModelo(false)} />}
       {showNovoOficio && selectedEmpresa && (
-        <OficioModal oficio={editingOficio} empresa={selectedEmpresa} destinatarios={destinatarios} profile={profile}
-          onSave={() => { setShowNovoOficio(false); setEditingOficio(null); fetchOficios(selectedEmpresa); supabase.from('oficios_destinatarios').select('*').eq('empresa_id', selectedEmpresa.id).order('nome').then(({ data }) => setDestinatarios(data || [])) }}
+        <OficioModal oficio={editingOficio} empresa={selectedEmpresa} destinatarios={destinatarios} opcoes={opcoesOficios} numeroSugerido={nextNumero()} profile={profile}
+          onSave={() => { setShowNovoOficio(false); setEditingOficio(null); fetchOficios(selectedEmpresa); fetchOpcoesOficios(selectedEmpresa); supabase.from('oficios_destinatarios').select('*').eq('empresa_id', selectedEmpresa.id).order('nome').then(({ data }) => setDestinatarios(data || [])) }}
           onClose={() => { setShowNovoOficio(false); setEditingOficio(null) }} />
       )}
       {showConsultar && selectedEmpresa && (
