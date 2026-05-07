@@ -52,6 +52,7 @@ type RegistroFinanceiro = {
   apolice_fim?: string | null;
   valor_assegurado?: number | string | null;
   seguro_premio?: number | string | null;
+  valor_restituido?: number | string | null;
   observacoes?: string | null;
   created_at?: string | null;
 };
@@ -82,6 +83,7 @@ type FormState = {
   apolice_fim: string;
   valor_assegurado: string;
   seguro_premio: string;
+  valor_restituido: string;
   observacoes: string;
 };
 
@@ -198,6 +200,7 @@ const initialForm: FormState = {
   apolice_fim: "",
   valor_assegurado: "",
   seguro_premio: "",
+  valor_restituido: "",
   observacoes: "",
 };
 
@@ -255,12 +258,29 @@ function normalizeInputValue(value: unknown) {
   return number ? String(number) : "";
 }
 
+function limparMarcadorValorRestituido(observacoes = "") {
+  return String(observacoes || "").replace(/\n?\[VALOR_RESTITUIDO:[^\]]*\]/g, "").trim();
+}
+
+function valorRestituido(registro: RegistroFinanceiro) {
+  const direto = parseMoney(registro.valor_restituido);
+  if (direto > 0) return direto;
+  const match = String(registro.observacoes || "").match(/\[VALOR_RESTITUIDO:([^\]]*)\]/);
+  return match ? parseMoney(match[1]) : 0;
+}
+
+function juntarMarcadorValorRestituido(observacoes = "", valor: unknown) {
+  const limpas = limparMarcadorValorRestituido(observacoes);
+  const restituido = parseMoney(valor);
+  return [limpas, restituido > 0 ? `[VALOR_RESTITUIDO:${restituido.toFixed(2)}]` : ""].filter(Boolean).join("\n");
+}
+
 function totalEncargos(registro: RegistroFinanceiro) {
   return CAMPOS_ENCARGOS.reduce((sum, field) => sum + parseMoney((registro as any)[field]), 0);
 }
 
 function totalRegistro(registro: RegistroFinanceiro) {
-  return parseMoney(registro.valor_bruto) + totalEncargos(registro);
+  return Math.max(parseMoney(registro.valor_bruto) + totalEncargos(registro) - valorRestituido(registro), 0);
 }
 
 function isPago(registro: RegistroFinanceiro) {
@@ -305,6 +325,7 @@ export default function Financeiro({ profile }: { profile: any }) {
   const [saving, setSaving] = useState(false);
   const [registros, setRegistros] = useState<RegistroFinanceiro[]>([]);
   const [processos, setProcessos] = useState<Processo[]>([]);
+  const [hasValorRestituidoColumn, setHasValorRestituidoColumn] = useState(false);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
   const [filters, setFilters] = useState({
@@ -340,7 +361,9 @@ export default function Financeiro({ profile }: { profile: any }) {
     if (finError) console.error("Erro ao carregar financeiro", finError);
     if (procError) console.error("Erro ao carregar processos", procError);
 
-    setRegistros((financeiros || []) as RegistroFinanceiro[]);
+    const registrosFinanceiros = (financeiros || []) as RegistroFinanceiro[];
+    setHasValorRestituidoColumn(registrosFinanceiros.some((registro) => Object.prototype.hasOwnProperty.call(registro, "valor_restituido")));
+    setRegistros(registrosFinanceiros);
     setProcessos((processosData || []) as Processo[]);
     setLoading(false);
   }
@@ -391,10 +414,11 @@ export default function Financeiro({ profile }: { profile: any }) {
     const total = filtered.reduce((sum, registro) => sum + totalRegistro(registro), 0);
     const principal = filtered.reduce((sum, registro) => sum + parseMoney(registro.valor_bruto), 0);
     const encargos = filtered.reduce((sum, registro) => sum + totalEncargos(registro), 0);
+    const restituido = filtered.reduce((sum, registro) => sum + valorRestituido(registro), 0);
     const pago = filtered.filter(isPago).reduce((sum, registro) => sum + totalRegistro(registro), 0);
     const atrasado = filtered.filter(isAtrasado).reduce((sum, registro) => sum + totalRegistro(registro), 0);
     const apolices = filtered.filter((registro) => registro.seguro_garantia || registro.apolice_numero || parseMoney(registro.valor_assegurado) > 0).length;
-    return { total, principal, encargos, pago, pendente: Math.max(total - pago, 0), atrasado, apolices };
+    return { total, principal, encargos, restituido, pago, pendente: Math.max(total - pago, 0), atrasado, apolices };
   }, [filtered]);
 
   function openForm(registro?: RegistroFinanceiro) {
@@ -430,7 +454,8 @@ export default function Financeiro({ profile }: { profile: any }) {
       apolice_fim: registro.apolice_fim || "",
       valor_assegurado: normalizeInputValue(registro.valor_assegurado),
       seguro_premio: normalizeInputValue(registro.seguro_premio),
-      observacoes: registro.observacoes || "",
+      valor_restituido: normalizeInputValue(valorRestituido(registro)),
+      observacoes: limparMarcadorValorRestituido(registro.observacoes || ""),
     });
     setModal(true);
   }
@@ -468,14 +493,18 @@ export default function Financeiro({ profile }: { profile: any }) {
       primeiro_vencimento: form.primeiro_vencimento || null,
       data_referencia: form.data_referencia || null,
       seguro_garantia: !!form.seguro_garantia,
-      observacoes: form.observacoes || null,
+      observacoes: hasValorRestituidoColumn
+        ? limparMarcadorValorRestituido(form.observacoes) || null
+        : juntarMarcadorValorRestituido(form.observacoes, form.valor_restituido) || null,
     };
 
     delete payload.id;
+    if (!hasValorRestituidoColumn) delete payload.valor_restituido;
     if (!form.id) payload.criado_por = profile.id;
     CAMPOS_VALOR.forEach((field) => {
       payload[field] = parseMoney((form as any)[field]);
     });
+    if (hasValorRestituidoColumn) payload.valor_restituido = parseMoney(form.valor_restituido);
 
     if (!form.seguro_garantia) {
       payload.apolice_numero = null;
@@ -529,6 +558,7 @@ export default function Financeiro({ profile }: { profile: any }) {
     { title: "Total financeiro", value: resumo.total, icon: Wallet, color: C.text, sub: `${filtered.length} registro(s)` },
     { title: "Principal", value: resumo.principal, icon: FileText, color: C.blue, sub: "acordos e execuções" },
     { title: "Encargos", value: resumo.encargos, icon: AlertTriangle, color: C.amber, sub: "custas, depósitos e honorários" },
+    { title: "Restituido", value: resumo.restituido, icon: CheckCircle, color: C.green, sub: "valores devolvidos" },
     { title: "Pago / quitado", value: resumo.pago, icon: CheckCircle, color: C.green, sub: "status finalizado" },
     { title: "Pendente", value: resumo.pendente, icon: AlertTriangle, color: resumo.pendente ? C.amber : C.green, sub: "em aberto" },
     { title: "Seguro-garantia", value: resumo.apolices, icon: ShieldCheck, color: C.blue, sub: "apólice(s)", count: true },
@@ -603,7 +633,7 @@ export default function Financeiro({ profile }: { profile: any }) {
 
       <section style={{ background: C.white, border: "1px solid " + C.border, borderRadius: 12, marginTop: 22, overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1180, fontSize: 13 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1260, fontSize: 13 }}>
             <thead>
               <tr style={{ background: C.grayBg, color: C.muted, textTransform: "uppercase", fontSize: 11, letterSpacing: ".05em" }}>
                 <th style={{ padding: 12, textAlign: "left" }}>Processo</th>
@@ -613,6 +643,7 @@ export default function Financeiro({ profile }: { profile: any }) {
                 <th style={{ padding: 12, textAlign: "left" }}>Vencimento</th>
                 <th style={{ padding: 12, textAlign: "right" }}>Principal</th>
                 <th style={{ padding: 12, textAlign: "right" }}>Encargos</th>
+                <th style={{ padding: 12, textAlign: "right" }}>Restituido</th>
                 <th style={{ padding: 12, textAlign: "right" }}>Total</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Status</th>
                 <th style={{ padding: 12, textAlign: "left" }}>Seguro</th>
@@ -621,9 +652,9 @@ export default function Financeiro({ profile }: { profile: any }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={11} style={{ padding: 30, textAlign: "center", color: C.muted }}>Carregando financeiro...</td></tr>
+                <tr><td colSpan={12} style={{ padding: 30, textAlign: "center", color: C.muted }}>Carregando financeiro...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={11} style={{ padding: 30, textAlign: "center", color: C.muted }}>Nenhum registro financeiro encontrado.</td></tr>
+                <tr><td colSpan={12} style={{ padding: 30, textAlign: "center", color: C.muted }}>Nenhum registro financeiro encontrado.</td></tr>
               ) : (
                 filtered.map((registro) => {
                   const processo = registro.processo_id ? processoById.get(registro.processo_id) : undefined;
@@ -642,6 +673,7 @@ export default function Financeiro({ profile }: { profile: any }) {
                       <td style={{ padding: 12, verticalAlign: "top", color: atrasado ? C.red : C.muted }}>{dateBR(registro.primeiro_vencimento)}</td>
                       <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 800 }}>{money(registro.valor_bruto)}</td>
                       <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", color: totalEncargos(registro) ? C.amber : C.muted }}>{money(totalEncargos(registro))}</td>
+                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", color: valorRestituido(registro) ? C.green : C.muted }}>{money(valorRestituido(registro))}</td>
                       <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 900 }}>{money(totalRegistro(registro))}</td>
                       <td style={{ padding: 12, verticalAlign: "top" }}>
                         <span style={{ display: "inline-flex", border: "1px solid " + (pago ? "#86efac" : atrasado ? "#fecaca" : "#fde68a"), background: pago ? C.greenBg : atrasado ? C.redBg : C.amberBg, color: pago ? C.green : atrasado ? C.red : C.amber, borderRadius: 999, padding: "4px 9px", fontSize: 12, fontWeight: 900 }}>
@@ -716,6 +748,7 @@ export default function Financeiro({ profile }: { profile: any }) {
               <F label="INSS reclamante"><input type="number" step="0.01" min="0" style={INP} value={form.inss_reclamante} onChange={(event) => setForm((old) => ({ ...old, inss_reclamante: event.target.value }))} /></F>
               <F label="INSS reclamada"><input type="number" step="0.01" min="0" style={INP} value={form.inss_reclamada} onChange={(event) => setForm((old) => ({ ...old, inss_reclamada: event.target.value }))} /></F>
               <F label="Multa"><input type="number" step="0.01" min="0" style={INP} value={form.multa_inadimplemento} onChange={(event) => setForm((old) => ({ ...old, multa_inadimplemento: event.target.value }))} /></F>
+              <F label="Valor restituido"><input type="number" step="0.01" min="0" style={INP} value={form.valor_restituido} onChange={(event) => setForm((old) => ({ ...old, valor_restituido: event.target.value }))} /></F>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12 }}>

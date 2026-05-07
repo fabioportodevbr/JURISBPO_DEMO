@@ -10,6 +10,26 @@ function F({label,children}) {
   </div>
 }
 
+function parseMoney(v) {
+  if (v === null || v === undefined || v === '') return 0
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
+  let s = String(v).replace(/[^\d,.-]/g, '')
+  if (!s) return 0
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.')
+  return Number(s) || 0
+}
+
+function financeiroExcluido(f = {}) {
+  return String(f?.observacoes || '').includes('[REGISTRO_FINANCEIRO_EXCLUIDO:')
+}
+
+function valorRestituidoFinanceiro(f = {}) {
+  const direto = parseMoney(f.valor_restituido)
+  if (direto > 0) return direto
+  const match = String(f?.observacoes || '').match(/\[VALOR_RESTITUIDO:([^\]]*)\]/)
+  return match ? parseMoney(match[1]) : 0
+}
+
 export function SeguroGarantiaCampos({financeiroForm,setFinanceiroForm}) {
   return (
     <div style={{border:'1px solid '+C.border,borderRadius:12,padding:12,margin:'12px 0'}}>
@@ -60,16 +80,21 @@ export function calcularResumoFinanceiroProcesso(proc, financeiros = []) {
     ['acordo','execucao','execução'].includes(String(f.natureza || '').toLowerCase())
   )
 
-  const totalGasto = financeiros.reduce((s, f) => s +
-    Number(f.valor_bruto || 0) +
-    Number(f.custas_processuais || 0) +
-    Number(f.fgts || 0) +
-    Number(f.honorarios_sucumbenciais || 0) +
-    Number(f.honorarios_periciais || 0) +
-    Number(f.inss_reclamante || 0) +
-    Number(f.inss_reclamada || 0) +
-    Number(f.multa_inadimplemento || 0) +
-    Number(f.seguro_premio || 0), 0)
+  const totalGasto = financeiros.filter(f => !financeiroExcluido(f)).reduce((s, f) => s + Math.max(
+    parseMoney(f.valor_bruto) +
+    parseMoney(f.deposito_ro) +
+    parseMoney(f.deposito_rr) +
+    parseMoney(f.deposito_embargos) +
+    parseMoney(f.custas) +
+    parseMoney(f.custas_processuais) +
+    parseMoney(f.fgts) +
+    parseMoney(f.honorarios_sucumbenciais) +
+    parseMoney(f.honorarios_periciais) +
+    parseMoney(f.inss_reclamante) +
+    parseMoney(f.inss_reclamada) +
+    parseMoney(f.multa_inadimplemento) +
+    parseMoney(f.seguro_premio) -
+    valorRestituidoFinanceiro(f), 0), 0)
 
   const economiaContabilizada = transito || acordoOuExecucaoPago
 
