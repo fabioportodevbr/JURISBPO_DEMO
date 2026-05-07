@@ -137,7 +137,7 @@ export default function Atividades({profile}){
   if(loading)return <div style={{padding:40,color:C.muted}}>Carregando atividades...</div>
   return <div style={{padding:24}}><div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><h1 style={{margin:0,fontSize:22}}>Atividades</h1><p style={{color:C.muted}}>Tarefas e prazos são individuais. Audiências e reuniões são compartilhadas com a equipe.</p></div>{canCreate&&<button onClick={()=>open()} style={{background:C.navy,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,display:'flex',gap:8,alignItems:'center'}}><Plus size={16}/>Nova Atividade</button>}</div>
 {/* ── Minhas Rotinas ── */}
-    {(rotinas.filter(r=>r.usuario_id===profile.id).length>0||isGerente)&&<div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,padding:'14px 18px',marginBottom:4}}>
+    <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:12,padding:'14px 18px',marginBottom:4}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <RefreshCw size={15} color={C.green}/>
@@ -164,7 +164,7 @@ export default function Atividades({profile}){
       {isGerente&&<details style={{marginTop:12}}><summary style={{fontSize:12,fontWeight:700,color:C.muted,cursor:'pointer',userSelect:'none'}}>Ver rotinas da equipe</summary>
         <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8}}>{Object.entries(rotinas.filter(r=>r.usuario_id!==profile.id).reduce((acc,r)=>{const n=r.profiles?.nome||r.profiles?.email||r.usuario_id;if(!acc[n])acc[n]=[];acc[n].push(r);return acc},{})).map(([nome,rs])=><div key={nome}><div style={{fontSize:12,fontWeight:800,color:C.muted,marginBottom:4}}>{nome}</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{rs.map(r=><div key={r.id} style={{background:'white',border:'1.5px solid '+(r.cor||C.green),borderRadius:8,padding:'8px 12px',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:8,flexShrink:0}}><span style={{flex:1}}>{r.texto}</span><span style={{fontSize:10,fontWeight:700,color:'white',background:r.cor||C.green,borderRadius:20,padding:'1px 8px',whiteSpace:'nowrap'}}>{r.recorrencia}</span><button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:2,display:'flex'}}><Trash2 size={12}/></button></div>)}</div></div>)}{rotinas.filter(r=>r.usuario_id!==profile.id).length===0&&<p style={{margin:0,fontSize:12,color:C.muted}}>Nenhum membro da equipe cadastrou rotinas ainda.</p>}</div>
       </details>}
-    </div>}
+    </div>
     {/* ── Botão para gerente criar rotina para outro membro ── */}
     {rotinaModal&&<Modal title={rotinaForm.id?'Editar rotina':'Nova rotina'} onClose={()=>setRotinaModal(false)} width={480}>
       <div style={{display:'grid',gap:14}}>
