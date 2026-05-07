@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase, can } from '../lib/supabase.js'
 import { Bell, AlertTriangle, Mail, CheckCircle, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X } from 'lucide-react'
 import ClippingJuridico from './ClippingJuridico.jsx'
+import MuralRecados from './MuralRecados.jsx'
 import { FinanceiroResumoDashboard } from './FinanceiroResumoDashboard.tsx'
 
 const C={text:'#0f172a',muted:'#64748b',border:'#e5e7eb',white:'#fff',blue:'#1d4ed8',green:'#16a34a',amber:'#b45309',red:'#dc2626',redBg:'#fee2e2',amberBg:'#fef3c7',blueBg:'#dbeafe',greenBg:'#dcfce7',grayBg:'#f8fafc'}
@@ -173,9 +174,12 @@ export default function Dashboard({profile}){
   }
 
   return <div style={{padding:24}}>
-    <div>
-      <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
-      <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
+      <div>
+        <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
+        <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
+      </div>
+      <MuralRecados profile={profile}/>
     </div>
 
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14,marginTop:22}}>
