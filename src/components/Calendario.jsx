@@ -133,12 +133,12 @@ export default function Calendario({ profile }) {
       const eid = profile.escritorio_id
       let atividadesQuery
       if (profile.role === 'gerente') {
-        const r = await supabase.from('atividades').select('*, processos(id,numero,titulo,tribunal)').eq('escritorio_id', eid).not('prazo', 'is', null).order('prazo', { ascending: true })
+        const r = await supabase.from('atividades').select('*, processos(id,numero,titulo,tribunal)').eq('escritorio_id', eid).not('prazo', 'is', null).neq('status','concluida').order('prazo', { ascending: true })
         atividadesQuery = r
       } else {
         const [privadas, compartilhadas] = await Promise.all([
-          supabase.from('atividades').select('*, processos(id,numero,titulo,tribunal)').eq('escritorio_id', eid).not('prazo', 'is', null).in('tipo', ['tarefa', 'prazo_processual']).eq('responsavel_id', profile.id).order('prazo', { ascending: true }),
-          supabase.from('atividades').select('*, processos(id,numero,titulo,tribunal)').eq('escritorio_id', eid).not('prazo', 'is', null).in('tipo', ['audiencia', 'reuniao']).order('prazo', { ascending: true }),
+          supabase.from('atividades').select('*, processos(id,numero,titulo,tribunal)').eq('escritorio_id', eid).not('prazo', 'is', null).neq('status','concluida').in('tipo', ['tarefa', 'prazo_processual']).eq('responsavel_id', profile.id).order('prazo', { ascending: true }),
+          supabase.from('atividades').select('*, processos(id,numero,titulo,tribunal)').eq('escritorio_id', eid).not('prazo', 'is', null).neq('status','concluida').in('tipo', ['audiencia', 'reuniao']).order('prazo', { ascending: true }),
         ])
         const mapa = new Map()
         ;[...(privadas.data || []), ...(compartilhadas.data || [])].forEach(x => mapa.set(x.id, x))
