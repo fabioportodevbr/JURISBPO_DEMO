@@ -24,9 +24,10 @@ export default function Atividades({profile}){
   const [items,setItems]=useState([]),[team,setTeam]=useState([]),[proc,setProc]=useState([]),[cont,setCont]=useState([]),[modal,setModal]=useState(false),[tab,setTab]=useState('dados'),[form,setForm]=useState({}),[loading,setLoading]=useState(true),[tipoView,setTipoView]=useState(null),[arquivoView,setArquivoView]=useState(false),[historyFor,setHistoryFor]=useState(null),[history,setHistory]=useState([]),[saving,setSaving]=useState(false)
   const [rotinas,setRotinas]=useState([])
   const [rotinaModal,setRotinaModal]=useState(false)
-  const [rotinaForm,setRotinaForm]=useState({id:null,texto:'',recorrencia:'',cor:'#064e3b'})
+  const [rotinaForm,setRotinaForm]=useState({id:null,texto:'',recorrencia:'',cor:'#064e3b',itens:[]})
   const [rotinaTarget,setRotinaTarget]=useState(null) // userId when gerente creates for someone
   const [rotinasSaving,setRotinasSaving]=useState(false)
+  const [novoItem,setNovoItem]=useState('')
   const isGerente=profile?.role==='gerente'
   const canCreate = can(profile, 'atividades.criar')
   const canEdit = can(profile, 'atividades.editar')
@@ -41,17 +42,32 @@ export default function Atividades({profile}){
     setRotinasSaving(true)
     const uid=rotinaTarget||profile.id
     if(rotinaForm.id){
-      await supabase.from('rotinas').update({texto:rotinaForm.texto.trim(),recorrencia:rotinaForm.recorrencia.trim(),cor:rotinaForm.cor,atualizado_em:new Date().toISOString()}).eq('id',rotinaForm.id)
+      await supabase.from('rotinas').update({texto:rotinaForm.texto.trim(),recorrencia:rotinaForm.recorrencia.trim(),cor:rotinaForm.cor,itens:rotinaForm.itens||[],atualizado_em:new Date().toISOString()}).eq('id',rotinaForm.id)
     }else{
-      await supabase.from('rotinas').insert({escritorio_id:profile.escritorio_id,usuario_id:uid,texto:rotinaForm.texto.trim(),recorrencia:rotinaForm.recorrencia.trim(),cor:rotinaForm.cor})
+      await supabase.from('rotinas').insert({escritorio_id:profile.escritorio_id,usuario_id:uid,texto:rotinaForm.texto.trim(),recorrencia:rotinaForm.recorrencia.trim(),cor:rotinaForm.cor,itens:rotinaForm.itens||[]})
     }
-    setRotinaModal(false);setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#064e3b'});setRotinaTarget(null)
+    setRotinaModal(false);setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#064e3b',itens:[]});setRotinaTarget(null);setNovoItem('')
     setRotinasSaving(false);loadRotinas()
   }
   const deleteRotina=async(id)=>{
     if(!confirm('Excluir esta rotina?'))return
     await supabase.from('rotinas').delete().eq('id',id)
     loadRotinas()
+  }
+  const toggleItem=async(rotina,itemId)=>{
+    const itens=(rotina.itens||[]).map(it=>it.id===itemId?{...it,concluido:!it.concluido}:it)
+    await supabase.from('rotinas').update({itens}).eq('id',rotina.id)
+    setRotinas(prev=>prev.map(r=>r.id===rotina.id?{...r,itens}:r))
+  }
+  const addItem=()=>{
+    const txt=novoItem.trim()
+    if(!txt)return
+    const item={id:crypto.randomUUID(),texto:txt,concluido:false}
+    setRotinaForm(f=>({...f,itens:[...(f.itens||[]),item]}))
+    setNovoItem('')
+  }
+  const removeItem=(itemId)=>{
+    setRotinaForm(f=>({...f,itens:(f.itens||[]).filter(it=>it.id!==itemId)}))
   }
   const load=async()=>{
     const eid=profile.escritorio_id
@@ -153,9 +169,18 @@ export default function Atividades({profile}){
             <div style={{flex:1}}>
               <p style={{margin:'0 0 6px',fontSize:13,fontWeight:600,color:C.text,lineHeight:1.4}}>{r.texto}</p>
               <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:11,fontWeight:700,color:'white',background:r.cor||C.green,borderRadius:20,padding:'2px 10px'}}><RefreshCw size={9}/>{r.recorrencia}</span>
+              {(r.itens||[]).length>0&&<div style={{marginTop:10,display:'flex',flexDirection:'column',gap:5}}>
+                {(r.itens||[]).map(it=><div key={it.id} onClick={e=>{e.stopPropagation();toggleItem(r,it.id)}} style={{display:'flex',alignItems:'flex-start',gap:7,cursor:'pointer'}}>
+                  <div style={{width:16,height:16,borderRadius:4,border:'2px solid '+(r.cor||C.green),background:it.concluido?(r.cor||C.green):'white',flexShrink:0,marginTop:1,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>
+                    {it.concluido&&<svg width="9" height="9" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </div>
+                  <span style={{fontSize:12,color:it.concluido?'#94a3b8':C.text,textDecoration:it.concluido?'line-through':'none',lineHeight:1.4,flex:1}}>{it.texto}</span>
+                </div>)}
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{(r.itens||[]).filter(i=>i.concluido).length}/{(r.itens||[]).length} concluídos</div>
+              </div>}
             </div>
             <div style={{display:'flex',gap:4,flexShrink:0}}>
-              <button onClick={()=>{setRotinaForm({id:r.id,texto:r.texto,recorrencia:r.recorrencia,cor:r.cor||'#064e3b'});setRotinaTarget(r.usuario_id);setRotinaModal(true)}} style={{border:0,background:'none',cursor:'pointer',color:C.muted,padding:3,display:'flex'}}><Pencil size={13}/></button>
+              <button onClick={()=>{setRotinaForm({id:r.id,texto:r.texto,recorrencia:r.recorrencia,cor:r.cor||'#064e3b',itens:r.itens||[]});setRotinaTarget(r.usuario_id);setRotinaModal(true);setNovoItem('')}} style={{border:0,background:'none',cursor:'pointer',color:C.muted,padding:3,display:'flex'}}><Pencil size={13}/></button>
               <button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:3,display:'flex'}}><Trash2 size={13}/></button>
             </div>
           </div>
@@ -180,6 +205,18 @@ export default function Atividades({profile}){
         <div><label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:5}}>Recorrência</label>
           <input value={rotinaForm.recorrencia} onChange={e=>setRotinaForm(f=>({...f,recorrencia:e.target.value}))} placeholder="Ex: Toda segunda-feira, Todo dia 5, Quinzenal..." style={{width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,fontSize:14,boxSizing:'border-box'}}/>
           <p style={{margin:'6px 0 0',fontSize:11,color:C.muted}}>Escreva como preferir: "Todo dia útil", "Toda segunda e quarta", "Todo dia 1º", etc.</p>
+        </div>
+        <div><label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:8}}>Lista de tarefas</label>
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8}}>
+            {(rotinaForm.itens||[]).map(it=><div key={it.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:'#f8fafc',borderRadius:7,border:'1px solid '+C.border}}>
+              <span style={{flex:1,fontSize:13,color:C.text}}>{it.texto}</span>
+              <button onClick={()=>removeItem(it.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:2,display:'flex',flexShrink:0}}><Trash2 size={13}/></button>
+            </div>)}
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <input value={novoItem} onChange={e=>setNovoItem(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addItem()}}} placeholder="Novo item... (Enter para adicionar)" style={{flex:1,padding:'8px 12px',border:'1px solid '+C.border,borderRadius:8,fontSize:13,boxSizing:'border-box'}}/>
+            <button onClick={addItem} disabled={!novoItem.trim()} style={{border:0,background:novoItem.trim()?C.navy:'#e2e8f0',color:novoItem.trim()?'white':C.muted,borderRadius:8,padding:'8px 14px',fontWeight:700,fontSize:13,cursor:novoItem.trim()?'pointer':'default'}}>+ Add</button>
+          </div>
         </div>
         <div><label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:8}}>Cor do post-it</label>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
