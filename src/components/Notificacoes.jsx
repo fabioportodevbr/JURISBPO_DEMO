@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { Bell, Mail, CheckCircle, RefreshCw, Send, Inbox, X, Paperclip, Reply, Download, FileText, Archive, ArchiveRestore } from 'lucide-react'
+import { Bell, CheckCircle, RefreshCw, Inbox, X, Archive, ArchiveRestore } from 'lucide-react'
 
 const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',amber:'#b45309',amberBg:'#fef3c7',green:'#16a34a',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',purple:'#064e3b',purpleBg:'#ede9fe'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
@@ -374,10 +374,7 @@ export default function Notificacoes({profile}){
 
     {naoLidas>0&&<div style={{marginTop:16,background:C.amberBg,color:C.amber,border:'1px solid #fde68a',borderRadius:12,padding:12,fontSize:14}}>Você tem <b>{naoLidas}</b> item(ns) não lido(s).</div>}
 
-    <div style={{display:'flex',gap:8,margin:'18px 0 10px',flexWrap:'wrap',alignItems:'center'}}>
-      <button onClick={()=>setAba('notificacoes')} style={{border:'1px solid '+C.border,background:aba==='notificacoes'?C.navy:C.white,color:aba==='notificacoes'?'white':C.text,borderRadius:20,padding:'8px 12px',fontWeight:800,cursor:'pointer',display:'flex',gap:7,alignItems:'center'}}><Bell size={15}/>Notificações</button>
-      <button onClick={()=>setAba('mensagens')} style={{border:'1px solid '+C.border,background:aba==='mensagens'?C.navy:C.white,color:aba==='mensagens'?'white':C.text,borderRadius:20,padding:'8px 12px',fontWeight:800,cursor:'pointer',display:'flex',gap:7,alignItems:'center'}}><Mail size={15}/>Mensagens</button>
-    </div>
+
 
     {aba==='notificacoes'&&<div style={{display:'flex',gap:8,margin:'0 0 18px',flexWrap:'wrap',alignItems:'center'}}>
       <span style={{fontSize:12,fontWeight:900,color:C.muted,textTransform:'uppercase',marginRight:4}}>Notificações:</span>
@@ -385,13 +382,9 @@ export default function Notificacoes({profile}){
       <button onClick={()=>setNotificacoesModo('arquivo')} style={{border:'1px solid '+C.border,background:notificacoesModo==='arquivo'?C.greenBg:C.white,color:notificacoesModo==='arquivo'?C.green:C.text,borderRadius:20,padding:'7px 11px',fontWeight:800,cursor:'pointer',display:'flex',gap:6,alignItems:'center'}}><Archive size={14}/>Arquivo</button>
     </div>}
 
-    {aba==='mensagens'&&<div style={{display:'flex',gap:8,margin:'0 0 18px',flexWrap:'wrap',alignItems:'center'}}>
-      <span style={{fontSize:12,fontWeight:900,color:C.muted,textTransform:'uppercase',marginRight:4}}>Mensagens:</span>
-      <button onClick={()=>setMensagensModo('entrada')} style={{border:'1px solid '+C.border,background:mensagensModo==='entrada'?C.greenBg:C.white,color:mensagensModo==='entrada'?C.green:C.text,borderRadius:20,padding:'7px 11px',fontWeight:800,cursor:'pointer',display:'flex',gap:6,alignItems:'center'}}><Inbox size={14}/>Caixa de entrada</button>
-      <button onClick={()=>setMensagensModo('arquivo')} style={{border:'1px solid '+C.border,background:mensagensModo==='arquivo'?C.greenBg:C.white,color:mensagensModo==='arquivo'?C.green:C.text,borderRadius:20,padding:'7px 11px',fontWeight:800,cursor:'pointer',display:'flex',gap:6,alignItems:'center'}}><Archive size={14}/>Arquivo</button>
-    </div>}
 
-    {loading?<div style={{color:C.muted}}>Carregando...</div>:aba==='notificacoes'?<div style={{display:'grid',gap:10}}>{notificacoesVisiveis.length===0?<Empty text={notificacoesModo==='arquivo'?'Nenhuma notificação arquivada.':'Nenhuma notificação na caixa de entrada.'}/>:notificacoesVisiveis.map(n=><NotificationCard key={n.id} n={n}/>)}</div>:<div style={{display:'grid',gap:10}}>{mensagensVisiveis.length===0?<Empty text={mensagensModo==='arquivo'?'Nenhuma mensagem arquivada.':'Nenhuma mensagem na caixa de entrada.'}/>:mensagensVisiveis.map(m=><MessageCard key={m.id} m={m}/>)}</div>}
+
+    {loading?<div style={{color:C.muted}}>Carregando...</div>:<div style={{display:'grid',gap:10}}>{notificacoesVisiveis.length===0?<Empty text={notificacoesModo==='arquivo'?'Nenhuma notificação arquivada.':'Nenhuma notificação na caixa de entrada.'}/>:notificacoesVisiveis.map(n=><NotificationCard key={n.id} n={n}/>)}</div>}
 
 
     {devolucao&&<Modal title="Devolver atividade" onClose={()=>{setDevolucao(null);setMotivoDevolucao('')}} width={560}>

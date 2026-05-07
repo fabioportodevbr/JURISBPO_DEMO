@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, FileText, CheckSquare, Calendar,
   Brain, Users, Bell, LogOut, Menu, ChevronRight, Settings,
-  AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet,
+  AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet, MessageSquare,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import { supabase, signOut, can, ROLES } from './lib/supabase.js'
@@ -21,6 +21,7 @@ import Calendario  from './components/Calendario.jsx'
 import IaJuridica  from './components/IaJuridica.jsx'
 import Equipe      from './components/Equipe.jsx'
 import Notificacoes from './components/Notificacoes.jsx'
+import Forum from './components/Forum.jsx'
 import MeuPerfil   from './components/MeuPerfil.jsx'
 import Relatorios   from './components/Relatorios.jsx'
 import PartesCRM   from './components/PartesCRM.jsx'
@@ -48,6 +49,7 @@ function buildNav(profile) {
     { path: '/financeiro', label: 'Financeiro',    Icon: Wallet,    perm: 'financeiro.ver' },
     { path: '/ia',         label: 'IA Jurídica',    Icon: Brain,     perm: 'ia.usar', accent: true },
     { path: '/notificacoes', label: 'Notificações', Icon: Bell },
+    { path: '/forum',         label: 'Fórum',         Icon: MessageSquare },
     { path: '/relatorios', label: 'Relatórios', Icon: BarChart3, perm: 'processos.ver' },
     { path: '/equipe',     label: 'Equipe',         Icon: Users,     perm: 'equipe.ver' },
   ]
@@ -81,7 +83,7 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
               <button key={path} onClick={() => { onNav(path); onClose() }}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 1, textAlign: 'left', background: active ? C.navyL : (accent && !active ? 'rgba(6,78,59,0.16)' : 'transparent'), color: active ? C.gold : (accent ? '#86efac' : 'rgba(255,255,255,0.6)'), fontSize: 14, fontWeight: active ? 700 : 400, transition: 'all 0.12s' }}>
                 <Icon size={16} />{label}
-                {path === '/notificacoes' && unreadCount > 0 && <span title={`${unreadCount} item(ns) não lido(s)`} style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999, background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
+                {(path === '/notificacoes') && unreadCount > 0 && <span title={`${unreadCount} item(ns) não lido(s)`} style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999, background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
                 {active && path !== '/notificacoes' && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
                 {active && path === '/notificacoes' && unreadCount === 0 && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
                 {accent && !active && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, background: 'rgba(6,78,59,0.55)', color: '#bbf7d0', padding: '2px 6px', borderRadius: 10 }}>IA</span>}
@@ -221,6 +223,7 @@ function AppLayout() {
             <Route path="/financeiro" element={can(profile,'financeiro.ver') ? <Financeiro profile={profile} /> : <Bloqueado />} />
             <Route path="/ia"         element={can(profile,'ia.usar')        ? <IaJuridica profile={profile} /> : <Bloqueado />} />
             <Route path="/notificacoes" element={<Notificacoes profile={profile} />} />
+            <Route path="/forum" element={<Forum profile={profile} />} />
             <Route path="/relatorios" element={<Relatorios profile={profile} />} />
             <Route path="/equipe"     element={can(profile,'equipe.ver')     ? <Equipe     profile={profile} /> : <Bloqueado />} />
             <Route path="/perfil"     element={<MeuPerfil  profile={profile} />} />
