@@ -28,12 +28,12 @@ function Modal({ title, onClose, children, wide }) {
   }, []);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}>
-      <div className={`bg-[#1a1f2e] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden ${wide ? 'w-full max-w-5xl' : 'w-full max-w-xl'}`}
-        style={{ maxHeight: '90vh' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}>
+      <div className={`border border-gray-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden ${wide ? 'w-full max-w-5xl' : 'w-full max-w-xl'}`}
+        style={{ maxHeight: '90vh', background: '#1e2535' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
           <h2 className="text-white font-semibold text-lg">{title}</h2>
-          <button onClick={onClose} className="text-white/50 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -64,29 +64,38 @@ function CreatableSelect({ options, value, onChange, placeholder, onCreateNew })
     <div ref={ref} className="relative">
       <button type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white hover:border-white/30 transition-colors">
-        <span className={value ? 'text-white' : 'text-white/40'}>{value || placeholder}</span>
-        <ChevronDown size={14} className="text-white/40" />
+        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-white hover:border-gray-500 transition-colors"
+        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }}>
+        <span className={value ? 'text-white' : 'text-gray-400'}>{value || placeholder}</span>
+        <ChevronDown size={14} className="text-gray-400" />
       </button>
       {open && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-[#1a1f2e] border border-white/20 rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute z-50 top-full mt-1 w-full rounded-xl shadow-2xl overflow-hidden"
+          style={{ background: '#1e2535', border: '1px solid rgba(255,255,255,0.15)' }}>
           <div className="p-2">
             <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar ou digitar novo..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/30 outline-none" />
+              className="w-full rounded-lg px-3 py-1.5 text-sm text-white outline-none"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} />
           </div>
           <div className="max-h-48 overflow-y-auto">
             {filtered.map(opt => (
               <button key={opt} type="button"
                 onClick={() => { onChange(opt); setOpen(false); setSearch(''); }}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 transition-colors ${value === opt ? 'text-emerald-400' : 'text-white/80'}`}>
+                className={`w-full text-left px-4 py-2 text-sm transition-colors ${value === opt ? 'text-emerald-400' : 'text-gray-200'}`}
+                style={{ ':hover': { background: 'rgba(255,255,255,0.05)' } }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 {opt}
               </button>
             ))}
             {canCreate && (
               <button type="button"
                 onClick={() => { onCreateNew(search.trim()); onChange(search.trim()); setOpen(false); setSearch(''); }}
-                className="w-full text-left px-4 py-2 text-sm text-emerald-400 hover:bg-emerald-400/10 flex items-center gap-2 border-t border-white/5">
+                className="w-full text-left px-4 py-2 text-sm text-emerald-400 flex items-center gap-2"
+                style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,185,129,0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <Plus size={13} />
                 Adicionar "{search.trim()}"
               </button>
@@ -104,7 +113,7 @@ function CreatableSelect({ options, value, onChange, placeholder, onCreateNew })
 function Field({ label, children, required }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-white/50 mb-1.5">
+      <label className="block text-xs font-medium text-gray-400 mb-1.5">
         {label}{required && <span className="text-red-400 ml-1">*</span>}
       </label>
       {children}
@@ -114,13 +123,15 @@ function Field({ label, children, required }) {
 function Input({ ...props }) {
   return (
     <input {...props}
-      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-emerald-500/50 transition-colors" />
+      className="w-full rounded-lg px-3 py-2 text-sm text-white outline-none transition-colors"
+      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'white' }} />
   );
 }
 function Textarea({ ...props }) {
   return (
     <textarea {...props} rows={3}
-      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-emerald-500/50 transition-colors resize-none" />
+      className="w-full rounded-lg px-3 py-2 text-sm text-white outline-none transition-colors resize-none"
+      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'white' }} />
   );
 }
 
@@ -276,22 +287,26 @@ function OficioModal({ oficio, empresa, destinatarios, onSave, onClose, currentU
 
         {/* Anexos */}
         <div>
-          <label className="block text-xs font-medium text-white/50 mb-2">Documentos Anexos</label>
-          <div className="border border-dashed border-white/20 rounded-xl p-4 text-center cursor-pointer hover:border-emerald-500/40 transition-colors"
-            onClick={() => fileRef.current?.click()}>
-            <Upload size={20} className="mx-auto text-white/30 mb-2" />
-            <p className="text-sm text-white/40">Clique para selecionar arquivos</p>
+          <label className="block text-xs font-medium text-gray-400 mb-2">Documentos Anexos</label>
+          <div className="rounded-xl p-4 text-center cursor-pointer transition-colors"
+            style={{ border: '2px dashed rgba(255,255,255,0.15)' }}
+            onClick={() => fileRef.current?.click()}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}>
+            <Upload size={20} className="mx-auto text-gray-500 mb-2" />
+            <p className="text-sm text-gray-400">Clique para selecionar arquivos</p>
             <input ref={fileRef} type="file" multiple className="hidden"
               onChange={e => setFiles(Array.from(e.target.files))} />
           </div>
           {files.length > 0 && (
             <div className="mt-2 space-y-1">
               {files.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-white/60 bg-white/5 rounded-lg px-3 py-1.5">
+                <div key={i} className="flex items-center gap-2 text-xs text-gray-300 rounded-lg px-3 py-1.5"
+                  style={{ background: 'rgba(255,255,255,0.06)' }}>
                   <Paperclip size={12} />
                   <span>{f.name}</span>
                   <button type="button" onClick={() => setFiles(ff => ff.filter((_, ii) => ii !== i))}
-                    className="ml-auto text-white/30 hover:text-red-400">
+                    className="ml-auto text-gray-500 hover:text-red-400">
                     <X size={12} />
                   </button>
                 </div>
@@ -383,33 +398,38 @@ function ConsultarModal({ empresa, onClose, currentUser, onEdit }) {
         {/* Lista */}
         <div className="w-1/2 flex flex-col gap-3">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar ofícios..."
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 outline-none" />
+              className="w-full rounded-xl pl-9 pr-3 py-2 text-sm text-white outline-none"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }} />
           </div>
-          <div className="text-xs text-white/30 font-medium">{filtered.length} registro(s)</div>
+          <div className="text-xs text-gray-400 font-medium">{filtered.length} registro(s)</div>
           <div className="overflow-y-auto space-y-1.5 flex-1" style={{ maxHeight: 440 }}>
             {loading ? (
-              <div className="text-white/30 text-sm text-center py-8">Carregando...</div>
+              <div className="text-gray-400 text-sm text-center py-8">Carregando...</div>
             ) : filtered.map(of => (
               <button key={of.id} onClick={() => selectOficio(of)}
-                className={`w-full text-left rounded-xl px-3 py-3 transition-all ${selected?.id === of.id ? 'bg-emerald-500/15 border border-emerald-500/30' : 'bg-white/5 border border-white/5 hover:border-white/15'}`}>
+                className="w-full text-left rounded-xl px-3 py-3 transition-all"
+                style={{
+                  background: selected?.id === of.id ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: selected?.id === of.id ? '1px solid rgba(16,185,129,0.35)' : '1px solid rgba(255,255,255,0.08)'
+                }}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono font-bold text-emerald-400">{of.numero}</span>
-                  <span className="text-xs text-white/30">{fmtDate(of.data)}</span>
+                  <span className="text-xs text-gray-400">{fmtDate(of.data)}</span>
                 </div>
-                <div className="text-sm text-white/80 mt-0.5 truncate">{of.destinatario}</div>
-                <div className="text-xs text-white/40 truncate mt-0.5">{of.referencia}</div>
+                <div className="text-sm text-gray-200 mt-0.5 truncate">{of.destinatario}</div>
+                <div className="text-xs text-gray-400 truncate mt-0.5">{of.referencia}</div>
               </button>
             ))}
           </div>
         </div>
 
         {/* Detalhe */}
-        <div className="w-1/2 border-l border-white/10 pl-4 flex flex-col">
+        <div className="w-1/2 pl-4 flex flex-col" style={{ borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
           {!selected ? (
-            <div className="flex-1 flex items-center justify-center text-white/20 text-sm">
+            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
               ← Selecione um ofício
             </div>
           ) : (
@@ -418,11 +438,13 @@ function ConsultarModal({ empresa, onClose, currentUser, onEdit }) {
                 <span className="text-lg font-mono font-bold text-emerald-400">{selected.numero}</span>
                 <div className="flex gap-2">
                   <button onClick={() => { onEdit(selected); onClose(); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs transition-colors">
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-300 hover:text-white text-xs transition-colors"
+                    style={{ background: 'rgba(255,255,255,0.07)' }}>
                     <Edit2 size={12} /> Editar
                   </button>
                   <button onClick={() => handleDelete(selected)} disabled={deleting}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs transition-colors">
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-red-400 text-xs transition-colors"
+                    style={{ background: 'rgba(239,68,68,0.1)' }}>
                     <Trash2 size={12} /> Excluir
                   </button>
                 </div>
@@ -438,33 +460,34 @@ function ConsultarModal({ empresa, onClose, currentUser, onEdit }) {
                   ['Arquivado', selected.arquivado],
                 ].map(([k, v]) => (
                   <div key={k}>
-                    <div className="text-xs text-white/30 mb-0.5">{k}</div>
-                    <div className="text-white/80">{v || '—'}</div>
+                    <div className="text-xs text-gray-400 mb-0.5">{k}</div>
+                    <div className="text-gray-200">{v || '—'}</div>
                   </div>
                 ))}
               </div>
 
               {selected.referencia && (
                 <div>
-                  <div className="text-xs text-white/30 mb-1">Referência / Assunto</div>
-                  <div className="text-sm text-white/80 bg-white/5 rounded-lg p-3">{selected.referencia}</div>
+                  <div className="text-xs text-gray-400 mb-1">Referência / Assunto</div>
+                  <div className="text-sm text-gray-200 rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.05)' }}>{selected.referencia}</div>
                 </div>
               )}
               {selected.observacoes && (
                 <div>
-                  <div className="text-xs text-white/30 mb-1">Observações</div>
-                  <div className="text-sm text-white/60 italic">{selected.observacoes}</div>
+                  <div className="text-xs text-gray-400 mb-1">Observações</div>
+                  <div className="text-sm text-gray-400 italic">{selected.observacoes}</div>
                 </div>
               )}
 
               {/* Anexos */}
               {anexos.length > 0 && (
                 <div>
-                  <div className="text-xs text-white/30 mb-2">Anexos ({anexos.length})</div>
+                  <div className="text-xs text-gray-400 mb-2">Anexos ({anexos.length})</div>
                   <div className="space-y-1">
                     {anexos.map(a => (
                       <a key={a.id} href={a.url} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 rounded-lg px-3 py-2 transition-colors">
+                        className="flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 rounded-lg px-3 py-2 transition-colors"
+                        style={{ background: 'rgba(16,185,129,0.08)' }}>
                         <Paperclip size={11} />
                         <span className="truncate">{a.nome_arquivo}</span>
                         <Download size={11} className="ml-auto" />
@@ -477,17 +500,18 @@ function ConsultarModal({ empresa, onClose, currentUser, onEdit }) {
               {/* Auditoria */}
               {auditoria.length > 0 && (
                 <div>
-                  <div className="text-xs text-white/30 mb-2">Histórico de alterações</div>
+                  <div className="text-xs text-gray-400 mb-2">Histórico de alterações</div>
                   <div className="space-y-1.5 max-h-28 overflow-y-auto">
                     {auditoria.map(a => (
                       <div key={a.id}
-                        className="flex items-center gap-2 text-xs bg-white/5 rounded-lg px-3 py-1.5">
+                        className="flex items-center gap-2 text-xs rounded-lg px-3 py-1.5"
+                        style={{ background: 'rgba(255,255,255,0.04)' }}>
                         <span className={`font-medium ${a.acao === 'excluído' ? 'text-red-400' : a.acao === 'criado' ? 'text-emerald-400' : 'text-blue-400'}`}>
                           {a.acao}
                         </span>
-                        <span className="text-white/40">por</span>
-                        <span className="text-white/60">{a.usuario_nome || '—'}</span>
-                        <span className="ml-auto text-white/30">{fmtTs(a.timestamp)}</span>
+                        <span className="text-gray-500">por</span>
+                        <span className="text-gray-300">{a.usuario_nome || '—'}</span>
+                        <span className="ml-auto text-gray-500">{fmtTs(a.timestamp)}</span>
                       </div>
                     ))}
                   </div>
@@ -549,32 +573,34 @@ function TodosModelosModal({ modelos, onClose }) {
     <Modal title="Todos os Modelos" onClose={onClose} wide>
       <div className="space-y-4">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar modelos..."
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 outline-none" />
+            className="w-full rounded-xl pl-9 pr-3 py-2 text-sm text-white outline-none"
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }} />
         </div>
-        <div className="text-xs text-white/30">{filtered.length} modelo(s)</div>
+        <div className="text-xs text-gray-400">{filtered.length} modelo(s)</div>
         <div className="overflow-y-auto space-y-2" style={{ maxHeight: 480 }}>
           {filtered.map(m => (
             <div key={m.id}
-              className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 hover:bg-white/8 transition-colors">
+              className="flex items-center justify-between rounded-xl px-4 py-3 transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)' }}>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-white font-medium text-sm">{m.nome}</span>
-                  {m.tipo && <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50">{m.tipo}</span>}
-                  {m.area && <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">{m.area}</span>}
+                  {m.tipo && <span className="text-xs px-1.5 py-0.5 rounded text-gray-400" style={{ background: 'rgba(255,255,255,0.08)' }}>{m.tipo}</span>}
+                  {m.area && <span className="text-xs px-1.5 py-0.5 rounded text-emerald-400" style={{ background: 'rgba(16,185,129,0.15)' }}>{m.area}</span>}
                 </div>
-                {m.descricao && <div className="text-xs text-white/40 mt-0.5">{m.descricao}</div>}
-                {m.arquivo_nome && <div className="text-xs text-white/30 mt-0.5 flex items-center gap-1"><Paperclip size={10} />{m.arquivo_nome}</div>}
+                {m.descricao && <div className="text-xs text-gray-400 mt-0.5">{m.descricao}</div>}
+                {m.arquivo_nome && <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Paperclip size={10} />{m.arquivo_nome}</div>}
               </div>
-              <div className="text-xs text-white/30 ml-4 whitespace-nowrap">
+              <div className="text-xs text-gray-500 ml-4 whitespace-nowrap">
                 {m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}
               </div>
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="text-white/30 text-sm text-center py-8">Nenhum modelo encontrado.</div>
+            <div className="text-gray-400 text-sm text-center py-8">Nenhum modelo encontrado.</div>
           )}
         </div>
       </div>
@@ -667,11 +693,11 @@ export default function Acervo() {
   const recentModelos = modelos.slice(0, 5);
 
   return (
-    <div className="p-8 min-h-screen" style={{ background: '#0d1117' }}>
+    <div className="p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white tracking-tight">Acervo</h1>
-        <p className="text-white/40 mt-1 text-sm">Modelos editáveis e controle de expedição de ofícios</p>
+        <p className="text-gray-400 mt-1 text-sm">Modelos editáveis e controle de expedição de ofícios</p>
       </div>
 
       {/* Tabs */}
@@ -683,9 +709,10 @@ export default function Acervo() {
           <button key={tab.id} onClick={() => setActiveSection(tab.id)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
               activeSection === tab.id
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                : 'bg-white/5 text-white/50 hover:text-white hover:bg-white/10'
-            }`}>
+                ? 'bg-emerald-500 text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+            style={activeSection !== tab.id ? { background: 'rgba(255,255,255,0.06)' } : {}}>
             <tab.icon size={15} />
             {tab.label}
           </button>
@@ -695,15 +722,15 @@ export default function Acervo() {
       {/* ── SEÇÃO MODELOS ── */}
       {activeSection === 'modelos' && (
         <div className="max-w-2xl">
-          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)' }}>
                   <BookOpen size={16} className="text-emerald-400" />
                 </div>
                 <div>
                   <div className="text-white font-semibold">Modelos de Documentos</div>
-                  <div className="text-xs text-white/40">{modelos.length} modelo(s) no acervo</div>
+                  <div className="text-xs text-gray-400">{modelos.length} modelo(s) no acervo</div>
                 </div>
               </div>
               <button onClick={() => setShowTodosModelos(true)}
@@ -711,40 +738,42 @@ export default function Acervo() {
                 Ver mais <ChevronRight size={14} />
               </button>
             </div>
-            <div className="divide-y divide-white/5">
+            <div style={{ divideColor: 'rgba(255,255,255,0.05)' }}>
               {loadingModelos ? (
-                <div className="px-6 py-8 text-center text-white/30 text-sm">Carregando...</div>
+                <div className="px-6 py-8 text-center text-gray-400 text-sm">Carregando...</div>
               ) : recentModelos.length === 0 ? (
-                <div className="px-6 py-8 text-center text-white/30 text-sm">Nenhum modelo encontrado.</div>
-              ) : recentModelos.map(m => (
-                <div key={m.id} className="flex items-center justify-between px-6 py-3.5 hover:bg-white/3 transition-colors">
+                <div className="px-6 py-8 text-center text-gray-400 text-sm">Nenhum modelo encontrado.</div>
+              ) : recentModelos.map((m, i) => (
+                <div key={m.id} className="flex items-center justify-between px-6 py-3.5"
+                  style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-white/8 flex items-center justify-center flex-shrink-0">
-                      <FileText size={13} className="text-white/50" />
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(255,255,255,0.07)' }}>
+                      <FileText size={13} className="text-gray-400" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm text-white font-medium truncate">{m.nome}</div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {m.tipo && <span className="text-xs text-white/30">{m.tipo}</span>}
-                        {m.area && <span className="text-xs text-emerald-400/60">{m.area}</span>}
+                        {m.tipo && <span className="text-xs text-gray-400">{m.tipo}</span>}
+                        {m.area && <span className="text-xs text-emerald-400">{m.area}</span>}
                         {m.arquivo_nome && (
-                          <span className="text-xs text-white/25 flex items-center gap-1">
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
                             <Paperclip size={9} />{m.arquivo_nome}
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="text-xs text-white/25 ml-4 whitespace-nowrap">
+                  <div className="text-xs text-gray-500 ml-4 whitespace-nowrap">
                     {m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}
                   </div>
                 </div>
               ))}
             </div>
             {modelos.length > 5 && (
-              <div className="px-6 py-3 border-t border-white/5 flex justify-center">
+              <div className="px-6 py-3 flex justify-center" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <button onClick={() => setShowTodosModelos(true)}
-                  className="text-sm text-white/40 hover:text-emerald-400 transition-colors">
+                  className="text-sm text-gray-400 hover:text-emerald-400 transition-colors">
                   Ver todos os {modelos.length} modelos →
                 </button>
               </div>
@@ -758,21 +787,22 @@ export default function Acervo() {
         <div className="space-y-6">
           {/* Empresas */}
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
+            <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
               {empresas.map(emp => (
                 <button key={emp.id} onClick={() => setSelectedEmpresa(emp)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedEmpresa?.id === emp.id
-                      ? 'bg-white text-[#0d1117]'
-                      : 'text-white/50 hover:text-white hover:bg-white/8'
-                  }`}>
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all`}
+                  style={{
+                    background: selectedEmpresa?.id === emp.id ? 'white' : 'transparent',
+                    color: selectedEmpresa?.id === emp.id ? '#0d1117' : 'rgba(255,255,255,0.5)',
+                  }}>
                   <Building2 size={13} className="inline mr-1.5 opacity-60" />
                   {emp.nome}
                 </button>
               ))}
             </div>
             <button onClick={() => setShowNovaEmpresa(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white text-sm transition-colors border border-dashed border-white/15">
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-gray-400 hover:text-white text-sm transition-colors"
+              style={{ border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent' }}>
               <Plus size={13} /> Nova empresa
             </button>
           </div>
@@ -785,66 +815,72 @@ export default function Acervo() {
                   <h2 className="text-xl font-bold text-white">
                     Controle de Ofícios — {selectedEmpresa.nome}
                   </h2>
-                  <p className="text-sm text-white/40 mt-0.5">
+                  <p className="text-sm text-gray-400 mt-0.5">
                     Ano {new Date().getFullYear()} · {oficiosList.length} ofício(s) registrado(s)
                     {oficiosList.length > 0 && ` · Próximo: ${nextNumero()}`}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setShowConsultar(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/8 hover:bg-white/12 text-white/70 hover:text-white text-sm transition-colors border border-white/10">
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-gray-300 hover:text-white text-sm transition-colors"
+                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <Eye size={14} /> Consultar todos
                   </button>
                   <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors shadow-lg shadow-emerald-500/20">
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors">
                     <Plus size={14} /> Novo Ofício
                   </button>
                 </div>
               </div>
 
               {/* Tabela */}
-              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-white/10">
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                         {['Número', 'Data', 'Departamento', 'Responsável', 'Destinatário', 'Referência/Assunto', 'Forma Envio', 'Pasta', ''].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wider whitespace-nowrap">
+                          <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                             {h}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody>
                       {loadingOficios ? (
-                        <tr><td colSpan={9} className="px-4 py-10 text-center text-white/30">Carregando...</td></tr>
+                        <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">Carregando...</td></tr>
                       ) : oficiosList.length === 0 ? (
-                        <tr><td colSpan={9} className="px-4 py-10 text-center text-white/30">
+                        <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">
                           Nenhum ofício registrado em {new Date().getFullYear()}.
                         </td></tr>
-                      ) : oficiosList.map(of => (
-                        <tr key={of.id} className="hover:bg-white/3 transition-colors group">
+                      ) : oficiosList.map((of, i) => (
+                        <tr key={of.id} className="group transition-colors"
+                          style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <td className="px-4 py-3">
                             <span className="font-mono font-bold text-emerald-400 text-xs">{of.numero}</span>
                           </td>
-                          <td className="px-4 py-3 text-white/60 whitespace-nowrap text-xs">{fmtDate(of.data)}</td>
-                          <td className="px-4 py-3 text-white/70 text-xs">{of.departamento || '—'}</td>
-                          <td className="px-4 py-3 text-white/70 text-xs whitespace-nowrap">{of.responsavel || '—'}</td>
+                          <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">{fmtDate(of.data)}</td>
+                          <td className="px-4 py-3 text-gray-300 text-xs">{of.departamento || '—'}</td>
+                          <td className="px-4 py-3 text-gray-300 text-xs whitespace-nowrap">{of.responsavel || '—'}</td>
                           <td className="px-4 py-3">
-                            <span className="text-xs font-medium text-white/80 bg-white/8 px-2 py-1 rounded-lg">{of.destinatario || '—'}</span>
+                            <span className="text-xs font-medium text-gray-200 rounded-lg px-2 py-1"
+                              style={{ background: 'rgba(255,255,255,0.08)' }}>{of.destinatario || '—'}</span>
                           </td>
-                          <td className="px-4 py-3 text-white/60 text-xs max-w-xs">
+                          <td className="px-4 py-3 text-gray-400 text-xs max-w-xs">
                             <div className="truncate max-w-[260px]" title={of.referencia}>{of.referencia || '—'}</div>
                           </td>
-                          <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{of.forma_envio || '—'}</td>
+                          <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{of.forma_envio || '—'}</td>
                           <td className="px-4 py-3">
                             {of.arquivado === 'SIM'
                               ? <span className="text-xs text-emerald-400 flex items-center gap-1"><Check size={11} />SIM</span>
-                              : <span className="text-xs text-white/30">{of.arquivado || '—'}</span>}
+                              : <span className="text-xs text-gray-500">{of.arquivado || '—'}</span>}
                           </td>
                           <td className="px-4 py-3">
                             <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true); }}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all">
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                              style={{ background: 'rgba(255,255,255,0.06)' }}>
                               <Edit2 size={13} />
                             </button>
                           </td>
@@ -874,7 +910,6 @@ export default function Acervo() {
             setShowNovoOficio(false);
             setEditingOficio(null);
             fetchOficios(selectedEmpresa);
-            // Atualizar destinatários
             supabase.from('oficios_destinatarios')
               .select('*').eq('empresa_id', selectedEmpresa.id).order('nome')
               .then(({ data }) => setDestinatarios(data || []));
