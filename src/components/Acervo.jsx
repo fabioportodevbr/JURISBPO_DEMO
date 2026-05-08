@@ -645,6 +645,30 @@ export default function Acervo({ profile }) {
     else { setSortCol(col); setSortDir('asc') }
   }
 
+  function exportarCSV() {
+    const headers = ['Número','Data','Departamento','Responsável','Destinatário','Referência / Assunto','Forma de Envio','Arquivado na Pasta','Observações']
+    const rows = sortedOficios.map(o => [
+      o.numero || '',
+      fmtDate(o.data),
+      o.departamento || '',
+      o.responsavel || '',
+      o.destinatario || '',
+      o.referencia || '',
+      o.forma_envio || '',
+      o.arquivado || '',
+      o.observacoes || '',
+    ])
+    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const csv = [headers, ...rows].map(row => row.map(esc).join(',')).join('\r\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `oficios_${String(selectedEmpresa?.nome || 'acervo').replace(/\s+/g,'_')}_${new Date().getFullYear()}.csv`
+    document.body.appendChild(a); a.click()
+    document.body.removeChild(a); URL.revokeObjectURL(url)
+  }
+
   function SortIcon({ col }) {
     if (sortCol !== col) return <ChevronDown size={10} style={{ opacity: 0.3, marginLeft: 2 }} />
     return sortDir === 'asc'
@@ -767,6 +791,10 @@ export default function Acervo({ profile }) {
                 <button onClick={() => setShowConsultar(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
                   <Eye size={14} />Consultar todos
+                </button>
+                <button onClick={exportarCSV} disabled={sortedOficios.length === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: sortedOficios.length === 0 ? C.muted : C.text, cursor: sortedOficios.length === 0 ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', opacity: sortedOficios.length === 0 ? 0.5 : 1 }}>
+                  <Download size={14} />Exportar CSV
                 </button>
                 {canEdit && <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true) }}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.navy, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
