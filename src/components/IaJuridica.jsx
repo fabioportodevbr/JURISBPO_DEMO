@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { Brain, Zap, Printer, AlertTriangle, Loader, Send } from 'lucide-react'
+import { Brain, Zap, Printer, AlertTriangle, Loader, Send, UploadCloud, Copy, Check } from 'lucide-react'
+import * as pdfjsLib from 'pdfjs-dist'
+import mammoth from 'mammoth'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
 
 const C = { navy:'#022c22', white:'#fff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', red:'#dc2626', redBg:'#fee2e2', purple:'#10b981', purpleBg:'#ede9fe', grayBg:'#f1f5f9', green:'#10b981', greenBg:'#d1fae5' }
 const INP = { width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid '+C.border, fontSize:14, color:C.text, background:C.white, boxSizing:'border-box', outline:'none', fontFamily:'inherit', lineHeight:1.6, resize:'vertical' }
 
 const callAI = async ({ prompt, mode='chat', maxTokens=2500, format='text', context=null }) => {
-  // A função Edge criada no Supabase se chama "ia-juridica" e espera receber { mensagem }.
-  // Mantemos esta função intermediária para preservar todas as telas e modos já existentes da IA.
   const { data, error } = await supabase.functions.invoke('ia-juridica', {
     body: {
       mensagem:
@@ -24,12 +26,57 @@ const callAI = async ({ prompt, mode='chat', maxTokens=2500, format='text', cont
   return resposta
 }
 
+const extrairTextoDoArquivo = async (file) => {
+  if (file.name.endsWith('.docx')) {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  } else if (file.name.endsWith('.pdf')) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      fullText += pageText + '\n\n';
+    }
+    return fullText;
+  }
+  throw new Error('Formato não suportado. Use .pdf ou .docx');
+}
+
+function FileUploadText({ onExtract, loading, setLoading, setError }) {
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      setLoading(true); setError('')
+      const text = await extrairTextoDoArquivo(file)
+      onExtract(text)
+    } catch (err) {
+      setError('Erro ao ler arquivo: ' + err.message)
+    } finally {
+      setLoading(false)
+      e.target.value = '' 
+    }
+  }
+
+  return (
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: C.grayBg, border: '1px solid ' + C.border, borderRadius: 8, cursor: loading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, color: C.muted, transition: 'all 0.2s' }}>
+      <UploadCloud size={16} />
+      {loading ? 'Extraindo...' : 'Anexar PDF / Word'}
+      <input type="file" accept=".pdf,.docx" style={{ display: 'none' }} onChange={handleFile} disabled={loading} />
+    </label>
+  )
+}
+
 function AIBox({ result, loading, error }) {
   if (loading) return <div style={{ padding:32, textAlign:'center', color:C.muted }}>
     <div style={{ width:32, height:32, border:'3px solid '+C.purple, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }}/>
-    <p style={{ fontSize:14 }}>A IA está analisando…</p>
+    <p style={{ fontSize:14 }}>A IA está processando…</p>
   </div>
-  if (error) return <div style={{ padding:14, background:C.redBg, borderRadius:10, color:C.red, fontSize:13 }}><AlertTriangle size={14} style={{ display:'inline', marginRight:6 }}/>{error}</div>
+  if (error) return <div style={{ padding:14, background:C.redBg, borderRadius:10, color:C.red, fontSize:13, whiteSpace:'pre-wrap' }}><AlertTriangle size={14} style={{ display:'inline', marginRight:6 }}/>{error}</div>
   if (!result) return null
   return <div style={{ background:C.grayBg, borderRadius:10, padding:'16px 18px', fontSize:14, color:C.text, lineHeight:1.8, whiteSpace:'pre-wrap', maxHeight:520, overflowY:'auto', border:'1px solid '+C.border }}>{result}</div>
 }
@@ -90,13 +137,13 @@ function Analise() {
   const [error, setError] = useState('')
 
   const analisar = async () => {
-    if (!text.trim()) { setError('Cole o texto do contrato.'); return }
+    if (!text.trim()) { setError('Cole ou anexe o texto do documento.'); return }
     setLoading(true); setError(''); setResult('')
     try {
       setResult(await callAI({
         mode:'contract_analysis',
         maxTokens:3200,
-        prompt:'Analise o contrato abaixo e forneça:\n1. CLÁUSULAS IDENTIFICADAS: RISCO (BAIXO/MÉDIO/ALTO), descrição do problema e sugestão de melhoria.\n2. PONTOS AUSENTES OU INCOMPLETOS.\n3. PARECER EXECUTIVO: resumo e recomendações.\n\nCONTRATO:\n'+text.slice(0,16000)
+        prompt:'Analise o documento abaixo e forneça:\n1. PONTOS CRÍTICOS IDENTIFICADOS: RISCO (BAIXO/MÉDIO/ALTO), descrição do problema e sugestão de melhoria.\n2. PONTOS AUSENTES OU INCOMPLETOS.\n3. PARECER EXECUTIVO: resumo e recomendações.\n\nDOCUMENTO:\n'+text.slice(0,16000)
       }))
     } catch(e) { setError('Erro: '+e.message) }
     finally { setLoading(false) }
@@ -104,8 +151,11 @@ function Analise() {
 
   return <div>
     <div style={{ background:C.white, borderRadius:12, border:'1px solid '+C.border, padding:20, marginBottom:16 }}>
-      <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:12 }}>📄 Análise de Cláusulas Contratuais</div>
-      <textarea style={{ ...INP, minHeight:180 }} value={text} onChange={e=>setText(e.target.value)} placeholder="Cole aqui o texto do contrato ou cláusulas que deseja analisar…"/>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom:12 }}>
+        <div style={{ fontSize:14, fontWeight:700, color:C.text }}>📄 Análise de Documentos</div>
+        <FileUploadText onExtract={(t) => setText(t)} loading={loading} setLoading={setLoading} setError={setError} />
+      </div>
+      <textarea style={{ ...INP, minHeight:180 }} value={text} onChange={e=>setText(e.target.value)} placeholder="Cole aqui ou anexe o documento que deseja analisar…"/>
       <div style={{ display:'flex', justifyContent:'flex-end', marginTop:12 }}>
         <button onClick={analisar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
           {loading?<Loader size={15} style={{ animation:'spin 0.8s linear infinite' }}/>:<Zap size={15}/>}{loading?'Analisando…':'Analisar com IA'}
@@ -140,8 +190,20 @@ function Comparacao() {
     <div style={{ background:C.white, borderRadius:12, border:'1px solid '+C.border, padding:20, marginBottom:16 }}>
       <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:14 }}>⚖️ Comparação de Documentos</div>
       <div className="ai-compare-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))', gap:16 }}>
-        <div><label style={{ fontSize:11, fontWeight:700, color:C.muted, display:'block', marginBottom:5, textTransform:'uppercase' }}>Documento 1</label><textarea style={{ ...INP, minHeight:220 }} value={t1} onChange={e=>setT1(e.target.value)} placeholder="Primeiro documento…"/></div>
-        <div><label style={{ fontSize:11, fontWeight:700, color:C.muted, display:'block', marginBottom:5, textTransform:'uppercase' }}>Documento 2</label><textarea style={{ ...INP, minHeight:220 }} value={t2} onChange={e=>setT2(e.target.value)} placeholder="Segundo documento…"/></div>
+        <div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase' }}>Documento 1</label>
+            <FileUploadText onExtract={setT1} loading={loading} setLoading={setLoading} setError={setError} />
+          </div>
+          <textarea style={{ ...INP, minHeight:220 }} value={t1} onChange={e=>setT1(e.target.value)} placeholder="Cole ou anexe o primeiro documento…"/>
+        </div>
+        <div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase' }}>Documento 2</label>
+            <FileUploadText onExtract={setT2} loading={loading} setLoading={setLoading} setError={setError} />
+          </div>
+          <textarea style={{ ...INP, minHeight:220 }} value={t2} onChange={e=>setT2(e.target.value)} placeholder="Cole ou anexe o segundo documento…"/>
+        </div>
       </div>
       <div style={{ display:'flex', justifyContent:'flex-end', marginTop:12 }}>
         <button onClick={comparar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
@@ -150,6 +212,62 @@ function Comparacao() {
       </div>
     </div>
     {(result||loading||error)&&<div style={{ background:C.white, borderRadius:12, border:'1px solid '+C.border, padding:20 }}><AIBox result={result} loading={loading} error={error}/></div>}
+  </div>
+}
+
+function Anonimizador() {
+  const [text, setText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState('')
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const anonimizar = async () => {
+    if (!text.trim()) { setError('Cole ou anexe o documento.'); return }
+    setLoading(true); setError(''); setResult(''); setCopied(false)
+    try {
+      setResult(await callAI({
+        mode:'document_anonymization',
+        maxTokens:3500,
+        prompt:'Aja como um redator estrito. Oculte TODOS os dados pessoais do texto a seguir (Nomes de pessoas, CPFs, RGs, Endereços completos, Telefones, E-mails e Placas de veículos). Substitua esses dados EXATAMENTE por "[***]". Não altere NENHUMA outra palavra, formatação ou significado do texto original. Apenas aplique as substituições. Não adicione saudações ou comentários. TEXTO:\n\n'+text.slice(0,16000)
+      }))
+    } catch(e) { setError('Erro: '+e.message) }
+    finally { setLoading(false) }
+  }
+
+  const handleCopy = () => {
+    if(!result) return
+    navigator.clipboard.writeText(result)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return <div>
+    <div style={{ background:C.white, borderRadius:12, border:'1px solid '+C.border, padding:20, marginBottom:16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom:12 }}>
+        <div style={{ fontSize:14, fontWeight:700, color:C.text }}>🕵️ Anonimizador de Documentos</div>
+        <FileUploadText onExtract={(t) => setText(t)} loading={loading} setLoading={setLoading} setError={setError} />
+      </div>
+      <p style={{ fontSize:13, color:C.muted, marginBottom:12 }}>Cole o texto ou anexe um PDF/Word. A IA ocultará dados sensíveis substituindo-os por [***].</p>
+      <textarea style={{ ...INP, minHeight:180 }} value={text} onChange={e=>setText(e.target.value)} placeholder="Cole aqui ou anexe o documento que deseja anonimizar…"/>
+      <div style={{ display:'flex', justifyContent:'flex-end', marginTop:12 }}>
+        <button onClick={anonimizar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
+          {loading?<Loader size={15} style={{ animation:'spin 0.8s linear infinite' }}/>:<Zap size={15}/>}{loading?'Anonimizando…':'Anonimizar Documento'}
+        </button>
+      </div>
+    </div>
+
+    {(result||loading||error)&&<div style={{ background:C.white, borderRadius:12, border:'1px solid '+C.border, padding:20, position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom:12 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em' }}>Texto Anonimizado</div>
+        {result && (
+          <button onClick={handleCopy} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 12px', background:C.grayBg, color:copied?C.green:C.text, border:'1px solid '+C.border, borderRadius:6, cursor:'pointer', fontSize:12, fontWeight:600 }}>
+            {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copiado!' : 'Copiar Texto'}
+          </button>
+        )}
+      </div>
+      <AIBox result={result} loading={loading} error={error}/>
+    </div>}
   </div>
 }
 
@@ -222,17 +340,24 @@ export default function IaJuridica({ profile }) {
     <div style={{ padding:24 }}>
       <div style={{ marginBottom:22 }}>
         <h1 style={{ fontSize:20, fontWeight:800, color:C.text, margin:0, display:'flex', alignItems:'center', gap:10 }}><Brain size={22} color={C.purple}/>IA Jurídica</h1>
-        <p style={{ fontSize:13, color:C.muted, margin:'4px 0 0' }}>Assistente interno conectado à OpenAI via Supabase Edge Function</p>
+        <p style={{ fontSize:13, color:C.muted, margin:'4px 0 0' }}>Assistente conectado à OpenAI via Supabase Edge Function</p>
       </div>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       <div style={{ display:'flex', gap:8, marginBottom:24, background:C.white, padding:6, borderRadius:10, border:'1px solid '+C.border, flexWrap:'wrap' }}>
-        {[{id:'chat',label:'Assistente'},{id:'analise',label:'Análise de Cláusulas'},{id:'comparacao',label:'Comparação de Docs'},{id:'relatorio',label:'Relatório em PDF'}].map(({id,label})=>(
-          <button key={id} onClick={()=>setSub(id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', border:'none', borderRadius:8, cursor:'pointer', background:sub===id?C.purple:'transparent', color:sub===id?'white':C.muted, fontSize:13, fontWeight:sub===id?700:400, flex:'1 1 auto' }}>{label}</button>
+        {[
+          {id:'chat',label:'Assistente'},
+          {id:'analise',label:'Análise de Documentos'},
+          {id:'comparacao',label:'Comparação de Docs'},
+          {id:'anonimizador',label:'Anonimizador de Docs'},
+          {id:'relatorio',label:'Relatório em PDF'}
+        ].map(({id,label})=>(
+          <button key={id} onClick={()=>setSub(id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', border:'none', borderRadius:8, cursor:'pointer', background:sub===id?C.purple:'transparent', color:sub===id?'white':C.muted, fontSize:13, fontWeight:sub===id?700:400, flex:'1 1 auto', justifyContent:'center' }}>{label}</button>
         ))}
       </div>
       {sub==='chat' && <ChatBasico profile={profile}/>}
       {sub==='analise' && <Analise/>}
       {sub==='comparacao' && <Comparacao/>}
+      {sub==='anonimizador' && <Anonimizador/>}
       {sub==='relatorio' && <Relatorio profile={profile}/>}
     </div>
   )
