@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
-import { Bell, AlertTriangle, Mail, CheckCircle, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X } from 'lucide-react'
+import { Bell, AlertTriangle, Mail, CheckCircle, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff } from 'lucide-react'
 import ClippingJuridico from './ClippingJuridico.jsx'
 import MuralRecados from './MuralRecados.jsx'
 import { FinanceiroResumoDashboard } from './FinanceiroResumoDashboard.tsx'
@@ -51,8 +51,9 @@ function PushDashboardHeader({novos,importantes,ultimo,onClick}){
   </button>
 }
 
-function PushModal({items,profile,onClose,onOpenProcess,onCreateProcess}){
+function PushModal({items,profile,onClose,onOpenProcess,onCreateProcess,onDismiss}){
   const podeCriar=can(profile,'processos.criar')
+  const [dismissing,setDismissing]=useState(null)
   return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:920,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',padding:18,borderBottom:'1px solid '+C.border}}>
@@ -78,6 +79,7 @@ function PushModal({items,profile,onClose,onOpenProcess,onCreateProcess}){
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}} onClick={e=>e.stopPropagation()}>
                 {vinculado?<button onClick={()=>onOpenProcess(p.processo_id)} style={{border:'1px solid '+C.green,background:C.greenBg,color:C.green,borderRadius:8,padding:'8px 10px',fontWeight:900,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6}}><Link2 size={14}/>Abrir processo</button>:podeCriar?<button onClick={()=>onCreateProcess(p)} style={{border:'1px solid '+C.blue,background:C.blueBg,color:C.blue,borderRadius:8,padding:'8px 10px',fontWeight:900,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6}}><Plus size={14}/>Criar processo</button>:<span style={{fontSize:12,color:C.muted}}>Sem permissão para criar</span>}
+                <button disabled={dismissing===p.id} onClick={async()=>{if(!window.confirm('Desconsiderar este andamento? Ele ficará oculto na lista principal.'))return;setDismissing(p.id);await onDismiss(p);setDismissing(null)}} style={{border:'1px solid '+C.red,background:C.redBg,color:C.red,borderRadius:8,padding:'8px 10px',fontWeight:900,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6,opacity:dismissing===p.id?0.5:1}}><EyeOff size={14}/>{dismissing===p.id?'...':'Desconsiderar'}</button>
               </div>
             </div>
           </article>
@@ -158,6 +160,12 @@ export default function Dashboard({profile}){
     setCreateForm({numero:push.numero_processo||'',titulo:push.numero_processo?`Processo ${push.numero_processo}`:(push.movimento||'Novo processo'),tribunal:push.tribunal||'',categoria:'trabalhista',parte_contraria:'',resumo_processo:shortText(pushText(push),700)})
   }
 
+  const desconsiderarPush=async(p)=>{
+    const {error}=await supabase.from('andamentos_processuais_push').update({status_associacao:'ignorado',ignorado_em:new Date().toISOString(),motivo_ignorado:'Desconsiderado manualmente no JurisBPO'}).eq('id',p.id)
+    if(error){alert('Erro ao desconsiderar: '+error.message);return}
+    setSt(prev=>({...prev,pushItems:prev.pushItems.filter(x=>x.id!==p.id),pushNovos:prev.pushNovos-1,pushImportantes:isImportantPush(p)?prev.pushImportantes-1:prev.pushImportantes}))
+  }
+
   const salvarProcessoPush=async()=>{
     if(!createPush)return
     if(!createForm.titulo.trim())return alert('Informe o título do processo.')
@@ -217,7 +225,7 @@ export default function Dashboard({profile}){
     <FinanceiroResumoDashboard profile={profile}/>
     <ClippingJuridico/>
 
-    {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso}/>}
+    {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso} onDismiss={desconsiderarPush}/>}
     {createPush&&<CriarProcessoPushModal push={createPush} form={createForm} setForm={setCreateForm} saving={savingProcess} onCancel={()=>setCreatePush(null)} onSave={salvarProcessoPush}/>}
   </div>
 }
