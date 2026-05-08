@@ -179,7 +179,7 @@ function AtividadeModal({atividade,onClose,onOpenProcess}){
   </div>
 }
 
-function ContratoAlertaModal({contrato,onClose}){
+function ContratoAlertaModal({contrato,onClose,onOpenContract}){
   const c=contrato
   const vencido=c.renovacao?.level==='vencido'
   const bg=vencido?C.redBg:C.amberBg
@@ -199,7 +199,8 @@ function ContratoAlertaModal({contrato,onClose}){
         <div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Contratante</div><div style={{fontSize:13,color:C.text}}>{c.contratante||'—'}</div></div>
         <div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Contratada</div><div style={{fontSize:13,color:C.text}}>{c.contratada||'—'}</div></div>
         {c.objeto&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Objeto</div><div style={{fontSize:13,color:C.text,lineHeight:1.45}}>{c.objeto}</div></div>}
-        {c.observacoes&&<div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Observações</div><div style={{fontSize:13,color:C.muted,fontStyle:'italic'}}>{c.observacoes}</div></div>}
+        {c.observacoes&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Observações</div><div style={{fontSize:13,color:C.muted,fontStyle:'italic'}}>{c.observacoes}</div></div>}
+        <div style={{borderTop:'1px solid '+C.border,paddingTop:14,marginTop:4}}><button onClick={()=>{onClose();onOpenContract(c.id)}} style={{display:'inline-flex',alignItems:'center',gap:8,border:'1px solid '+color,background:bg,color,borderRadius:8,padding:'9px 16px',fontWeight:900,cursor:'pointer',fontSize:13}}><ExternalLink size={14}/>Acessar contrato</button></div>
       </div>
     </div>
   </div>
@@ -251,6 +252,7 @@ export default function Dashboard({profile}){
   const totalAvisos=useMemo(()=>st.notificacoes.length+st.mensagens.length,[st.notificacoes,st.mensagens])
 
   const abrirProcesso=(processoId)=>{if(!processoId)return;setPushModal(false);navigate(`/processos?processo_id=${processoId}`)}
+  const abrirContrato=(contratoId)=>{if(!contratoId)return;navigate(`/contratos?contrato_id=${contratoId}`)}
 
   const iniciarCriacaoProcesso=(push)=>{
     setCreatePush(push)
@@ -326,7 +328,7 @@ export default function Dashboard({profile}){
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso} onDismiss={desconsiderarPush}/>}
     {audienciaModal&&<AudienciaModal audiencia={audienciaModal} onClose={()=>setAudienciaModal(null)} onOpenProcess={abrirProcesso}/>}
     {atividadeModal&&<AtividadeModal atividade={atividadeModal} onClose={()=>setAtividadeModal(null)} onOpenProcess={abrirProcesso}/>}
-    {contratoModal&&<ContratoAlertaModal contrato={contratoModal} onClose={()=>setContratoModal(null)}/>}
+    {contratoModal&&<ContratoAlertaModal contrato={contratoModal} onClose={()=>setContratoModal(null)} onOpenContract={abrirContrato}/>}
     {createPush&&<CriarProcessoPushModal push={createPush} form={createForm} setForm={setCreateForm} saving={savingProcess} onCancel={()=>setCreatePush(null)} onSave={salvarProcessoPush}/>}
   </div>
 }

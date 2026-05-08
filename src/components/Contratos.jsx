@@ -52,6 +52,7 @@ export default function Contratos({profile}){
   const load=async()=>{const{data,error}=await supabase.from('contratos').select('*').eq('escritorio_id',profile.escritorio_id).order('created_at',{ascending:false});if(error)alert(error.message);setItems(data||[])}
   const loadPartes=async()=>{const{data,error}=await supabase.from('partes_crm').select('id,nome,nome_fantasia,tipo,status').eq('escritorio_id',profile.escritorio_id).eq('status','ativo').order('nome');if(error)console.error(error);setPartes(data||[])}
   useEffect(()=>{load();loadPartes()},[profile.escritorio_id])
+  useEffect(()=>{if(!items.length)return;const params=new URLSearchParams(window.location.search);const id=params.get('contrato_id');if(!id)return;const alvo=items.find(c=>c.id===id);if(alvo){open(alvo);window.history.replaceState(null,'','/contratos')}},[items])
   const filtered=useMemo(()=>{const term=q.trim().toLowerCase();const hoje=new Date();return items.filter(c=>{
     if(categoria!=='todos'&&(c.categoria||'cliente')!==categoria)return false
     if(term&&![c.titulo,c.numero,c.contratante,c.contratada,c.status,c.observacoes,c.categoria].some(v=>String(v||'').toLowerCase().includes(term)))return false
