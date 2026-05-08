@@ -380,9 +380,9 @@ function TodosModelosModal({ modelos, onClose }) {
                   {m.area && <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 99, background: C.primaryLight, color: C.primary, fontWeight: 600 }}>{m.area}</span>}
                 </div>
                 {m.descricao && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{m.descricao}</div>}
-                {m.arquivo_nome && (m.arquivo_url || m.url)
-                  ? <a href={m.arquivo_url || m.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.primary, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontWeight: 700 }}><Paperclip size={10} />{m.arquivo_nome}</a>
-                  : m.arquivo_nome && <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><Paperclip size={10} />{m.arquivo_nome}</div>}
+                {m.arquivo_nome && (m.arquivo_base64
+                  ? <a href={`data:${m.arquivo_tipo||'application/octet-stream'};base64,${m.arquivo_base64}`} download={m.arquivo_nome} style={{ fontSize: 11, color: C.primary, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontWeight: 700 }}><Paperclip size={10} />{m.arquivo_nome}</a>
+                  : <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><Paperclip size={10} />{m.arquivo_nome}</div>)}
               </div>
               <div style={{ fontSize: 12, color: C.muted, marginLeft: 16, whiteSpace: 'nowrap' }}>{m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}</div>
             </div>
@@ -403,23 +403,6 @@ function ModeloUploadModal({ profile, onSave, onClose }) {
   const fileRef = useRef(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  async function insertModelo(payload) {
-    const attempts = [
-      payload,
-      { nome: payload.nome, tipo: payload.tipo, area: payload.area, descricao: payload.descricao, arquivo_nome: payload.arquivo_nome, arquivo_url: payload.arquivo_url, storage_path: payload.storage_path, storage_bucket: payload.storage_bucket },
-      { nome: payload.nome, tipo: payload.tipo, area: payload.area, descricao: payload.descricao, arquivo_nome: payload.arquivo_nome, arquivo_url: payload.arquivo_url },
-      { nome: payload.nome, tipo: payload.tipo, area: payload.area, descricao: payload.descricao, arquivo_nome: payload.arquivo_nome },
-    ]
-    let lastError = null
-    for (const body of attempts) {
-      const { error } = await supabase.from('modelos').insert(body)
-      if (!error) return
-      lastError = error
-      if (!/column|schema|cache|not found/i.test(error.message || '')) break
-    }
-    throw lastError
-  }
-
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.nome.trim()) { setErr('Informe o nome do modelo.'); return }
@@ -427,24 +410,26 @@ function ModeloUploadModal({ profile, onSave, onClose }) {
     setSaving(true); setErr('')
     try {
       for (const file of files) {
-        const safeName = file.name.replace(/[^\w.\-]+/g, '_')
-        const path = `${profile?.escritorio_id || 'modelos'}/modelos/${Date.now()}_${safeName}`
-        const { error: upErr } = await supabase.storage.from('modelos').upload(path, file, { upsert: false })
-        if (upErr) throw upErr
-        const { data: { publicUrl } } = supabase.storage.from('modelos').getPublicUrl(path)
-        await insertModelo({
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = ev => resolve(ev.target.result.split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        const { error } = await supabase.from('acervo_modelos').insert({
           escritorio_id: profile?.escritorio_id,
-          nome: files.length > 1 ? `${form.nome.trim()} - ${file.name}` : form.nome.trim(),
+          nome: files.length > 1 ? `${form.nome.trim()} — ${file.name}` : form.nome.trim(),
           tipo: form.tipo || null,
           area: form.area || null,
           descricao: form.descricao || null,
           arquivo_nome: file.name,
-          arquivo_url: publicUrl,
-          storage_bucket: 'modelos',
-          storage_path: path,
+          arquivo_tipo: file.type,
+          arquivo_tamanho: file.size,
+          arquivo_base64: base64,
           created_by: profile?.id,
           updated_at: new Date().toISOString(),
         })
+        if (error) throw error
       }
       onSave()
     } catch (e2) { setErr('Erro ao anexar modelo: ' + (e2?.message || e2)) }
@@ -479,7 +464,7 @@ function ModeloUploadModal({ profile, onSave, onClose }) {
 }
 
 export default function Acervo({ profile }) {
-  const [activeSection, setActiveSection] = useState('modelos')
+  const [activeSection, setActiveSection] = useState('oficios')
   const [modelos, setModelos] = useState([])
   const [loadingModelos, setLoadingModelos] = useState(true)
   const [showTodosModelos, setShowTodosModelos] = useState(false)
@@ -499,9 +484,9 @@ export default function Acervo({ profile }) {
 
   const fetchModelos = useCallback(() => {
     setLoadingModelos(true)
-    supabase.from('modelos').select('*').order('updated_at', { ascending: false })
+    supabase.from('acervo_modelos').select('*').eq('escritorio_id', profile.escritorio_id).order('updated_at', { ascending: false })
       .then(({ data }) => { setModelos(data || []); setLoadingModelos(false) })
-  }, [])
+  }, [profile.escritorio_id])
 
   useEffect(() => { fetchModelos() }, [fetchModelos])
 
@@ -568,7 +553,7 @@ export default function Acervo({ profile }) {
 
       {/* Abas */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        {[{ id: 'modelos', label: 'Modelos', Icon: BookOpen }, { id: 'oficios', label: 'Expedição de Ofícios e Cartas', Icon: Send }].map(({ id, label, Icon }) => {
+        {[{ id: 'oficios', label: 'Expedição de Ofícios e Cartas', Icon: Send }, { id: 'modelos', label: 'Modelos', Icon: BookOpen }].map(({ id, label, Icon }) => {
           const active = activeSection === id
           return (
             <button key={id} onClick={() => setActiveSection(id)}
@@ -615,9 +600,9 @@ export default function Acervo({ profile }) {
                     <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
                       {m.tipo && <span style={{ fontSize: 11, color: C.muted }}>{m.tipo}</span>}
                       {m.area && <span style={{ fontSize: 11, color: C.primary, fontWeight: 600 }}>{m.area}</span>}
-                      {m.arquivo_nome && (m.arquivo_url || m.url)
-                        ? <a href={m.arquivo_url || m.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.primary, display: 'flex', alignItems: 'center', gap: 3, textDecoration: 'none', fontWeight: 700 }}><Paperclip size={9} />{m.arquivo_nome}</a>
-                        : m.arquivo_nome && <span style={{ fontSize: 11, color: C.muted, display: 'flex', alignItems: 'center', gap: 3 }}><Paperclip size={9} />{m.arquivo_nome}</span>}
+                      {m.arquivo_nome && (m.arquivo_base64
+                        ? <a href={`data:${m.arquivo_tipo||'application/octet-stream'};base64,${m.arquivo_base64}`} download={m.arquivo_nome} style={{ fontSize: 11, color: C.primary, display: 'flex', alignItems: 'center', gap: 3, textDecoration: 'none', fontWeight: 700 }}><Paperclip size={9} />{m.arquivo_nome}</a>
+                        : <span style={{ fontSize: 11, color: C.muted, display: 'flex', alignItems: 'center', gap: 3 }}><Paperclip size={9} />{m.arquivo_nome}</span>)}
                     </div>
                   </div>
                 </div>
