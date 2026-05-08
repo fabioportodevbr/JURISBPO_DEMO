@@ -22,7 +22,19 @@ function limparObservacoesContrato(obs=''){return String(obs||'').replace(/\n?\[
 function extrairAditivosContrato(c={}){const m=String(c?.observacoes||'').match(/\[ADITIVOS_CONTRATO:([^\]]*)\]/);if(!m)return [];try{return JSON.parse(decodeURIComponent(m[1]))||[]}catch{return []}}
 function extrairFlagsContrato(c={}){const m=String(c?.observacoes||'').match(/\[FLAGS_CONTRATO:([^\]]*)\]/);if(!m)return {renovacao_automatica:false,prazo_indeterminado:false};try{return JSON.parse(decodeURIComponent(m[1]))||{renovacao_automatica:false,prazo_indeterminado:false}}catch{return {renovacao_automatica:false,prazo_indeterminado:false}}}
 function juntarMetadadosContrato(obs='',aditivos=[],flags={}){const limpas=limparObservacoesContrato(obs);const marcadorAditivos=aditivos?.length?`${ADITIVOS_MARK}${encodeURIComponent(JSON.stringify(aditivos))}]`:'';const marcadorFlags=(flags?.renovacao_automatica||flags?.prazo_indeterminado)?`${FLAGS_CONTRATO_MARK}${encodeURIComponent(JSON.stringify(flags))}]`:'';return [limpas,marcadorFlags,marcadorAditivos].filter(Boolean).join('\n')}
-function VigenciaBadge({contrato}){const d=daysUntil(contrato.data_fim);let bg=C.grayBg,color=C.gray,text='Sem fim cadastrado';if(d!==null){if(d<0){bg=C.redBg;color=C.red;text=`Encerrado há ${Math.abs(d)} dia(s)`}else if(d<=30){bg=C.redBg;color=C.red;text=`Termina em ${d} dia(s)`}else if(d<=90){bg=C.amberBg;color=C.amber;text=`Termina em ${d} dia(s)`}else{bg=C.greenBg;color=C.green;text=`Termina em ${d} dia(s)`}}return <span style={{fontSize:11,fontWeight:900,padding:'4px 8px',borderRadius:20,background:bg,color,whiteSpace:'nowrap'}}>{text}</span>}
+function VigenciaBadge({contrato}){
+  const status=contrato.status||'ativo'
+  if(status==='encerrado'||status==='arquivo_temporario') return null
+  const d=daysUntil(contrato.data_fim)
+  let bg=C.grayBg,color=C.gray,text='Sem fim cadastrado'
+  if(d!==null){
+    if(d<0){bg=C.redBg;color=C.red;text=`Vencido há ${Math.abs(d)} dia(s)`}
+    else if(d<=30){bg=C.redBg;color=C.red;text=`Vence em ${d} dia(s)`}
+    else if(d<=90){bg=C.amberBg;color=C.amber;text=`Vence em ${d} dia(s)`}
+    else{bg=C.greenBg;color=C.green;text=`Termina em ${d} dia(s)`}
+  }
+  return <span style={{fontSize:11,fontWeight:900,padding:'4px 8px',borderRadius:20,background:bg,color,whiteSpace:'nowrap'}}>{text}</span>
+}
 function RenovacaoInfo({contrato}){if(!contrato.notificar_renovacao||!contrato.data_fim)return null;const fim=daysUntil(contrato.data_fim);const limite=fim===null?null:fim-Number(contrato.renovacao_antecedencia_dias||0);let bg=C.blueBg,color=C.blue,text=`Avisar ${contrato.renovacao_alerta_dias||30} dia(s) antes do limite de renovação`;if(limite!==null){if(limite<0){bg=C.redBg;color=C.red;text=`Limite de manifestação vencido há ${Math.abs(limite)} dia(s)`}else if(limite<=Number(contrato.renovacao_alerta_dias||30)){bg=C.redBg;color=C.red;text=`Manifestar renovação em até ${limite} dia(s)`}else{text=`Renovação: alerta inicia em ${limite-Number(contrato.renovacao_alerta_dias||30)} dia(s)`}}
 return <div style={{fontSize:11,fontWeight:800,color,background:bg,borderRadius:8,padding:'6px 8px',display:'inline-flex',gap:6,alignItems:'center'}}><Bell size={12}/>{text}</div>}
 function crmLabel(p){return [p.nome, p.nome_fantasia].filter(Boolean).join(' — ')}
