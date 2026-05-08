@@ -155,10 +155,24 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
     formasEnvio: opcoes?.formasEnvio || [],
   })
   const [files, setFiles] = useState([])
+  const [existingAnexos, setExistingAnexos] = useState([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const fileRef = useRef(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  useEffect(() => {
+    if (!isEdit || !oficio?.id) return
+    supabase.from('oficios_anexos').select('*').eq('oficio_id', oficio.id).order('created_at', { ascending: true })
+      .then(({ data }) => setExistingAnexos(data || []))
+  }, [isEdit, oficio?.id])
+
+  async function deleteAnexo(anexo) {
+    if (!confirm(`Excluir o arquivo "${anexo.nome_arquivo}"?`)) return
+    const { error } = await supabase.from('oficios_anexos').delete().eq('id', anexo.id)
+    if (error) { alert('Erro ao excluir: ' + error.message); return }
+    setExistingAnexos(prev => prev.filter(a => a.id !== anexo.id))
+  }
 
   async function addDestinatario(nome) {
     await supabase.from('oficios_destinatarios').insert({ empresa_id: empresa.id, nome })
@@ -233,15 +247,48 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
           <Field label="Observações"><input style={inp} value={form.observacoes} onChange={e => set('observacoes', e.target.value)} /></Field>
         </div>
         <Field label="Documentos Anexos">
+          {isEdit && existingAnexos.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                Arquivos já anexados ({existingAnexos.length})
+              </div>
+              {existingAnexos.map(a => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, background: C.bg, border: '1px solid ' + C.border, borderRadius: 6, padding: '7px 10px', marginBottom: 4 }}>
+                  <Paperclip size={12} color={C.primary} />
+                  {a.arquivo_base64
+                    ? <a href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo}
+                        style={{ flex: 1, color: C.primary, fontWeight: 600, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {a.nome_arquivo}
+                      </a>
+                    : <span style={{ flex: 1, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span>
+                  }
+                  {a.arquivo_base64 && (
+                    <a href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo}
+                      title="Baixar" style={{ color: C.muted, display: 'flex', padding: 2 }}>
+                      <Download size={13} />
+                    </a>
+                  )}
+                  <button type="button" onClick={() => deleteAnexo(a)} title="Excluir este arquivo"
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.danger, display: 'flex', padding: 2 }}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {isEdit && existingAnexos.length === 0 && (
+            <p style={{ fontSize: 12, color: C.muted, margin: '0 0 8px' }}>Nenhum arquivo anexado ainda.</p>
+          )}
           <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed ' + C.border, borderRadius: 10, padding: 14, textAlign: 'center', cursor: 'pointer' }}>
             <Upload size={18} color={C.muted} style={{ display: 'block', margin: '0 auto 4px' }} />
-            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Clique para selecionar arquivos</p>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{isEdit ? 'Clique para adicionar novos arquivos' : 'Clique para selecionar arquivos'}</p>
             <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => setFiles(Array.from(e.target.files))} />
           </div>
           {files.map((f, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: C.bg, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}>
-              <Paperclip size={12} color={C.muted} />
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: '#f0fdf4', border: '1px solid ' + C.primaryLight, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}>
+              <Paperclip size={12} color={C.primary} />
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+              <span style={{ fontSize: 11, color: C.muted, flexShrink: 0 }}>novo</span>
               <button type="button" onClick={() => setFiles(ff => ff.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 0 }}><X size={13} /></button>
             </div>
           ))}
