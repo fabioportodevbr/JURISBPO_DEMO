@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase, can } from '../lib/supabase.js'
+import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Plus, Search, Edit2, Trash2, X, FolderOpen, Clock, CheckSquare, DollarSign, Download, Upload } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
 import AndamentosProcessuaisPush from './AndamentosProcessuaisPush.jsx'
@@ -313,7 +313,7 @@ export default function Processos({profile}){
   const canCreateFinanceiro=can(profile,'financeiro.criar')
   const canEditFinanceiro=can(profile,'financeiro.editar')
   const canDeleteFinanceiro=can(profile,'financeiro.excluir')
-  const load=async()=>{const eid=profile.escritorio_id;const[{data:p},{data:l},{data:a},{data:f},{data:pc}]=await Promise.all([supabase.from('processos').select('*').eq('escritorio_id',eid).order('updated_at',{ascending:false}),supabase.from('usuarios_escritorios').select('usuario_id,papel,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),supabase.from('atividades').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false}),supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false}),supabase.from('partes_crm').select('*').eq('escritorio_id',eid).eq('status','ativo').order('nome')]);setItems(p||[]);setTeam((l||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id})));setAtividades(a||[]);setFinanceiros(f||[]);setPartes(pc||[]);setLoading(false)}
+  const load=async()=>{const eid=profile.escritorio_id;const[p,{data:l},a,f,{data:pc}]=await Promise.all([fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid).order('updated_at',{ascending:false})),supabase.from('usuarios_escritorios').select('usuario_id,papel,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),fetchAllRows(()=>supabase.from('atividades').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false})),fetchAllRows(()=>supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false})),supabase.from('partes_crm').select('*').eq('escritorio_id',eid).eq('status','ativo').order('nome')]);setItems(p||[]);setTeam((l||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id})));setAtividades(a||[]);setFinanceiros(f||[]);setPartes(pc||[]);setLoading(false)}
   useEffect(()=>{load()},[profile.escritorio_id])
   const active=items.filter(p=>p.status!=='encerrado'), closed=items.filter(p=>p.status==='encerrado')
   const latestCreated=active.slice().sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,5)
