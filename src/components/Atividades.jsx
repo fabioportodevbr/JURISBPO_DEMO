@@ -155,7 +155,43 @@ export default function Atividades({profile}){
   const reabrir=async(t)=>{if(!canArchive)return alert('Sem permissão para reabrir atividades.');if(!t?.id)return;const {data,error}=await supabase.from('atividades').update({status:'a_fazer',concluida_em:null}).eq('id',t.id).eq('escritorio_id',profile.escritorio_id).select().single();if(error)return alert(error.message);await registrarEvento(data,'reabertura',`Atividade reaberta por ${profile.nome||profile.email||profile.id} em ${new Date().toLocaleString('pt-BR')}.`);load()}
   const del=async(t)=>{if(!canDelete)return alert('Visitante possui acesso somente leitura.');if(confirm('Excluir atividade?')){await supabase.from('atividades').delete().eq('id',t.id);load()}}
   const showHistory=async(t)=>{const {data}=await supabase.from('atividade_atribuicoes').select('*').eq('atividade_id',t.id).order('created_at',{ascending:false});setHistory(data||[]);setHistoryFor(t)}
-  const renderCard=(t)=><div key={t.id} style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:14}}><div style={{display:'flex',justifyContent:'space-between',gap:8}}><div><Chip kind={typeKind[t.tipo]}>{label(TIPOS,t.tipo)}</Chip><b style={{display:'block',marginTop:8,lineHeight:1.3}}>{t.titulo}</b></div><div style={{display:'flex',gap:2}}><button onClick={()=>showHistory(t)} title="Histórico" style={{border:0,background:'none',color:C.muted,cursor:'pointer'}}><History size={14}/></button>{canArchive&&!isArquivada(t)&&<button onClick={()=>arquivar(t)} title="Arquivar" style={{border:0,background:'none',color:C.green,cursor:'pointer'}}><Archive size={14}/></button>}{canArchive&&isArquivada(t)&&<button onClick={()=>reabrir(t)} title="Reabrir" style={{border:0,background:'none',color:C.amber,cursor:'pointer'}}><RotateCcw size={14}/></button>}{canEdit&&!isArquivada(t)&&<button onClick={()=>open(t)} style={{border:0,background:'none',color:C.blue,cursor:'pointer'}}><Edit2 size={14}/></button>}{canDelete&&!isArquivada(t)&&<button onClick={()=>del(t)} style={{border:0,background:'none',color:C.red,cursor:'pointer'}}><Trash2 size={14}/></button>}</div></div><div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}><Chip kind={t.prioridade==='urgente'?'red':t.prioridade==='alta'?'amber':'gray'}>{label(PRIOR,t.prioridade)}</Chip>{t.prazo&&<Chip kind="amber">{dateBR(t.prazo)}</Chip>}{t.horario&&<Chip kind="purple">{t.horario}</Chip>}{isArquivada(t)&&<Chip kind="green">Arquivada</Chip>}{['audiencia','reuniao'].includes(t.tipo)&&<Chip kind="green">Compartilhada</Chip>}{['tarefa','prazo_processual'].includes(t.tipo)&&<Chip kind="gray">Individual</Chip>}{t.tipo==='audiencia'&&t.audiencia_modalidade&&<Chip kind="green">{label(AUDIENCIA_MODALIDADES,t.audiencia_modalidade)}</Chip>}{t.tipo==='audiencia'&&t.audiencia_tipo&&<Chip kind="purple">{label(AUDIENCIA_TIPOS,t.audiencia_tipo)}</Chip>}</div>{t.descricao&&<p style={{fontSize:12,color:C.muted,margin:'8px 0 0'}}>{t.descricao}</p>}<div style={{fontSize:12,color:C.muted,marginTop:8}}>Responsável: {team.find(x=>x.id===t.responsavel_id)?.nome||'—'}</div>{t.processos&&<div style={{fontSize:11,color:C.muted,marginTop:4}}>Processo: {t.processos.numero || t.processos.titulo}</div>}{t.contrato_id&&<div style={{fontSize:11,color:C.muted,marginTop:4}}>Contrato: {(cont.find(c=>c.id===t.contrato_id)?.numero || cont.find(c=>c.id===t.contrato_id)?.titulo) || 'Contrato vinculado'}</div>}{isArquivada(t)&&<div style={{fontSize:11,color:C.green,marginTop:6,fontWeight:800}}>Arquivada/concluída em {t.concluida_em?new Date(t.concluida_em).toLocaleString('pt-BR'):'data não registrada'}</div>}</div>
+  const renderCard=(t)=>{
+    const arq=isArquivada(t)
+    const resp=team.find(x=>x.id===t.responsavel_id)?.nome
+    const prKind={urgente:'red',alta:'amber',media:'blue',baixa:'gray'}[t.prioridade]||'gray'
+    const hoje=new Date();hoje.setHours(0,0,0,0)
+    const dprazo=t.prazo?new Date(t.prazo+'T12:00:00'):null
+    const prazoKind=dprazo?(dprazo<hoje?'red':dprazo-hoje<7*86400000?'amber':'gray'):'gray'
+    return <div key={t.id} style={{background:arq?'#f8fafc':C.white,border:'1px solid '+C.border,borderRadius:12,padding:'12px 14px',display:'grid',gap:8,opacity:arq?0.85:1}}>
+      {/* tipo + ações */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <Chip kind={typeKind[t.tipo]}>{label(TIPOS,t.tipo)}</Chip>
+        <div style={{display:'flex',gap:1}}>
+          <button onClick={()=>showHistory(t)} title="Histórico" style={{border:0,background:'none',color:C.muted,cursor:'pointer',padding:'2px 4px',borderRadius:4,display:'flex'}}><History size={13}/></button>
+          {canArchive&&!arq&&<button onClick={()=>arquivar(t)} title="Arquivar" style={{border:0,background:'none',color:C.green,cursor:'pointer',padding:'2px 4px',borderRadius:4,display:'flex'}}><Archive size={13}/></button>}
+          {canArchive&&arq&&<button onClick={()=>reabrir(t)} title="Reabrir" style={{border:0,background:'none',color:C.amber,cursor:'pointer',padding:'2px 4px',borderRadius:4,display:'flex'}}><RotateCcw size={13}/></button>}
+          {canEdit&&!arq&&<button onClick={()=>open(t)} style={{border:0,background:'none',color:C.blue,cursor:'pointer',padding:'2px 4px',borderRadius:4,display:'flex'}}><Edit2 size={13}/></button>}
+          {canDelete&&!arq&&<button onClick={()=>del(t)} style={{border:0,background:'none',color:C.red,cursor:'pointer',padding:'2px 4px',borderRadius:4,display:'flex'}}><Trash2 size={13}/></button>}
+        </div>
+      </div>
+      {/* título compacto */}
+      <div style={{fontSize:13,fontWeight:700,color:C.text,lineHeight:1.35,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{t.titulo}</div>
+      {/* badges */}
+      <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+        {t.prazo&&<Chip kind={prazoKind}>{dateBR(t.prazo)}{t.horario?' · '+t.horario:''}</Chip>}
+        {t.prioridade&&t.prioridade!=='baixa'&&<Chip kind={prKind}>{label(PRIOR,t.prioridade)}</Chip>}
+        {t.tipo==='audiencia'&&t.audiencia_modalidade&&<Chip kind="green">{label(AUDIENCIA_MODALIDADES,t.audiencia_modalidade)}</Chip>}
+        {t.tipo==='audiencia'&&t.audiencia_tipo&&<Chip kind="purple">{label(AUDIENCIA_TIPOS,t.audiencia_tipo)}</Chip>}
+      </div>
+      {/* rodapé */}
+      <div style={{fontSize:11,color:C.muted,display:'flex',flexWrap:'wrap',gap:10,borderTop:'1px solid '+C.border,paddingTop:6}}>
+        {resp&&<span>{resp}</span>}
+        {t.processos&&<span style={{color:C.blue}}>{t.processos.numero||t.processos.titulo}</span>}
+        {t.contrato_id&&<span>{cont.find(c=>c.id===t.contrato_id)?.titulo||'Contrato vinculado'}</span>}
+        {arq&&<span style={{color:C.green,fontWeight:700}}>Arquivada em {t.concluida_em?new Date(t.concluida_em).toLocaleDateString('pt-BR'):'—'}</span>}
+      </div>
+    </div>
+  }
   if(loading)return <div style={{padding:40,color:C.muted}}>Carregando atividades...</div>
   return <div style={{padding:24}}><div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',alignItems:'flex-start'}}><div><h1 style={{margin:0,fontSize:22}}>Atividades</h1><p style={{color:C.muted}}>Tarefas e prazos são individuais. Audiências e reuniões são compartilhadas com a equipe.</p></div>{canCreate&&<button onClick={()=>open()} style={{display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.navy, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit'}}><Plus size={14}/>Nova Atividade</button>}</div>
 {/* ── Minhas Rotinas ── */}
