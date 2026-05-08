@@ -183,12 +183,21 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
       }
       await supabase.from('oficios_auditoria').insert({ oficio_id: ofId, empresa_id: empresa.id, numero_oficio: form.numero, acao: action, usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: payload })
       for (const file of files) {
-        const path = `oficios/${ofId}/${Date.now()}_${file.name}`
-        const { data: up } = await supabase.storage.from('documentos').upload(path, file)
-        if (up) {
-          const { data: { publicUrl } } = supabase.storage.from('documentos').getPublicUrl(path)
-          await supabase.from('oficios_anexos').insert({ oficio_id: ofId, nome_arquivo: file.name, url: publicUrl, created_by: profile?.id, created_by_nome: profile?.nome || profile?.email })
-        }
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = ev => resolve(ev.target.result.split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        const { error: anexoErr } = await supabase.from('oficios_anexos').insert({
+          oficio_id: ofId,
+          nome_arquivo: file.name,
+          arquivo_base64: base64,
+          arquivo_tipo: file.type || 'application/octet-stream',
+          created_by: profile?.id,
+          created_by_nome: profile?.nome || profile?.email,
+        })
+        if (anexoErr) throw new Error('Erro ao salvar anexo "' + file.name + '": ' + anexoErr.message)
       }
       onSave()
     } catch (e2) { setErr('Erro ao salvar: ' + e2.message) }
@@ -246,15 +255,45 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
   )
 }
 
+// ── Modal: Ver Anexos de um Ofício ────────────────────────────────────────
+function AnexosOficioModal({ oficio, onClose }) {
+  const [anexos, setAnexos] = useState([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    supabase.from('oficios_anexos').select('*').eq('oficio_id', oficio.id).order('created_at', { ascending: true })
+      .then(({ data }) => { setAnexos(data || []); setLoading(false) })
+  }, [oficio.id])
+  return (
+    <Modal title={`Anexos — Ofício ${oficio.numero}`} onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {loading && <p style={{ color: C.muted, fontSize: 14 }}>Carregando...</p>}
+        {!loading && anexos.length === 0 && <p style={{ color: C.muted, fontSize: 14, textAlign: 'center', padding: 24 }}>Nenhum anexo para este ofício.</p>}
+        {anexos.map(a => (
+          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.bg, borderRadius: 8, padding: '10px 14px', border: '1px solid ' + C.border }}>
+            <Paperclip size={14} color={C.muted} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span>
+            {a.arquivo_base64
+              ? <a href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', border: 'none', borderRadius: 6, background: C.primary, color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                  <Download size={12} />Baixar
+                </a>
+              : <span style={{ fontSize: 12, color: C.muted, fontStyle: 'italic' }}>indisponível</span>}
+            {a.created_by_nome && <span style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>{a.created_by_nome}</span>}
+          </div>
+        ))}
+      </div>
+    </Modal>
+  )
+}
+
 // ── Modal: Consultar Todos ────────────────────────────────────────────────
-function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit, canDelete }) {
+function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit }) {
   const [oficios, setOficios] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [anexos, setAnexos] = useState([])
   const [auditoria, setAuditoria] = useState([])
-  const [deleting, setDeleting] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -270,15 +309,6 @@ function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit, canDelete 
       supabase.from('oficios_auditoria').select('*').eq('oficio_id', of.id).order('timestamp', { ascending: false }),
     ])
     setAnexos(a || []); setAuditoria(au || [])
-  }
-
-  async function handleDelete(of) {
-    if (!canDelete) { alert('Visitante possui acesso somente leitura.'); return }
-    if (!confirm(`Excluir ofício ${of.numero}?`)) return
-    setDeleting(true)
-    await supabase.from('oficios_auditoria').insert({ oficio_id: of.id, empresa_id: empresa.id, numero_oficio: of.numero, acao: 'excluído', usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: of })
-    await supabase.from('oficios').delete().eq('id', of.id)
-    setSelected(null); fetchAll(); setDeleting(false)
   }
 
   const filtered = oficios.filter(o => (o.numero + o.destinatario + o.referencia + o.responsavel + o.departamento).toLowerCase().includes(search.toLowerCase()))
@@ -313,10 +343,7 @@ function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit, canDelete 
           ) : (<>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: C.primary }}>{selected.numero}</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {canEdit && <button onClick={() => { onEdit(selected); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Edit2 size={13} />Editar</button>}
-                {canDelete && <button onClick={() => handleDelete(selected)} disabled={deleting} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid #fca5a5', borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Trash2 size={13} />Excluir</button>}
-              </div>
+              {canEdit && <button onClick={() => { onEdit(selected); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Edit2 size={13} />Editar</button>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[['Data', fmtDate(selected.data)], ['Departamento', selected.departamento], ['Responsável', selected.responsavel], ['Remetente', selected.remetente], ['Forma de Envio', selected.forma_envio], ['Arquivado', selected.arquivado]].map(([k, v]) => (
@@ -325,7 +352,19 @@ function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit, canDelete 
             </div>
             {selected.referencia && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Referência / Assunto</div><div style={{ fontSize: 14, color: C.text, background: C.bg, borderRadius: 8, padding: '10px 14px', lineHeight: 1.5 }}>{selected.referencia}</div></div>}
             {selected.observacoes && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Observações</div><div style={{ fontSize: 13, color: C.muted, fontStyle: 'italic' }}>{selected.observacoes}</div></div>}
-            {anexos.length > 0 && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Anexos ({anexos.length})</div>{anexos.map(a => <a key={a.id} href={a.url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.primary, background: C.primaryLight, borderRadius: 6, padding: '6px 10px', textDecoration: 'none', fontWeight: 600, marginBottom: 4 }}><Paperclip size={12} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span><Download size={12} /></a>)}</div>}
+            {anexos.length > 0 && <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Anexos ({anexos.length})</div>
+              {anexos.map(a => (
+                a.arquivo_base64
+                  ? <a key={a.id} href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.primary, background: C.primaryLight, borderRadius: 6, padding: '6px 10px', textDecoration: 'none', fontWeight: 600, marginBottom: 4 }}>
+                      <Paperclip size={12} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span><Download size={12} />
+                    </a>
+                  : <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted, background: C.bg, borderRadius: 6, padding: '6px 10px', marginBottom: 4 }}>
+                      <Paperclip size={12} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span>
+                    </div>
+              ))}
+            </div>}
             {auditoria.length > 0 && <div><div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Histórico</div><div style={{ maxHeight: 110, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>{auditoria.map(a => <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, background: C.bg, borderRadius: 6, padding: '5px 10px' }}><span style={{ fontWeight: 700, color: a.acao === 'excluído' ? C.danger : a.acao === 'criado' ? C.primaryMid : C.warning }}>{a.acao}</span><span style={{ color: C.muted }}>por</span><span style={{ color: C.text, fontWeight: 600 }}>{a.usuario_nome || '—'}</span><span style={{ marginLeft: 'auto', color: C.muted }}>{fmtTs(a.timestamp)}</span></div>)}</div></div>}
           </>)}
         </div>
@@ -479,6 +518,7 @@ export default function Acervo({ profile }) {
   const [showConsultar, setShowConsultar] = useState(false)
   const [showNovaEmpresa, setShowNovaEmpresa] = useState(false)
   const [editingOficio, setEditingOficio] = useState(null)
+  const [anexosOficio, setAnexosOficio] = useState(null)
   const canEdit = can(profile, 'docs.upload')
   const canDelete = can(profile, 'docs.excluir')
 
@@ -529,19 +569,14 @@ export default function Acervo({ profile }) {
     return `${String(next).padStart(3, '0')}/${year}`
   }
 
-  async function excluirUltimoOficio() {
-    if (!canDelete) { alert('Visitante possui acesso somente leitura.'); return }
-    const alvo = ultimoOficio(oficiosList)
-    if (!alvo) return
-    if (!confirm(`Excluir o último ofício registrado (${alvo.numero})?`)) return
-    await supabase.from('oficios_auditoria').insert({ oficio_id: alvo.id, empresa_id: selectedEmpresa.id, numero_oficio: alvo.numero, acao: 'excluído', usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: alvo })
-    await supabase.from('oficios').delete().eq('id', alvo.id)
-    fetchOficios(selectedEmpresa)
-    fetchOpcoesOficios(selectedEmpresa)
+  async function excluirModelo(id) {
+    if (!canDelete) return
+    if (!confirm('Excluir este modelo?')) return
+    await supabase.from('acervo_modelos').delete().eq('id', id)
+    fetchModelos()
   }
 
   const recentModelos = modelos.slice(0, 5)
-  const ultimoRegistro = ultimoOficio(oficiosList)
 
   return (
     <div style={{ padding: 32, background: C.bg, minHeight: '100%' }}>
@@ -606,7 +641,13 @@ export default function Acervo({ profile }) {
                     </div>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, marginLeft: 12, whiteSpace: 'nowrap' }}>{m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <div style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>{m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}</div>
+                  {canDelete && <button onClick={() => excluirModelo(m.id)} title="Excluir modelo"
+                    style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', border: '1px solid #fca5a5', borderRadius: 6, background: C.dangerLight, color: C.danger, cursor: 'pointer' }}>
+                    <Trash2 size={12} />
+                  </button>}
+                </div>
               </div>
             ))}
             {modelos.length > 5 && (
@@ -653,11 +694,6 @@ export default function Acervo({ profile }) {
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
                   <Eye size={14} />Consultar todos
                 </button>
-                {canDelete && <button onClick={excluirUltimoOficio} disabled={!ultimoRegistro}
-                  title={ultimoRegistro ? `Excluir ${ultimoRegistro.numero}` : 'Nenhum ofício para excluir'}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #fca5a5', borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: ultimoRegistro ? 'pointer' : 'not-allowed', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', opacity: ultimoRegistro ? 1 : 0.55 }}>
-                  <Trash2 size={14} />Excluir último
-                </button>}
                 {canEdit && <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true) }}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
                   <Plus size={14} />Novo Ofício
@@ -666,45 +702,65 @@ export default function Acervo({ profile }) {
             </div>
 
             <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: C.bg, borderBottom: '1px solid ' + C.border }}>
-                      {['Número', 'Data', 'Departamento', 'Responsável', 'Destinatário', 'Referência / Assunto', 'Forma Envio', 'Pasta', ''].map(h => (
-                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingOficios ? <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</td></tr>
-                      : oficiosList.length === 0 ? <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum ofício registrado em {new Date().getFullYear()}.</td></tr>
-                      : oficiosList.map((of, i) => (
-                      <tr key={of.id} style={{ borderTop: i === 0 ? 'none' : '1px solid ' + C.border }}
-                        onMouseEnter={e => e.currentTarget.style.background = C.bg}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <td style={{ padding: '10px 14px' }}><span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 12, color: C.primary }}>{of.numero}</span></td>
-                        <td style={{ padding: '10px 14px', color: C.muted, whiteSpace: 'nowrap' }}>{fmtDate(of.data)}</td>
-                        <td style={{ padding: '10px 14px', color: C.text }}>{of.departamento || '—'}</td>
-                        <td style={{ padding: '10px 14px', color: C.text, whiteSpace: 'nowrap' }}>{of.responsavel || '—'}</td>
-                        <td style={{ padding: '10px 14px' }}><span style={{ background: C.primaryLight, color: C.primary, padding: '3px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{of.destinatario || '—'}</span></td>
-                        <td style={{ padding: '10px 14px', color: C.muted, maxWidth: 260 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.referencia}>{of.referencia || '—'}</div></td>
-                        <td style={{ padding: '10px 14px', color: C.muted, whiteSpace: 'nowrap' }}>{of.forma_envio || '—'}</td>
-                        <td style={{ padding: '10px 14px' }}>
-                          {of.arquivado === 'SIM'
-                            ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 12, fontWeight: 700 }}><Check size={12} />SIM</span>
-                            : <span style={{ color: C.muted, fontSize: 12 }}>{of.arquivado || '—'}</span>}
-                        </td>
-                        <td style={{ padding: '8px 10px' }}>
-                          {canEdit && <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true) }}
-                            style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
-                            <Edit2 size={12} />
-                          </button>}
-                        </td>
-                      </tr>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: 88 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 100 }} />
+                  <col style={{ width: 108 }} />
+                  <col style={{ width: 118 }} />
+                  <col />
+                  <col style={{ width: 96 }} />
+                  <col style={{ width: 48 }} />
+                  <col style={{ width: 36 }} />
+                  <col style={{ width: 36 }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ background: C.bg, borderBottom: '1px solid ' + C.border }}>
+                    {['Número', 'Data', 'Depto.', 'Responsável', 'Destinatário', 'Referência / Assunto', 'Envio', 'Pasta', '', ''].map((h, idx) => (
+                      <th key={idx} style={{ padding: '9px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden' }}>{h}</th>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingOficios ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</td></tr>
+                    : oficiosList.length === 0 ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum ofício registrado em {new Date().getFullYear()}.</td></tr>
+                    : oficiosList.map((of, i) => (
+                    <tr key={of.id} style={{ borderTop: i === 0 ? 'none' : '1px solid ' + C.border }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <td style={{ padding: '8px 10px', overflow: 'hidden' }}><span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 11, color: C.primary }}>{of.numero}</span></td>
+                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12 }}>{fmtDate(of.data)}</td>
+                      <td style={{ padding: '8px 10px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.departamento}>{of.departamento || '—'}</td>
+                      <td style={{ padding: '8px 10px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.responsavel}>{of.responsavel || '—'}</td>
+                      <td style={{ padding: '8px 10px', overflow: 'hidden' }}>
+                        <span style={{ display: 'block', background: C.primaryLight, color: C.primary, padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.destinatario}>{of.destinatario || '—'}</span>
+                      </td>
+                      <td style={{ padding: '8px 10px', color: C.muted, overflow: 'hidden' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.referencia}>{of.referencia || '—'}</div>
+                      </td>
+                      <td style={{ padding: '8px 10px', color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.forma_envio}>{of.forma_envio || '—'}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        {of.arquivado === 'SIM'
+                          ? <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#16a34a', fontSize: 11, fontWeight: 700 }}><Check size={11} />SIM</span>
+                          : <span style={{ color: C.muted, fontSize: 11 }}>{of.arquivado || '—'}</span>}
+                      </td>
+                      <td style={{ padding: '6px 4px' }}>
+                        <button onClick={() => setAnexosOficio(of)} title="Ver anexos"
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
+                          <Paperclip size={11} />
+                        </button>
+                      </td>
+                      <td style={{ padding: '6px 4px' }}>
+                        {canEdit && <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true) }}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
+                          <Edit2 size={11} />
+                        </button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </>)}
         </div>
@@ -719,10 +775,11 @@ export default function Acervo({ profile }) {
           onClose={() => { setShowNovoOficio(false); setEditingOficio(null) }} />
       )}
       {showConsultar && selectedEmpresa && (
-        <ConsultarModal empresa={selectedEmpresa} profile={profile} canEdit={canEdit} canDelete={canDelete}
+        <ConsultarModal empresa={selectedEmpresa} profile={profile} canEdit={canEdit}
           onClose={() => setShowConsultar(false)}
           onEdit={of => { setEditingOficio(of); setShowNovoOficio(true) }} />
       )}
+      {anexosOficio && <AnexosOficioModal oficio={anexosOficio} onClose={() => setAnexosOficio(null)} />}
       {showNovaEmpresa && (
         <NovaEmpresaModal
           onSave={() => { setShowNovaEmpresa(false); supabase.from('oficios_empresas').select('*').order('nome').then(({ data }) => setEmpresas(data || [])) }}
