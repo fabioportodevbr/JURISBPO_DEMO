@@ -6,7 +6,7 @@ export default function MyApp({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>JurisBPO - Gestao Juridica</title>
+        <title>JurisBPO - Gestão Jurídica</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="theme-color" content="#064e3b" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
