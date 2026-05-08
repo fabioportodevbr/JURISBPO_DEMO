@@ -6,7 +6,7 @@ import { X, ExternalLink, Settings } from 'lucide-react'
 const C = {
   white: '#fff', text: '#0f172a', muted: '#64748b',
   border: '#e5e7eb', blue: '#1d4ed8', red: '#dc2626',
-  green: '#16a34a', amber: '#b45309', purple: '#064e3b',
+  green: '#16a34a', amber: '#b45309', purple: '#10b981',
   bg: '#f8fafc', greenBg: '#dcfce7', blueBg: '#dbeafe',
   amberBg: '#fef3c7',
 }

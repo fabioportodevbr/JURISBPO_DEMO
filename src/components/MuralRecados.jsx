@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase.js'
 import { MessageSquare, X, Send, Archive, Trash2, Clock, ChevronDown } from 'lucide-react'
 
 const C = {
-  navy: '#050505', white: '#fff', text: '#0f172a', muted: '#64748b',
-  border: '#e5e7eb', green: '#064e3b', greenBg: '#dcfce7',
+  navy: '#022c22', white: '#fff', text: '#0f172a', muted: '#64748b',
+  border: '#e5e7eb', green: '#10b981', greenBg: '#dcfce7',
   red: '#dc2626', redBg: '#fee2e2', amber: '#b45309', amberBg: '#fef3c7',
   grayBg: '#f1f5f9',
 }

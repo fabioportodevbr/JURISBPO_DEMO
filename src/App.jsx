@@ -31,7 +31,7 @@ import ConfiguracaoCalendario from './pages/ConfiguracaoCalendario.jsx'
 
 // ── Tema ─────────────────────────────────────────────────────────────────
 const C = {
-  navy: '#050505', navyL: '#111827', gold: '#064e3b',
+  navy: '#022c22', navyL: '#064e3b', gold: '#10b981',
   bg: '#f8fafc', white: '#ffffff', text: '#0f172a',
   muted: '#64748b', border: '#e5e7eb', red: '#dc2626',
 }
@@ -164,7 +164,7 @@ function AppLayout() {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 40, height: 40, border: '3px solid #050505', borderTopColor: C.gold, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+          <div style={{ width: 40, height: 40, border: '3px solid rgba(6, 78, 59, 0.1)', borderTopColor: C.gold, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
           <p style={{ color: C.muted, fontSize: 14 }}>Carregando...</p>
         </div>
         <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.sidebar-nav::-webkit-scrollbar{display:none}.sidebar-nav{scrollbar-width:none;-ms-overflow-style:none}`}</style>

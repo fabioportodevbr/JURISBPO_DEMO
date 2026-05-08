@@ -3,7 +3,7 @@ import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Plus, RefreshCw, Pencil, Edit2, Trash2, X, CalendarDays, History, Paperclip, ArrowRight, Archive, RotateCcw } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
 
-const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',red:'#dc2626',redBg:'#fee2e2',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',purple:'#064e3b',purpleBg:'#dcfce7',grayBg:'#f1f5f9'}
+const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',red:'#dc2626',redBg:'#fee2e2',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',purple:'#10b981',purpleBg:'#dcfce7',grayBg:'#f1f5f9'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const TIPOS=[['tarefa','Tarefas'],['prazo_processual','Prazos processuais'],['audiencia','Audiências'],['reuniao','Reuniões']]
 const STATUS=[['a_fazer','A fazer'],['em_andamento','Em andamento'],['concluida','Concluída'],['cancelada','Cancelada']]
@@ -24,7 +24,7 @@ export default function Atividades({profile}){
   const [items,setItems]=useState([]),[team,setTeam]=useState([]),[proc,setProc]=useState([]),[cont,setCont]=useState([]),[modal,setModal]=useState(false),[tab,setTab]=useState('dados'),[form,setForm]=useState({}),[loading,setLoading]=useState(true),[tipoView,setTipoView]=useState(null),[arquivoView,setArquivoView]=useState(false),[historyFor,setHistoryFor]=useState(null),[history,setHistory]=useState([]),[saving,setSaving]=useState(false)
   const [rotinas,setRotinas]=useState([])
   const [rotinaModal,setRotinaModal]=useState(false)
-  const [rotinaForm,setRotinaForm]=useState({id:null,texto:'',recorrencia:'',cor:'#064e3b',itens:[]})
+  const [rotinaForm,setRotinaForm]=useState({id:null,texto:'',recorrencia:'',cor:'#10b981',itens:[]})
   const [rotinaTarget,setRotinaTarget]=useState(null) // userId when gerente creates for someone
   const [rotinasSaving,setRotinasSaving]=useState(false)
   const [novoItem,setNovoItem]=useState('')
@@ -48,7 +48,7 @@ export default function Atividades({profile}){
     }else{
       await supabase.from('rotinas').insert({escritorio_id:profile.escritorio_id,usuario_id:uid,texto:rotinaForm.texto.trim(),recorrencia:rotinaForm.recorrencia.trim(),cor:rotinaForm.cor,itens:rotinaForm.itens||[]})
     }
-    setRotinaModal(false);setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#064e3b',itens:[]});setRotinaTarget(null);setNovoItem('')
+    setRotinaModal(false);setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#10b981',itens:[]});setRotinaTarget(null);setNovoItem('')
     setRotinasSaving(false);loadRotinas()
   }
   const deleteRotina=async(id)=>{
@@ -163,7 +163,7 @@ export default function Atividades({profile}){
           <b style={{fontSize:14,color:C.green}}>Minhas Rotinas</b>
           <span style={{fontSize:12,color:C.muted}}>{rotinas.filter(r=>r.usuario_id===profile.id).length} procedimento(s) recorrente(s)</span>
         </div>
-        {canCreate&&<button onClick={()=>{setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#064e3b'});setRotinaTarget(null);setRotinaModal(true)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #86efac',background:'white',color:C.green,borderRadius:8,padding:'6px 12px',fontWeight:700,fontSize:12,cursor:'pointer'}}>+ Adicionar</button>}
+        {canCreate&&<button onClick={()=>{setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#10b981'});setRotinaTarget(null);setRotinaModal(true)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #86efac',background:'white',color:C.green,borderRadius:8,padding:'6px 12px',fontWeight:700,fontSize:12,cursor:'pointer'}}>+ Adicionar</button>}
       </div>
       {rotinas.filter(r=>r.usuario_id===profile.id).length===0&&<p style={{margin:0,fontSize:13,color:C.muted}}>Nenhuma rotina cadastrada ainda. Clique em "+ Adicionar" para registrar seus procedimentos recorrentes.</p>}
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
@@ -183,7 +183,7 @@ export default function Atividades({profile}){
               </div>}
             </div>
             <div style={{display:'flex',gap:4,flexShrink:0}}>
-              {canEdit&&<button onClick={()=>{setRotinaForm({id:r.id,texto:r.texto,recorrencia:r.recorrencia,cor:r.cor||'#064e3b',itens:r.itens||[]});setRotinaTarget(r.usuario_id);setRotinaModal(true);setNovoItem('')}} style={{border:0,background:'none',cursor:'pointer',color:C.muted,padding:3,display:'flex'}}><Pencil size={13}/></button>}
+              {canEdit&&<button onClick={()=>{setRotinaForm({id:r.id,texto:r.texto,recorrencia:r.recorrencia,cor:r.cor||'#10b981',itens:r.itens||[]});setRotinaTarget(r.usuario_id);setRotinaModal(true);setNovoItem('')}} style={{border:0,background:'none',cursor:'pointer',color:C.muted,padding:3,display:'flex'}}><Pencil size={13}/></button>}
               {canDelete&&<button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:3,display:'flex'}}><Trash2 size={13}/></button>}
             </div>
           </div>
@@ -223,12 +223,12 @@ export default function Atividades({profile}){
         </div>
         <div><label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:8}}>Cor do post-it</label>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {['#064e3b','#1d4ed8','#b45309','#7c3aed','#dc2626','#0f766e','#334155'].map(cor=><button key={cor} onClick={()=>setRotinaForm(f=>({...f,cor}))} style={{width:28,height:28,borderRadius:'50%',background:cor,border:rotinaForm.cor===cor?'3px solid '+C.text:'2px solid transparent',cursor:'pointer',transition:'border .1s'}}/>)}
+            {['#10b981','#1d4ed8','#b45309','#7c3aed','#dc2626','#0f766e','#334155'].map(cor=><button key={cor} onClick={()=>setRotinaForm(f=>({...f,cor}))} style={{width:28,height:28,borderRadius:'50%',background:cor,border:rotinaForm.cor===cor?'3px solid '+C.text:'2px solid transparent',cursor:'pointer',transition:'border .1s'}}/>)}
           </div>
         </div>
         <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
           <button onClick={()=>setRotinaModal(false)} style={{border:'1px solid '+C.border,background:'white',borderRadius:8,padding:'10px 16px',cursor:'pointer',fontWeight:700}}>Cancelar</button>
-          <button onClick={saveRotina} disabled={rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()} style={{background:rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()?C.muted:'#064e3b',color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>{rotinasSaving?'Salvando...':rotinaForm.id?'Salvar alterações':'Adicionar rotina'}</button>
+          <button onClick={saveRotina} disabled={rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()} style={{background:rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()?C.muted:'#10b981',color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>{rotinasSaving?'Salvando...':rotinaForm.id?'Salvar alterações':'Adicionar rotina'}</button>
         </div>
       </div>
     </Modal>}

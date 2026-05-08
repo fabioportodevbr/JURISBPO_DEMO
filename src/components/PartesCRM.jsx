@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Building2, Plus, Search, X, Save, Edit2, Trash2 } from 'lucide-react'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 
-const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',green:'#064e3b',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',amber:'#b45309',amberBg:'#fef3c7',grayBg:'#f1f5f9'}
+const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',green:'#10b981',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',amber:'#b45309',amberBg:'#fef3c7',grayBg:'#f1f5f9'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const TIPOS=[['empresa_grupo','Empresa do grupo'],['cliente','Cliente'],['fornecedor','Fornecedor/prestador'],['parte_contraria','Parte contrária/reclamada'],['terceiro','Terceiro']]
 const STATUS=[['ativo','Ativo'],['inativo','Inativo']]

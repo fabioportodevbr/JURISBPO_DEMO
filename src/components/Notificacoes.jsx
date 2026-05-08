@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Bell, CheckCircle, RefreshCw, Inbox, X, Archive, ArchiveRestore } from 'lucide-react'
 
-const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',amber:'#b45309',amberBg:'#fef3c7',green:'#16a34a',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',purple:'#064e3b',purpleBg:'#ede9fe'}
+const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',amber:'#b45309',amberBg:'#fef3c7',green:'#16a34a',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',purple:'#10b981',purpleBg:'#ede9fe'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 
 const tipoInfo={

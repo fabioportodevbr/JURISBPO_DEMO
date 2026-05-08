@@ -15,7 +15,7 @@ import {
   Filter,
 } from 'lucide-react'
 
-const C={white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',red:'#dc2626',redBg:'#fee2e2',grayBg:'#f8fafc',navy:'#050505'}
+const C={white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',red:'#dc2626',redBg:'#fee2e2',grayBg:'#f8fafc',navy:'#022c22'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:10,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 
 

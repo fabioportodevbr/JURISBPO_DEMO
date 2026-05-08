@@ -4,9 +4,9 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { CheckCircle, AlertCircle, Key, Upload, Image as ImageIcon } from 'lucide-react'
 import AvatarUsuario from './common/AvatarUsuario.jsx'
 
-const C = { navy:'#050505', gold:'#064e3b', bg:'#f8fafc', white:'#ffffff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', green:'#16a34a', greenBg:'#dcfce7', red:'#dc2626', redBg:'#fee2e2', purple:'#064e3b' }
+const C = { navy:'#022c22', gold:'#10b981', bg:'#f8fafc', white:'#ffffff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', green:'#16a34a', greenBg:'#dcfce7', red:'#dc2626', redBg:'#fee2e2', purple:'#10b981' }
 const INP = { width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid '+C.border, fontSize:14, color:C.text, background:C.white, boxSizing:'border-box', outline:'none', fontFamily:'inherit' }
-const CORES = ['#064e3b','#064e3b','#1d4ed8','#16a34a','#dc2626','#b45309','#065f46','#be185d']
+const CORES = ['#10b981','#10b981','#1d4ed8','#16a34a','#dc2626','#b45309','#065f46','#be185d']
 
 function Field({ label, children }) {
   return <div style={{ marginBottom: 14 }}><label style={{ fontSize: 11, fontWeight: 700, color: C.muted, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>{children}</div>

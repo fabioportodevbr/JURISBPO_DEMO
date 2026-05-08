@@ -3,7 +3,7 @@ import { supabase, ROLES, can } from '../lib/supabase.js'
 import AvatarUsuario from './common/AvatarUsuario.jsx'
 import { X, Send, Mail, Phone, Briefcase, Scale, Paperclip, UserRound, Plus, Trash2, UserPlus, ShieldCheck } from 'lucide-react'
 
-const C={white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',navy:'#050505',gold:'#064e3b',green:'#064e3b',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2'}
+const C={white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',navy:'#022c22',gold:'#10b981',green:'#10b981',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:10,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const BTN={border:0,borderRadius:10,padding:'10px 14px',fontWeight:900,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}
 

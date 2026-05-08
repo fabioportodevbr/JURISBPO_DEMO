@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase, can } from '../lib/supabase.js'
 import { Upload, Trash2, Eye, AlertCircle, File } from 'lucide-react'
 
-const C = { white:'#fff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', red:'#dc2626', redBg:'#fee2e2', purple:'#064e3b', grayBg:'#f1f5f9' }
+const C = { white:'#fff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', red:'#dc2626', redBg:'#fee2e2', purple:'#10b981', grayBg:'#f1f5f9' }
 const fmb = (b=0) => b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'
 const fdt = (s) => s ? new Date(s).toLocaleString('pt-BR') : '—'
 const icon = (name='') => name.match(/\.pdf$/i)?'📄':name.match(/\.docx?$/i)?'📝':name.match(/\.(jpg|jpeg|png|gif|webp)$/i)?'🖼️':name.match(/\.txt$/i)?'📃':'📎'

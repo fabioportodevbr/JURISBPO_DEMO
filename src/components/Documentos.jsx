@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Upload, Trash2, Eye, File, AlertCircle } from 'lucide-react'
 
-const C = { navy:'#050505', white:'#fff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', red:'#dc2626', redBg:'#fee2e2', purple:'#064e3b', purpleBg:'#ede9fe', grayBg:'#f1f5f9', green:'#16a34a', greenBg:'#dcfce7' }
+const C = { navy:'#022c22', white:'#fff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', red:'#dc2626', redBg:'#fee2e2', purple:'#10b981', purpleBg:'#ede9fe', grayBg:'#f1f5f9', green:'#16a34a', greenBg:'#dcfce7' }
 const INP = { width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid '+C.border, fontSize:14, color:C.text, background:C.white, boxSizing:'border-box', outline:'none', fontFamily:'inherit' }
 const fmb = (b) => b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'
 const fdt = (s) => s ? new Date(s).toLocaleString('pt-BR') : '—'

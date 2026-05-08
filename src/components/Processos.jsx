@@ -5,7 +5,7 @@ import DocumentosVinculados from './DocumentoVinculados.jsx'
 import AndamentosProcessuaisPush from './AndamentosProcessuaisPush.jsx'
 import { SeguroGarantiaCampos, TransitoJulgadoCampo, calcularResumoFinanceiroProcesso } from './FinanceiroSeguroGarantia.jsx'
 
-const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',red:'#dc2626',redBg:'#fee2e2',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',purple:'#064e3b',purpleBg:'#dcfce7',grayBg:'#f1f5f9'}
+const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',red:'#dc2626',redBg:'#fee2e2',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',purple:'#10b981',purpleBg:'#dcfce7',grayBg:'#f1f5f9'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const STATUS=[['ativo','Ativo'],['arquivo_temporario','Arquivo temporário'],['encerrado','Encerrado']]
 const FASES=[['conhecimento','Conhecimento'],['recurso','Recurso'],['execucao_sentenca','Execução de sentença'],['arquivo_definitivo','Arquivo definitivo']]

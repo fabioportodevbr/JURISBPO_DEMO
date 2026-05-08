@@ -7,7 +7,7 @@ const C = {
   border:'#e5e7eb',
   text:'#0f172a',
   muted:'#64748b',
-  green:'#064e3b',
+  green:'#10b981',
   amber:'#b45309',
   amberBg:'#fef3c7',
   red:'#dc2626',

@@ -88,7 +88,7 @@ type FormState = {
 };
 
 const C = {
-  navy: "#050505",
+  navy: "#022c22",
   white: "#fff",
   text: "#0f172a",
   muted: "#64748b",

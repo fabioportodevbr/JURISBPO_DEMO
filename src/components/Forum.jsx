@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Send, Paperclip, Download, Users, MessageSquare, Hash, X, FileText, Image, Mail, Archive, ArchiveRestore, Reply, Inbox } from 'lucide-react'
 
-const C={navy:'#050505',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',green:'#064e3b',greenBg:'#dcfce7',blue:'#1d4ed8',blueBg:'#dbeafe',amber:'#b45309',amberBg:'#fef3c7',red:'#dc2626',redBg:'#fee2e2',grayBg:'#f8fafc',sidebarBg:'#0f172a',sidebarItem:'rgba(255,255,255,0.07)',sidebarActive:'rgba(6,78,59,0.35)',sidebarText:'rgba(255,255,255,0.75)',sidebarMuted:'rgba(255,255,255,0.35)'}
+const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',green:'#10b981',greenBg:'#dcfce7',blue:'#1d4ed8',blueBg:'#dbeafe',amber:'#b45309',amberBg:'#fef3c7',red:'#dc2626',redBg:'#fee2e2',grayBg:'#f8fafc',sidebarBg:'#0f172a',sidebarItem:'rgba(255,255,255,0.07)',sidebarActive:'rgba(6,78,59,0.35)',sidebarText:'rgba(255,255,255,0.75)',sidebarMuted:'rgba(255,255,255,0.35)'}
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 
 function avatar(nome,size=32){
