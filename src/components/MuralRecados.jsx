@@ -146,6 +146,11 @@ export default function MuralRecados({ profile }) {
             </button>
           </div>
         )}
+        {variant === 'arquivado' && isGerente && (
+          <button onClick={() => excluir(r)} title="Excluir recado arquivado" style={{ border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: C.red, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
     </div>
   )
