@@ -147,6 +147,64 @@ function AudienciaModal({audiencia,onClose,onOpenProcess}){
   </div>
 }
 
+function AtividadeModal({atividade,onClose,onOpenProcess}){
+  const a=atividade
+  const TIPOS_MAP={tarefa:'Tarefa',prazo_processual:'Prazo processual',reuniao:'Reunião',audiencia:'Audiência'}
+  const STATUS_MAP={a_fazer:'A fazer',em_andamento:'Em andamento',concluida:'Concluída',cancelada:'Cancelada'}
+  const PRIOR_MAP={baixa:'Baixa',media:'Média',alta:'Alta',urgente:'Urgente'}
+  const priorColor={baixa:C.muted,media:C.amber,alta:C.red,urgente:C.red}[a.prioridade]||C.muted
+  const kindBg={tarefa:C.redBg,prazo_processual:C.redBg,reuniao:C.greenBg}[a.tipo]||C.blueBg
+  const kindColor={tarefa:C.red,prazo_processual:C.red,reuniao:C.green}[a.tipo]||C.blue
+  const Icon={tarefa:AlertTriangle,prazo_processual:Clock,reuniao:CalendarCheck}[a.tipo]||Clock
+  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:520,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:'16px 18px',borderBottom:'1px solid '+C.border,background:kindBg}}>
+        <div style={{display:'flex',alignItems:'flex-start',gap:10}}><Icon size={20} color={kindColor} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{a.titulo}</b><span style={{fontSize:12,color:C.muted}}>{TIPOS_MAP[a.tipo]||a.tipo}</span></div></div>
+        <button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',color:C.muted,flexShrink:0}}><X size={20}/></button>
+      </div>
+      <div style={{padding:18}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Data / Prazo</div><div style={{fontSize:18,fontWeight:900,color:C.text}}>{brDate(a.prazo)}</div></div>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Horário</div><div style={{fontSize:18,fontWeight:900,color:C.text}}>{a.horario||'—'}</div></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Status</div><div style={{fontSize:13}}>{STATUS_MAP[a.status]||a.status||'—'}</div></div>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Prioridade</div><div style={{fontSize:13,fontWeight:700,color:priorColor}}>{PRIOR_MAP[a.prioridade]||a.prioridade||'—'}</div></div>
+        </div>
+        {a.local&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Local / link</div><div style={{fontSize:13,color:C.text}}>{a.local}</div></div>}
+        {a.descricao&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Descrição</div><div style={{fontSize:13,color:C.text,lineHeight:1.45}}>{a.descricao}</div></div>}
+        {a.processo_id&&<div style={{borderTop:'1px solid '+C.border,paddingTop:14,marginTop:4}}><button onClick={()=>{onClose();onOpenProcess(a.processo_id)}} style={{display:'inline-flex',alignItems:'center',gap:8,border:'1px solid '+C.blue,background:C.blueBg,color:C.blue,borderRadius:8,padding:'9px 16px',fontWeight:900,cursor:'pointer',fontSize:13}}><ExternalLink size={14}/>Abrir processo vinculado</button></div>}
+      </div>
+    </div>
+  </div>
+}
+
+function ContratoAlertaModal({contrato,onClose}){
+  const c=contrato
+  const vencido=c.renovacao?.level==='vencido'
+  const bg=vencido?C.redBg:C.amberBg
+  const color=vencido?C.red:C.amber
+  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:520,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:'16px 18px',borderBottom:'1px solid '+C.border,background:bg}}>
+        <div style={{display:'flex',alignItems:'flex-start',gap:10}}><AlertTriangle size={20} color={color} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{c.titulo}</b><span style={{fontSize:12,color:C.muted}}>Alerta de renovação contratual</span></div></div>
+        <button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',color:C.muted,flexShrink:0}}><X size={20}/></button>
+      </div>
+      <div style={{padding:18}}>
+        <div style={{background:bg,border:'1px solid '+(vencido?'#fca5a5':'#fde68a'),borderRadius:10,padding:'12px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8}}><AlertTriangle size={16} color={color}/><span style={{fontSize:13,fontWeight:800,color}}>{c.renovacao?.text}</span></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          {c.numero&&<div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Número</div><div style={{fontSize:14,fontWeight:700}}>{c.numero}</div></div>}
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Vigência até</div><div style={{fontSize:18,fontWeight:900,color}}>{brDate(c.data_fim)}</div></div>
+        </div>
+        <div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Contratante</div><div style={{fontSize:13,color:C.text}}>{c.contratante||'—'}</div></div>
+        <div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Contratada</div><div style={{fontSize:13,color:C.text}}>{c.contratada||'—'}</div></div>
+        {c.objeto&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Objeto</div><div style={{fontSize:13,color:C.text,lineHeight:1.45}}>{c.objeto}</div></div>}
+        {c.observacoes&&<div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Observações</div><div style={{fontSize:13,color:C.muted,fontStyle:'italic'}}>{c.observacoes}</div></div>}
+      </div>
+    </div>
+  </div>
+}
+
 function saudacaoHorario(){
   const h=new Date().getHours()
   if(h>=5&&h<12)return 'Bom dia'
@@ -158,6 +216,8 @@ export default function Dashboard({profile}){
   const navigate=useNavigate()
   const[pushModal,setPushModal]=useState(false)
   const[audienciaModal,setAudienciaModal]=useState(null)
+  const[atividadeModal,setAtividadeModal]=useState(null)
+  const[contratoModal,setContratoModal]=useState(null)
   const[createPush,setCreatePush]=useState(null)
   const[createForm,setCreateForm]=useState({numero:'',titulo:'',tribunal:'',categoria:'trabalhista',parte_contraria:'',resumo_processo:''})
   const[savingProcess,setSavingProcess]=useState(false)
@@ -249,21 +309,24 @@ export default function Dashboard({profile}){
 
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas de renovação contratual</h2>
-      {st.ren.length?st.ren.map(c=><div key={c.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:c.renovacao.level==='vencido'?C.redBg:C.amberBg}}>
-        <b>{c.titulo}</b>
-        <div style={{fontSize:12,color:C.muted,marginTop:3}}>{c.numero?'Contrato nº '+c.numero+' · ':''}{c.contratante||'Contratante não informado'} × {c.contratada||'Contratada não informada'} · fim: {brDate(c.data_fim)}</div>
-        <div style={{fontSize:12,fontWeight:900,color:c.renovacao.level==='vencido'?C.red:C.amber,marginTop:4,display:'flex',gap:6,alignItems:'center'}}><AlertTriangle size={13}/>{c.renovacao.text}</div>
+      {st.ren.length?st.ren.map(c=><div key={c.id} onClick={()=>setContratoModal(c)} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:c.renovacao.level==='vencido'?C.redBg:C.amberBg,cursor:'pointer',transition:'filter .12s'}} onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.96)'} onMouseLeave={e=>e.currentTarget.style.filter='none'}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+          <div><b>{c.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{c.numero?'Contrato nº '+c.numero+' · ':''}{c.contratante||'Contratante não informado'} × {c.contratada||'Contratada não informada'} · fim: {brDate(c.data_fim)}</div><div style={{fontSize:12,fontWeight:900,color:c.renovacao.level==='vencido'?C.red:C.amber,marginTop:4,display:'flex',gap:6,alignItems:'center'}}><AlertTriangle size={13}/>{c.renovacao.text}</div></div>
+          <ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>
+        </div>
       </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>Nenhum alerta de renovação no momento.</div>}
     </div>
 
-    <ListBlock title="Atividades pendentes" icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,6)} empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger"/>
-    <ListBlock title="Atividades futuras" icon={<Clock size={16}/>} items={st.futuras.slice(0,6)} empty="Nenhuma tarefa ou prazo futuro agendado." kind="warning"/>
-    <ListBlock title="Reuniões na semana" icon={<CalendarCheck size={16}/>} items={st.reunioesSemana.slice(0,6)} empty="Nenhuma reunião nos próximos 7 dias." kind="success"/>
+    <ListBlock title="Atividades pendentes" icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,6)} empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger" onItemClick={setAtividadeModal}/>
+    <ListBlock title="Atividades futuras" icon={<Clock size={16}/>} items={st.futuras.slice(0,6)} empty="Nenhuma tarefa ou prazo futuro agendado." kind="warning" onItemClick={setAtividadeModal}/>
+    <ListBlock title="Reuniões na semana" icon={<CalendarCheck size={16}/>} items={st.reunioesSemana.slice(0,6)} empty="Nenhuma reunião nos próximos 7 dias." kind="success" onItemClick={setAtividadeModal}/>
     <FinanceiroResumoDashboard profile={profile}/>
     <ClippingJuridico/>
 
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso} onDismiss={desconsiderarPush}/>}
     {audienciaModal&&<AudienciaModal audiencia={audienciaModal} onClose={()=>setAudienciaModal(null)} onOpenProcess={abrirProcesso}/>}
+    {atividadeModal&&<AtividadeModal atividade={atividadeModal} onClose={()=>setAtividadeModal(null)} onOpenProcess={abrirProcesso}/>}
+    {contratoModal&&<ContratoAlertaModal contrato={contratoModal} onClose={()=>setContratoModal(null)}/>}
     {createPush&&<CriarProcessoPushModal push={createPush} form={createForm} setForm={setCreateForm} saving={savingProcess} onCancel={()=>setCreatePush(null)} onSave={salvarProcessoPush}/>}
   </div>
 }
