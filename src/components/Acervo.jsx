@@ -3,7 +3,7 @@ import { supabase, can } from '../lib/supabase'
 import {
   FileText, Send, Plus, Search, Edit2, Trash2, Download,
   ChevronRight, X, Paperclip, Eye, Building2, BookOpen,
-  Check, ChevronDown, Upload, AlertCircle,
+  Check, ChevronDown, ChevronUp, Upload, AlertCircle,
 } from 'lucide-react'
 
 // ── Cores (mesmas do App.jsx) ─────────────────────────────────────────────
@@ -520,6 +520,8 @@ export default function Acervo({ profile }) {
   const [showNovaEmpresa, setShowNovaEmpresa] = useState(false)
   const [editingOficio, setEditingOficio] = useState(null)
   const [anexosOficio, setAnexosOficio] = useState(null)
+  const [sortCol, setSortCol] = useState('numero')
+  const [sortDir, setSortDir] = useState('asc')
   const canEdit = can(profile, 'docs.upload')
   const canDelete = can(profile, 'docs.excluir')
 
@@ -541,7 +543,7 @@ export default function Acervo({ profile }) {
   const fetchOficios = useCallback(async (empresa) => {
     if (!empresa) return
     setLoadingOficios(true)
-    const { data } = await supabase.from('oficios').select('*').eq('empresa_id', empresa.id).eq('ano', new Date().getFullYear()).order('created_at', { ascending: true })
+    const { data } = await supabase.from('oficios').select('*').eq('empresa_id', empresa.id).eq('ano', new Date().getFullYear())
     setOficiosList(data || []); setLoadingOficios(false)
   }, [])
 
@@ -578,6 +580,30 @@ export default function Acervo({ profile }) {
   }
 
   const recentModelos = modelos.slice(0, 5)
+
+  const sortedOficios = [...oficiosList].sort((a, b) => {
+    let va, vb
+    if (sortCol === 'destinatario') {
+      va = String(a.destinatario || '').toLowerCase()
+      vb = String(b.destinatario || '').toLowerCase()
+      return sortDir === 'asc' ? va.localeCompare(vb, 'pt-BR') : vb.localeCompare(va, 'pt-BR')
+    }
+    // default: numero sequencial
+    va = numSeq(a.numero); vb = numSeq(b.numero)
+    return sortDir === 'asc' ? va - vb : vb - va
+  })
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  function SortIcon({ col }) {
+    if (sortCol !== col) return <ChevronDown size={10} style={{ opacity: 0.3, marginLeft: 2 }} />
+    return sortDir === 'asc'
+      ? <ChevronUp size={10} style={{ color: C.primary, marginLeft: 2 }} />
+      : <ChevronDown size={10} style={{ color: C.primary, marginLeft: 2 }} />
+  }
 
   return (
     <div style={{ padding: 32, background: C.bg, minHeight: '100%' }}>
@@ -703,65 +729,81 @@ export default function Acervo({ profile }) {
             </div>
 
             <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
-                <colgroup>
-                  <col style={{ width: 88 }} />
-                  <col style={{ width: 80 }} />
-                  <col style={{ width: 100 }} />
-                  <col style={{ width: 108 }} />
-                  <col style={{ width: 118 }} />
-                  <col />
-                  <col style={{ width: 96 }} />
-                  <col style={{ width: 48 }} />
-                  <col style={{ width: 36 }} />
-                  <col style={{ width: 36 }} />
-                </colgroup>
-                <thead>
-                  <tr style={{ background: C.bg, borderBottom: '1px solid ' + C.border }}>
-                    {['Número', 'Data', 'Depto.', 'Responsável', 'Destinatário', 'Referência / Assunto', 'Envio', 'Pasta', '', ''].map((h, idx) => (
-                      <th key={idx} style={{ padding: '9px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingOficios ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</td></tr>
-                    : oficiosList.length === 0 ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum ofício registrado em {new Date().getFullYear()}.</td></tr>
-                    : oficiosList.map((of, i) => (
-                    <tr key={of.id} style={{ borderTop: i === 0 ? 'none' : '1px solid ' + C.border }}
-                      onMouseEnter={e => e.currentTarget.style.background = C.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '8px 10px', overflow: 'hidden' }}><span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 11, color: C.primary }}>{of.numero}</span></td>
-                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12 }}>{fmtDate(of.data)}</td>
-                      <td style={{ padding: '8px 10px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.departamento}>{of.departamento || '—'}</td>
-                      <td style={{ padding: '8px 10px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.responsavel}>{of.responsavel || '—'}</td>
-                      <td style={{ padding: '8px 10px', overflow: 'hidden' }}>
-                        <span style={{ display: 'block', background: C.primaryLight, color: C.primary, padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.destinatario}>{of.destinatario || '—'}</span>
-                      </td>
-                      <td style={{ padding: '8px 10px', color: C.muted, overflow: 'hidden' }}>
-                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.referencia}>{of.referencia || '—'}</div>
-                      </td>
-                      <td style={{ padding: '8px 10px', color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.forma_envio}>{of.forma_envio || '—'}</td>
-                      <td style={{ padding: '8px 10px' }}>
-                        {of.arquivado === 'SIM'
-                          ? <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#16a34a', fontSize: 11, fontWeight: 700 }}><Check size={11} />SIM</span>
-                          : <span style={{ color: C.muted, fontSize: 11 }}>{of.arquivado || '—'}</span>}
-                      </td>
-                      <td style={{ padding: '6px 4px' }}>
-                        <button onClick={() => setAnexosOficio(of)} title="Ver anexos"
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
-                          <Paperclip size={11} />
-                        </button>
-                      </td>
-                      <td style={{ padding: '6px 4px' }}>
-                        {canEdit && <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true) }}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
-                          <Edit2 size={11} />
-                        </button>}
-                      </td>
+              <div style={{ overflowY: 'auto', maxHeight: 390 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: 88 }} />
+                    <col style={{ width: 80 }} />
+                    <col style={{ width: 100 }} />
+                    <col style={{ width: 108 }} />
+                    <col style={{ width: 118 }} />
+                    <col />
+                    <col style={{ width: 96 }} />
+                    <col style={{ width: 48 }} />
+                    <col style={{ width: 36 }} />
+                    <col style={{ width: 36 }} />
+                  </colgroup>
+                  <thead>
+                    <tr style={{ background: C.bg, boxShadow: '0 1px 0 ' + C.border }}>
+                      {[
+                        { key: 'numero', label: 'Número', sortable: true },
+                        { key: 'data', label: 'Data', sortable: false },
+                        { key: 'departamento', label: 'Depto.', sortable: false },
+                        { key: 'responsavel', label: 'Responsável', sortable: false },
+                        { key: 'destinatario', label: 'Destinatário', sortable: true },
+                        { key: 'referencia', label: 'Referência / Assunto', sortable: false },
+                        { key: 'envio', label: 'Envio', sortable: false },
+                        { key: 'pasta', label: 'Pasta', sortable: false },
+                        { key: 'a1', label: '', sortable: false },
+                        { key: 'a2', label: '', sortable: false },
+                      ].map(col => (
+                        <th key={col.key} onClick={col.sortable ? () => toggleSort(col.key) : undefined}
+                          style={{ padding: '9px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: sortCol === col.key ? C.primary : C.muted, textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', position: 'sticky', top: 0, background: C.bg, zIndex: 1, cursor: col.sortable ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                          {col.label}{col.sortable && <SortIcon col={col.key} />}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {loadingOficios ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</td></tr>
+                      : sortedOficios.length === 0 ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum ofício registrado em {new Date().getFullYear()}.</td></tr>
+                      : sortedOficios.map((of, i) => (
+                      <tr key={of.id} style={{ borderTop: i === 0 ? 'none' : '1px solid ' + C.border }}
+                        onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '8px 10px', overflow: 'hidden' }}><span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 11, color: C.primary }}>{of.numero}</span></td>
+                        <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12 }}>{fmtDate(of.data)}</td>
+                        <td style={{ padding: '8px 10px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.departamento}>{of.departamento || '—'}</td>
+                        <td style={{ padding: '8px 10px', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.responsavel}>{of.responsavel || '—'}</td>
+                        <td style={{ padding: '8px 10px', overflow: 'hidden' }}>
+                          <span style={{ display: 'block', background: C.primaryLight, color: C.primary, padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.destinatario}>{of.destinatario || '—'}</span>
+                        </td>
+                        <td style={{ padding: '8px 10px', color: C.muted, overflow: 'hidden' }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.referencia}>{of.referencia || '—'}</div>
+                        </td>
+                        <td style={{ padding: '8px 10px', color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={of.forma_envio}>{of.forma_envio || '—'}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          {of.arquivado === 'SIM'
+                            ? <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#16a34a', fontSize: 11, fontWeight: 700 }}><Check size={11} />SIM</span>
+                            : <span style={{ color: C.muted, fontSize: 11 }}>{of.arquivado || '—'}</span>}
+                        </td>
+                        <td style={{ padding: '6px 4px' }}>
+                          <button onClick={() => setAnexosOficio(of)} title="Ver anexos"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
+                            <Paperclip size={11} />
+                          </button>
+                        </td>
+                        <td style={{ padding: '6px 4px' }}>
+                          {canEdit && <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true) }}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
+                            <Edit2 size={11} />
+                          </button>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>)}
         </div>
