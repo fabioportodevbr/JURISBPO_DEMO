@@ -18,6 +18,8 @@ function parseMoney(v) {
   if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.')
   return Number(s) || 0
 }
+function moeda(v){if(v===null||v===undefined||v==='')return '';return parseMoney(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function moedaChange(valor,setter){const digits=String(valor||'').replace(/\D/g,'');setter(digits?(Number(digits)/100).toFixed(2):'')}
 
 function financeiroExcluido(f = {}) {
   return String(f?.observacoes || '').includes('[REGISTRO_FINANCEIRO_EXCLUIDO:')
@@ -51,10 +53,10 @@ export function SeguroGarantiaCampos({financeiroForm,setFinanceiroForm}) {
           <input type="date" style={INP} value={financeiroForm.apolice_fim||''} onChange={e=>setFinanceiroForm({...financeiroForm,apolice_fim:e.target.value})}/>
         </F>
         <F label="Valor assegurado">
-          <input type="number" step="0.01" style={INP} value={financeiroForm.valor_assegurado||''} onChange={e=>setFinanceiroForm({...financeiroForm,valor_assegurado:e.target.value})}/>
+          <input type="text" inputMode="numeric" style={INP} value={moeda(financeiroForm.valor_assegurado)} onChange={e=>moedaChange(e.target.value,v=>setFinanceiroForm({...financeiroForm,valor_assegurado:v}))} placeholder="R$ 0,00"/>
         </F>
         <F label="Prêmio pago">
-          <input type="number" step="0.01" style={INP} value={financeiroForm.seguro_premio||''} onChange={e=>setFinanceiroForm({...financeiroForm,seguro_premio:e.target.value})}/>
+          <input type="text" inputMode="numeric" style={INP} value={moeda(financeiroForm.seguro_premio)} onChange={e=>moedaChange(e.target.value,v=>setFinanceiroForm({...financeiroForm,seguro_premio:v}))} placeholder="R$ 0,00"/>
         </F>
       </div>
     </div>
