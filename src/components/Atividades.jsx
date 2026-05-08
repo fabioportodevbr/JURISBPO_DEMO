@@ -39,6 +39,7 @@ export default function Atividades({profile}){
     setRotinas(data||[])
   }
   const saveRotina=async()=>{
+    if(!canCreate)return alert('Visitante possui acesso somente leitura.')
     if(!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim())return
     setRotinasSaving(true)
     const uid=rotinaTarget||profile.id
@@ -51,6 +52,7 @@ export default function Atividades({profile}){
     setRotinasSaving(false);loadRotinas()
   }
   const deleteRotina=async(id)=>{
+    if(!canDelete)return alert('Visitante possui acesso somente leitura.')
     if(!confirm('Excluir esta rotina?'))return
     await supabase.from('rotinas').delete().eq('id',id)
     loadRotinas()
@@ -161,7 +163,7 @@ export default function Atividades({profile}){
           <b style={{fontSize:14,color:C.green}}>Minhas Rotinas</b>
           <span style={{fontSize:12,color:C.muted}}>{rotinas.filter(r=>r.usuario_id===profile.id).length} procedimento(s) recorrente(s)</span>
         </div>
-        <button onClick={()=>{setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#064e3b'});setRotinaTarget(null);setRotinaModal(true)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #86efac',background:'white',color:C.green,borderRadius:8,padding:'6px 12px',fontWeight:700,fontSize:12,cursor:'pointer'}}>+ Adicionar</button>
+        {canCreate&&<button onClick={()=>{setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#064e3b'});setRotinaTarget(null);setRotinaModal(true)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #86efac',background:'white',color:C.green,borderRadius:8,padding:'6px 12px',fontWeight:700,fontSize:12,cursor:'pointer'}}>+ Adicionar</button>}
       </div>
       {rotinas.filter(r=>r.usuario_id===profile.id).length===0&&<p style={{margin:0,fontSize:13,color:C.muted}}>Nenhuma rotina cadastrada ainda. Clique em "+ Adicionar" para registrar seus procedimentos recorrentes.</p>}
       <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
@@ -181,14 +183,14 @@ export default function Atividades({profile}){
               </div>}
             </div>
             <div style={{display:'flex',gap:4,flexShrink:0}}>
-              <button onClick={()=>{setRotinaForm({id:r.id,texto:r.texto,recorrencia:r.recorrencia,cor:r.cor||'#064e3b',itens:r.itens||[]});setRotinaTarget(r.usuario_id);setRotinaModal(true);setNovoItem('')}} style={{border:0,background:'none',cursor:'pointer',color:C.muted,padding:3,display:'flex'}}><Pencil size={13}/></button>
-              <button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:3,display:'flex'}}><Trash2 size={13}/></button>
+              {canEdit&&<button onClick={()=>{setRotinaForm({id:r.id,texto:r.texto,recorrencia:r.recorrencia,cor:r.cor||'#064e3b',itens:r.itens||[]});setRotinaTarget(r.usuario_id);setRotinaModal(true);setNovoItem('')}} style={{border:0,background:'none',cursor:'pointer',color:C.muted,padding:3,display:'flex'}}><Pencil size={13}/></button>}
+              {canDelete&&<button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:3,display:'flex'}}><Trash2 size={13}/></button>}
             </div>
           </div>
         </div>)}
       </div>
       {isGerente&&<details style={{marginTop:12}}><summary style={{fontSize:12,fontWeight:700,color:C.muted,cursor:'pointer',userSelect:'none'}}>Ver rotinas da equipe</summary>
-        <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8}}>{Object.entries(rotinas.filter(r=>r.usuario_id!==profile.id).reduce((acc,r)=>{const n=(team||[]).find(t=>t.id===r.usuario_id)?.nome||r.usuario_id;if(!acc[n])acc[n]=[];acc[n].push(r);return acc},{})).map(([nome,rs])=><div key={nome}><div style={{fontSize:12,fontWeight:800,color:C.muted,marginBottom:4}}>{nome}</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{rs.map(r=><div key={r.id} style={{background:'white',border:'1.5px solid '+(r.cor||C.green),borderRadius:8,padding:'8px 12px',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:8,flexShrink:0}}><span style={{flex:1}}>{r.texto}</span><span style={{fontSize:10,fontWeight:700,color:'white',background:r.cor||C.green,borderRadius:20,padding:'1px 8px',whiteSpace:'nowrap'}}>{r.recorrencia}</span><button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:2,display:'flex'}}><Trash2 size={12}/></button></div>)}</div></div>)}{rotinas.filter(r=>r.usuario_id!==profile.id).length===0&&<p style={{margin:0,fontSize:12,color:C.muted}}>Nenhum membro da equipe cadastrou rotinas ainda.</p>}</div>
+        <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:8}}>{Object.entries(rotinas.filter(r=>r.usuario_id!==profile.id).reduce((acc,r)=>{const n=(team||[]).find(t=>t.id===r.usuario_id)?.nome||r.usuario_id;if(!acc[n])acc[n]=[];acc[n].push(r);return acc},{})).map(([nome,rs])=><div key={nome}><div style={{fontSize:12,fontWeight:800,color:C.muted,marginBottom:4}}>{nome}</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{rs.map(r=><div key={r.id} style={{background:'white',border:'1.5px solid '+(r.cor||C.green),borderRadius:8,padding:'8px 12px',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:8,flexShrink:0}}><span style={{flex:1}}>{r.texto}</span><span style={{fontSize:10,fontWeight:700,color:'white',background:r.cor||C.green,borderRadius:20,padding:'1px 8px',whiteSpace:'nowrap'}}>{r.recorrencia}</span>{canDelete&&<button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:'#dc2626',padding:2,display:'flex'}}><Trash2 size={12}/></button>}</div>)}</div></div>)}{rotinas.filter(r=>r.usuario_id!==profile.id).length===0&&<p style={{margin:0,fontSize:12,color:C.muted}}>Nenhum membro da equipe cadastrou rotinas ainda.</p>}</div>
       </details>}
     </div>
     {/* ── Botão para gerente criar rotina para outro membro ── */}

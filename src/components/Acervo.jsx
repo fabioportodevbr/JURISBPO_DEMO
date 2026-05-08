@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, can } from '../lib/supabase'
 import {
   FileText, Send, Plus, Search, Edit2, Trash2, Download,
   ChevronRight, X, Paperclip, Eye, Building2, BookOpen,
@@ -247,7 +247,7 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
 }
 
 // ── Modal: Consultar Todos ────────────────────────────────────────────────
-function ConsultarModal({ empresa, onClose, profile, onEdit }) {
+function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit, canDelete }) {
   const [oficios, setOficios] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -273,6 +273,7 @@ function ConsultarModal({ empresa, onClose, profile, onEdit }) {
   }
 
   async function handleDelete(of) {
+    if (!canDelete) { alert('Visitante possui acesso somente leitura.'); return }
     if (!confirm(`Excluir ofício ${of.numero}?`)) return
     setDeleting(true)
     await supabase.from('oficios_auditoria').insert({ oficio_id: of.id, empresa_id: empresa.id, numero_oficio: of.numero, acao: 'excluído', usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: of })
@@ -313,8 +314,8 @@ function ConsultarModal({ empresa, onClose, profile, onEdit }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: C.primary }}>{selected.numero}</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { onEdit(selected); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Edit2 size={13} />Editar</button>
-                <button onClick={() => handleDelete(selected)} disabled={deleting} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid #fca5a5', borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Trash2 size={13} />Excluir</button>
+                {canEdit && <button onClick={() => { onEdit(selected); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Edit2 size={13} />Editar</button>}
+                {canDelete && <button onClick={() => handleDelete(selected)} disabled={deleting} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid #fca5a5', borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Trash2 size={13} />Excluir</button>}
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -493,6 +494,8 @@ export default function Acervo({ profile }) {
   const [showConsultar, setShowConsultar] = useState(false)
   const [showNovaEmpresa, setShowNovaEmpresa] = useState(false)
   const [editingOficio, setEditingOficio] = useState(null)
+  const canEdit = can(profile, 'docs.upload')
+  const canDelete = can(profile, 'docs.excluir')
 
   const fetchModelos = useCallback(() => {
     setLoadingModelos(true)
@@ -542,6 +545,7 @@ export default function Acervo({ profile }) {
   }
 
   async function excluirUltimoOficio() {
+    if (!canDelete) { alert('Visitante possui acesso somente leitura.'); return }
     const alvo = ultimoOficio(oficiosList)
     if (!alvo) return
     if (!confirm(`Excluir o último ofício registrado (${alvo.numero})?`)) return
@@ -590,9 +594,9 @@ export default function Acervo({ profile }) {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => setShowUploadModelo(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, cursor: 'pointer', color: C.primary, borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
+                {canEdit && <button onClick={() => setShowUploadModelo(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, cursor: 'pointer', color: C.primary, borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
                   <Upload size={14} />Anexar modelo
-                </button>
+                </button>}
                 <button onClick={() => setShowTodosModelos(true)} style={{ display: 'flex', alignItems: 'center', gap: 4, border: 'none', background: 'none', cursor: 'pointer', color: C.primary, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
                   Ver mais <ChevronRight size={14} />
                 </button>
@@ -645,10 +649,10 @@ export default function Acervo({ profile }) {
                 )
               })}
             </div>
-            <button onClick={() => setShowNovaEmpresa(true)}
+            {canEdit && <button onClick={() => setShowNovaEmpresa(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px dashed ' + C.border, borderRadius: 8, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
               <Plus size={13} />Nova empresa
-            </button>
+            </button>}
           </div>
 
           {selectedEmpresa && (<>
@@ -664,15 +668,15 @@ export default function Acervo({ profile }) {
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
                   <Eye size={14} />Consultar todos
                 </button>
-                <button onClick={excluirUltimoOficio} disabled={!ultimoRegistro}
+                {canDelete && <button onClick={excluirUltimoOficio} disabled={!ultimoRegistro}
                   title={ultimoRegistro ? `Excluir ${ultimoRegistro.numero}` : 'Nenhum ofício para excluir'}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #fca5a5', borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: ultimoRegistro ? 'pointer' : 'not-allowed', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', opacity: ultimoRegistro ? 1 : 0.55 }}>
                   <Trash2 size={14} />Excluir último
-                </button>
-                <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true) }}
+                </button>}
+                {canEdit && <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true) }}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
                   <Plus size={14} />Novo Ofício
-                </button>
+                </button>}
               </div>
             </div>
 
@@ -706,10 +710,10 @@ export default function Acervo({ profile }) {
                             : <span style={{ color: C.muted, fontSize: 12 }}>{of.arquivado || '—'}</span>}
                         </td>
                         <td style={{ padding: '8px 10px' }}>
-                          <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true) }}
+                          {canEdit && <button onClick={() => { setEditingOficio(of); setShowNovoOficio(true) }}
                             style={{ display: 'flex', alignItems: 'center', padding: '4px 8px', border: '1px solid ' + C.border, borderRadius: 6, background: C.white, color: C.muted, cursor: 'pointer' }}>
                             <Edit2 size={12} />
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     ))}
@@ -730,7 +734,7 @@ export default function Acervo({ profile }) {
           onClose={() => { setShowNovoOficio(false); setEditingOficio(null) }} />
       )}
       {showConsultar && selectedEmpresa && (
-        <ConsultarModal empresa={selectedEmpresa} profile={profile}
+        <ConsultarModal empresa={selectedEmpresa} profile={profile} canEdit={canEdit} canDelete={canDelete}
           onClose={() => setShowConsultar(false)}
           onEdit={of => { setEditingOficio(of); setShowNovoOficio(true) }} />
       )}
