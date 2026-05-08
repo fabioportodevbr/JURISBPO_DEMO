@@ -125,7 +125,7 @@ function ChatBasico({ profile }) {
     {error && <div style={{ marginBottom:10 }}><AIBox error={error}/></div>}
     <div style={{ display:'flex', gap:10, alignItems:'flex-end' }}>
       <textarea style={{ ...INP, minHeight:52, maxHeight:140 }} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); enviar() } }} placeholder="Digite sua pergunta ou pedido…" />
-      <button onClick={enviar} disabled={loading || !input.trim()} style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 16px', background:loading||!input.trim()?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading||!input.trim()?'not-allowed':'pointer' }}><Send size={15}/>Enviar</button>
+      <button onClick={enviar} disabled={loading || !input.trim()} style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 16px', background:loading||!input.trim()?C.muted:C.navy, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading||!input.trim()?'not-allowed':'pointer' }}><Send size={15}/>Enviar</button>
     </div>
   </div>
 }
@@ -157,7 +157,7 @@ function Analise() {
       </div>
       <textarea style={{ ...INP, minHeight:180 }} value={text} onChange={e=>setText(e.target.value)} placeholder="Cole aqui ou anexe o documento que deseja analisar…"/>
       <div style={{ display:'flex', justifyContent:'flex-end', marginTop:12 }}>
-        <button onClick={analisar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
+        <button onClick={analisar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.navy, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
           {loading?<Loader size={15} style={{ animation:'spin 0.8s linear infinite' }}/>:<Zap size={15}/>}{loading?'Analisando…':'Analisar com IA'}
         </button>
       </div>
@@ -206,7 +206,7 @@ function Comparacao() {
         </div>
       </div>
       <div style={{ display:'flex', justifyContent:'flex-end', marginTop:12 }}>
-        <button onClick={comparar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
+        <button onClick={comparar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.navy, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
           {loading?<Loader size={15} style={{ animation:'spin 0.8s linear infinite' }}/>:null}{loading?'Comparando…':'Comparar com IA'}
         </button>
       </div>
@@ -251,7 +251,7 @@ function Anonimizador() {
       <p style={{ fontSize:13, color:C.muted, marginBottom:12 }}>Cole o texto ou anexe um PDF/Word. A IA ocultará dados sensíveis substituindo-os por [***].</p>
       <textarea style={{ ...INP, minHeight:180 }} value={text} onChange={e=>setText(e.target.value)} placeholder="Cole aqui ou anexe o documento que deseja anonimizar…"/>
       <div style={{ display:'flex', justifyContent:'flex-end', marginTop:12 }}>
-        <button onClick={anonimizar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
+        <button onClick={anonimizar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.navy, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
           {loading?<Loader size={15} style={{ animation:'spin 0.8s linear infinite' }}/>:<Zap size={15}/>}{loading?'Anonimizando…':'Anonimizar Documento'}
         </button>
       </div>
@@ -326,7 +326,7 @@ function Relatorio({ profile }) {
     </div>
     {error&&<div style={{ padding:12, background:C.redBg, borderRadius:8, color:C.red, fontSize:13, marginBottom:12 }}><AlertTriangle size={14} style={{ display:'inline', marginRight:6 }}/>{error}</div>}
     <div style={{ display:'flex', justifyContent:'flex-end' }}>
-      <button onClick={gerar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.purple, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
+      <button onClick={gerar} disabled={loading} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', background:loading?C.muted:C.navy, color:'white', border:'none', borderRadius:8, fontSize:14, fontWeight:700, cursor:loading?'not-allowed':'pointer' }}>
         {loading?<Loader size={15} style={{ animation:'spin 0.8s linear infinite' }}/>:<Printer size={15}/>}{loading?'Gerando…':'Gerar Relatório em PDF'}
       </button>
     </div>
@@ -351,7 +351,7 @@ export default function IaJuridica({ profile }) {
           {id:'anonimizador',label:'Anonimizador de Docs'},
           {id:'relatorio',label:'Relatório em PDF'}
         ].map(({id,label})=>(
-          <button key={id} onClick={()=>setSub(id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', border:'none', borderRadius:8, cursor:'pointer', background:sub===id?C.purple:'transparent', color:sub===id?'white':C.muted, fontSize:13, fontWeight:sub===id?700:400, flex:'1 1 auto', justifyContent:'center' }}>{label}</button>
+          <button key={id} onClick={()=>setSub(id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', border:'none', borderRadius:8, cursor:'pointer', background:sub===id?C.navy:'transparent', color:sub===id?'white':C.muted, fontSize:13, fontWeight:sub===id?700:400, flex:'1 1 auto', justifyContent:'center' }}>{label}</button>
         ))}
       </div>
       {sub==='chat' && <ChatBasico profile={profile}/>}

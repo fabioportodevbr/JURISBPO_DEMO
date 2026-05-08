@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase.js'
 import { X, ExternalLink, Settings } from 'lucide-react'
 
 const C = {
-  white: '#fff', text: '#0f172a', muted: '#64748b',
+  navy: '#022c22', white: '#fff', text: '#0f172a', muted: '#64748b',
   border: '#e5e7eb', blue: '#1d4ed8', red: '#dc2626',
   green: '#16a34a', amber: '#b45309', purple: '#10b981',
   bg: '#f8fafc', greenBg: '#dcfce7', blueBg: '#dbeafe',
@@ -248,8 +248,8 @@ export default function Calendario({ profile }) {
               {googleConectado ? 'Google Calendar ✓' : 'Conectar Google Calendar'}
             </a>
           )}
-          <button onClick={() => setMode('agenda')} style={{ border: '1px solid ' + C.border, borderRadius: 8, padding: '8px 12px', background: mode === 'agenda' ? C.text : C.white, color: mode === 'agenda' ? 'white' : C.text }}>Agenda</button>
-          <button onClick={() => setMode('mes')} style={{ border: '1px solid ' + C.border, borderRadius: 8, padding: '8px 12px', background: mode === 'mes' ? C.text : C.white, color: mode === 'mes' ? 'white' : C.text }}>Mês</button>
+          <button onClick={() => setMode('agenda')} style={{ border: '1px solid ' + C.border, borderRadius: 8, padding: '8px 12px', background: mode === 'agenda' ? C.navy : C.white, color: mode === 'agenda' ? 'white' : C.text }}>Agenda</button>
+          <button onClick={() => setMode('mes')} style={{ border: '1px solid ' + C.border, borderRadius: 8, padding: '8px 12px', background: mode === 'mes' ? C.navy : C.white, color: mode === 'mes' ? 'white' : C.text }}>Mês</button>
         </div>
       </div>
 

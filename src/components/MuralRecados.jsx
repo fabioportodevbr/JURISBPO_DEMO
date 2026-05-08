@@ -154,7 +154,7 @@ export default function MuralRecados({ profile }) {
     <div style={{ position: 'relative' }} ref={panelRef}>
       {/* Trigger button */}
       <button onClick={() => { setOpen(v => !v); setTimeout(() => textareaRef.current?.focus(), 100) }}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: open ? C.navy : C.white, color: open ? 'white' : C.text, border: '1px solid ' + C.border, borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 13, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', transition: 'all 0.15s', position: 'relative' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: open ? '#facc15' : '#fef08a', color: '#000000', border: '1px solid #eab308', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', transition: 'all 0.15s', position: 'relative' }}>
         <MessageSquare size={15} />
         Mural de Recados
         {ativos.length > 0 && (

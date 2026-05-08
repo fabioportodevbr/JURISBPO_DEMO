@@ -8,6 +8,7 @@ import {
 
 // ── Cores (mesmas do App.jsx) ─────────────────────────────────────────────
 const C = {
+  navy:         '#022c22',
   bg:           '#f8fafc',
   white:        '#ffffff',
   text:         '#0f172a',
@@ -592,7 +593,7 @@ export default function Acervo({ profile }) {
           const active = activeSection === id
           return (
             <button key={id} onClick={() => setActiveSection(id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', border: '1px solid ' + (active ? C.primary : C.border), borderRadius: 8, background: active ? C.primary : C.white, color: active ? 'white' : C.text, cursor: 'pointer', fontSize: 14, fontWeight: active ? 700 : 400, fontFamily: 'inherit' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', border: '1px solid ' + (active ? C.navy : C.border), borderRadius: 8, background: active ? C.navy : C.white, color: active ? 'white' : C.text, cursor: 'pointer', fontSize: 14, fontWeight: active ? 700 : 400, fontFamily: 'inherit' }}>
               <Icon size={15} />{label}
             </button>
           )
@@ -695,7 +696,7 @@ export default function Acervo({ profile }) {
                   <Eye size={14} />Consultar todos
                 </button>
                 {canEdit && <button onClick={() => { setEditingOficio(null); setShowNovoOficio(true) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.navy, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>
                   <Plus size={14} />Novo Ofício
                 </button>}
               </div>

@@ -182,7 +182,7 @@ export default function Equipe({profile}){
         <h1 style={{margin:0,fontSize:22}}>Equipe</h1>
         <p style={{color:C.muted}}>Membros vinculados à empresa. Clique em um membro para ver o perfil e enviar mensagem.</p>
       </div>
-      {isGerente&&<button onClick={()=>setShowNovoMembro(true)} style={{...BTN,background:C.green,color:'white'}}><UserPlus size={16}/>Adicionar membro</button>}
+      {isGerente&&<button onClick={()=>setShowNovoMembro(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.navy, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}><UserPlus size={14}/>Adicionar membro</button>}
     </div>
 
     {isGerente&&<div style={{marginTop:8,marginBottom:10,border:'1px solid '+C.border,borderRadius:12,padding:12,background:'#f8fafc',display:'flex',gap:10,alignItems:'flex-start',color:C.muted,fontSize:13}}>
