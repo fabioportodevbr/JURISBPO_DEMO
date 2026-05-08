@@ -26,13 +26,15 @@ const PUSH_IMPORTANTE=/senten[cç]a|ac[oó]rd[aã]o|decis[aã]o|liminar|tutela|i
 function pushText(p){return [p.movimento,p.assunto_email,p.corpo_email_resumo,p.corpo_resumo,p.corpo_email_limpo].filter(Boolean).join(' ')}
 function isImportantPush(p){return PUSH_IMPORTANTE.test(pushText(p))}
 
-function ListBlock({title,icon,items,empty,kind='default'}){
+function ListBlock({title,icon,items,empty,kind='default',onItemClick}){
   const bg=kind==='danger'?C.redBg:kind==='warning'?C.amberBg:kind==='info'?C.blueBg:kind==='success'?C.greenBg:C.white
   return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
     <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}>{icon}{title}</h2>
-    {items.length?items.map(t=><div key={t.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:bg}}>
-      <b>{t.titulo}</b>
-      <div style={{fontSize:12,color:C.muted,marginTop:3}}>{t.tipo} · {brDate(t.prazo)}{t.horario?` às ${t.horario}`:''}{t.status?` · ${t.status}`:''}</div>
+    {items.length?items.map(t=><div key={t.id} onClick={onItemClick?()=>onItemClick(t):undefined} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:bg,cursor:onItemClick?'pointer':'default',transition:'filter .12s'}} onMouseEnter={onItemClick?e=>e.currentTarget.style.filter='brightness(0.96)':undefined} onMouseLeave={onItemClick?e=>e.currentTarget.style.filter='none':undefined}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+        <div><b>{t.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{t.tipo} · {brDate(t.prazo)}{t.horario?` às ${t.horario}`:''}{t.status?` · ${t.status}`:''}</div></div>
+        {onItemClick&&<ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>}
+      </div>
     </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>{empty}</div>}
   </div>
 }
@@ -111,6 +113,40 @@ function CriarProcessoPushModal({push,form,setForm,saving,onCancel,onSave}){
   </div>
 }
 
+function AudienciaModal({audiencia,onClose,onOpenProcess}){
+  const a=audiencia
+  const MODS={presencial:'Presencial',online:'Online'}
+  const TIPOS_AUD={inicial:'Inicial',instrucao:'Instrução',una:'Una',conciliacao:'Conciliação'}
+  const STATUS_AUD={a_fazer:'A fazer',em_andamento:'Em andamento',concluida:'Concluída',cancelada:'Cancelada'}
+  const PRIOR_AUD={baixa:'Baixa',media:'Média',alta:'Alta',urgente:'Urgente'}
+  const priorColor={baixa:C.muted,media:C.amber,alta:C.red,urgente:C.red}[a.prioridade]||C.muted
+  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:520,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:'16px 18px',borderBottom:'1px solid '+C.border,background:C.blueBg}}>
+        <div style={{display:'flex',alignItems:'flex-start',gap:10}}><CalendarDays size={20} color={C.blue} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{a.titulo}</b><span style={{fontSize:12,color:C.muted}}>Audiência</span></div></div>
+        <button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',color:C.muted,flexShrink:0}}><X size={20}/></button>
+      </div>
+      <div style={{padding:18}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Data</div><div style={{fontSize:18,fontWeight:900,color:C.text}}>{brDate(a.prazo)}</div></div>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Horário</div><div style={{fontSize:18,fontWeight:900,color:C.text}}>{a.horario||'—'}</div></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Modalidade</div><div style={{fontSize:13,fontWeight:600}}>{MODS[a.audiencia_modalidade]||a.audiencia_modalidade||'—'}</div></div>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Tipo</div><div style={{fontSize:13,fontWeight:600}}>{TIPOS_AUD[a.audiencia_tipo]||a.audiencia_tipo||'—'}</div></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Status</div><div style={{fontSize:13}}>{STATUS_AUD[a.status]||a.status||'—'}</div></div>
+          <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Prioridade</div><div style={{fontSize:13,fontWeight:700,color:priorColor}}>{PRIOR_AUD[a.prioridade]||a.prioridade||'—'}</div></div>
+        </div>
+        {a.local&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Local / link</div><div style={{fontSize:13,color:C.text}}>{a.local}</div></div>}
+        {a.descricao&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Descrição</div><div style={{fontSize:13,color:C.text,lineHeight:1.45}}>{a.descricao}</div></div>}
+        {a.processo_id&&<div style={{borderTop:'1px solid '+C.border,paddingTop:14,marginTop:4}}><button onClick={()=>{onClose();onOpenProcess(a.processo_id)}} style={{display:'inline-flex',alignItems:'center',gap:8,border:'1px solid '+C.blue,background:C.blueBg,color:C.blue,borderRadius:8,padding:'9px 16px',fontWeight:900,cursor:'pointer',fontSize:13}}><ExternalLink size={14}/>Abrir processo vinculado</button></div>}
+      </div>
+    </div>
+  </div>
+}
+
 function saudacaoHorario(){
   const h=new Date().getHours()
   if(h>=5&&h<12)return 'Bom dia'
@@ -121,6 +157,7 @@ function saudacaoHorario(){
 export default function Dashboard({profile}){
   const navigate=useNavigate()
   const[pushModal,setPushModal]=useState(false)
+  const[audienciaModal,setAudienciaModal]=useState(null)
   const[createPush,setCreatePush]=useState(null)
   const[createForm,setCreateForm]=useState({numero:'',titulo:'',tribunal:'',categoria:'trabalhista',parte_contraria:'',resumo_processo:''})
   const[savingProcess,setSavingProcess]=useState(false)
@@ -200,7 +237,7 @@ export default function Dashboard({profile}){
     </div>
 
     <PushDashboardHeader novos={st.pushNovos} importantes={st.pushImportantes} ultimo={st.pushUltimo} onClick={()=>setPushModal(true)}/>
-    <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info"/>
+    <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info" onItemClick={setAudienciaModal}/>
 
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Notificações e mensagens não lidas</h2>
@@ -226,6 +263,7 @@ export default function Dashboard({profile}){
     <ClippingJuridico/>
 
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso} onDismiss={desconsiderarPush}/>}
+    {audienciaModal&&<AudienciaModal audiencia={audienciaModal} onClose={()=>setAudienciaModal(null)} onOpenProcess={abrirProcesso}/>}
     {createPush&&<CriarProcessoPushModal push={createPush} form={createForm} setForm={setCreateForm} saving={savingProcess} onCancel={()=>setCreatePush(null)} onSave={salvarProcessoPush}/>}
   </div>
 }
