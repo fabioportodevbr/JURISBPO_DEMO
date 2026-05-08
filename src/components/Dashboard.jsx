@@ -40,7 +40,7 @@ function ListBlock({title,icon,items,empty,kind='default',onItemClick}){
 }
 
 function PushDashboardHeader({novos,importantes,ultimo,onClick}){
-  return <button type="button" onClick={onClick} style={{width:'100%',height:'100%',textAlign:'left',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap',padding:'14px 16px',border:'1px solid '+C.border,borderRadius:14,background:importantes?C.amberBg:C.blueBg,cursor:'pointer',boxSizing:'border-box'}}>
+  return <button type="button" onClick={onClick} style={{width:'100%',textAlign:'left',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap',padding:'14px 16px',border:'1px solid '+C.border,borderRadius:14,background:importantes?C.amberBg:C.blueBg,cursor:'pointer'}}>
     <div>
       <div style={{fontSize:13,fontWeight:900,color:C.text,display:'flex',alignItems:'center',gap:8}}><Mail size={16}/>Acompanhamento processual via push</div>
       <div style={{fontSize:12,color:C.muted,marginTop:3}}>{ultimo?`Último recebimento: ${new Date(ultimo.criado_em).toLocaleString('pt-BR')}`:'Últimos andamentos recebidos por e-mail dos tribunais.'}</div>
@@ -295,9 +295,11 @@ export default function Dashboard({profile}){
       <Card title="Alertas e mensagens" value={totalAvisos} sub="itens não lidos" color={totalAvisos?C.red:C.green}/>
     </div>
 
-    <div style={{display:'grid',gridTemplateColumns:'1fr 340px',gap:16,marginTop:22,alignItems:'start'}}>
-      <PushDashboardHeader novos={st.pushNovos} importantes={st.pushImportantes} ultimo={st.pushUltimo} onClick={()=>setPushModal(true)}/>
+    <div style={{marginTop:22}}>
       <MuralRecados profile={profile}/>
+    </div>
+    <div style={{marginTop:12}}>
+      <PushDashboardHeader novos={st.pushNovos} importantes={st.pushImportantes} ultimo={st.pushUltimo} onClick={()=>setPushModal(true)}/>
     </div>
 
     <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info" onItemClick={setAudienciaModal}/>
