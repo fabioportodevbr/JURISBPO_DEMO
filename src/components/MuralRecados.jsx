@@ -85,7 +85,16 @@ export default function MuralRecados({ profile }) {
 
   const excluir = async (r) => {
     if (!confirm('Excluir este recado definitivamente? Esta ação não pode ser desfeita.')) return
-    await supabase.from('mural_recados').delete().eq('id', r.id)
+    const { error } = await supabase
+      .from('mural_recados')
+      .update({
+        status: 'excluido',
+        excluido_por: profile.id,
+        excluido_por_nome: profile.nome || profile.email,
+        excluido_em: new Date().toISOString(),
+      })
+      .eq('id', r.id)
+    if (error) { alert('Erro ao excluir: ' + error.message); return }
     setRecados(prev => prev.filter(x => x.id !== r.id))
   }
 
