@@ -65,13 +65,33 @@ function ChatPane({profile,team,onlineMap}){
   const loadMsgs=useCallback(async(sid)=>{
     if(!sid)return
     if(sid==='geral'){
-      const{data}=await supabase.from('chat_mensagens').select('*').eq('escritorio_id',profile.escritorio_id).eq('tipo','geral').order('criado_em',{ascending:true}).limit(200)
-      setMsgs(data||[])
+      const { data: lastClear } = await supabase.from('chat_mensagens')
+        .select('criado_em')
+        .eq('escritorio_id', profile.escritorio_id)
+        .eq('tipo', 'geral')
+        .eq('texto', '[SISTEMA_ARQUIVAR_SESSAO]')
+        .order('criado_em', { ascending: false }).limit(1).maybeSingle()
+      
+      let query = supabase.from('chat_mensagens')
+        .select('*')
+        .eq('escritorio_id',profile.escritorio_id)
+        .eq('tipo','geral')
+        .neq('texto', '[SISTEMA_ARQUIVAR_SESSAO]')
+        .order('criado_em',{ascending:false})
+        .limit(200)
+        
+      if (lastClear) {
+         query = query.gt('criado_em', lastClear.criado_em)
+      }
+      const { data } = await query
+      setMsgs(data ? data.reverse() : [])
     } else {
       const{data}=await supabase.from('chat_mensagens').select('*').eq('sala_id',sid).order('criado_em',{ascending:true}).limit(200)
       setMsgs(data||[])
       // Mark as read
-      await supabase.rpc('marcar_chat_lido',{p_sala_id:sid,p_usuario_id:profile.id}).catch(()=>{})
+      try {
+        await supabase.rpc('marcar_chat_lido',{p_sala_id:sid,p_usuario_id:profile.id})
+      } catch (err) {}
     }
   },[profile])
 
@@ -82,6 +102,13 @@ function ChatPane({profile,team,onlineMap}){
       :`sala_id=eq.${sid}`
     const ch=supabase.channel('chat_'+sid)
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_mensagens',filter},payload=>{
+        if (sid==='geral') {
+          if (payload.new.texto === '[SISTEMA_ARQUIVAR_SESSAO]') {
+            setMsgs([])
+            return
+          }
+          if (payload.new.tipo !== 'geral') return;
+        }
         setMsgs(prev=>[...prev,payload.new])
         setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth'}),50)
       })
@@ -138,48 +165,81 @@ function ChatPane({profile,team,onlineMap}){
 
   const outrosDM=team.filter(t=>t.id!==profile.id)
 
-  return <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
-    {/* Sidebar */}
-    <div style={{width:240,background:C.sidebarBg,display:'flex',flexDirection:'column',flexShrink:0,borderRight:'1px solid rgba(255,255,255,0.06)'}}>
-      {/* Geral */}
-      <div style={{padding:'16px 10px 8px'}}>
-        <div style={{fontSize:10,fontWeight:900,color:C.sidebarMuted,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6,paddingLeft:8}}>Canais</div>
-        <button onClick={()=>{setSalaId('geral');setSalaTitle('Sala Geral')}} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 10px',border:0,borderRadius:8,cursor:'pointer',background:salaId==='geral'?C.sidebarActive:'transparent',color:salaId==='geral'?'white':C.sidebarText,fontSize:14,fontWeight:salaId==='geral'?700:400,textAlign:'left',transition:'all .12s'}}>
-          <Hash size={15}/> Sala Geral
-        </button>
-      </div>
-      {/* DMs */}
-      <div style={{padding:'8px 10px',flex:1,overflowY:'auto'}}>
-        <div style={{fontSize:10,fontWeight:900,color:C.sidebarMuted,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6,paddingLeft:8}}>Mensagens Diretas</div>
-        {outrosDM.map(u=>{
-          const isOnline=!!onlineMap[u.id]
-          const active=salaId!=='geral'&&salaTitle===u.nome
-          return <button key={u.id} onClick={()=>abrirDM(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 10px',border:0,borderRadius:8,cursor:'pointer',background:active?C.sidebarActive:'transparent',color:active?'white':C.sidebarText,fontSize:13,fontWeight:active?700:400,textAlign:'left',transition:'all .12s',marginBottom:1}}>
-            <div style={{position:'relative',flexShrink:0}}>
-              {avatar(u.nome,26)}
-              <span style={{position:'absolute',bottom:-1,right:-1,width:9,height:9,borderRadius:'50%',background:isOnline?'#22c55e':'#475569',border:'1.5px solid '+C.sidebarBg}}/>
-            </div>
-            <span style={{flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.nome}</span>
-          </button>
-        })}
-      </div>
-    </div>
+  const [historicoOpen, setHistoricoOpen] = useState(false)
+  const [sessoes, setSessoes] = useState([])
+  const [sessaoMsgs, setSessaoMsgs] = useState(null)
+  const [loadingHist, setLoadingHist] = useState(false)
 
+  const loadHistorico = async () => {
+    setLoadingHist(true)
+    const { data: comandos } = await supabase.from('chat_mensagens')
+      .select('criado_em, id')
+      .eq('escritorio_id', profile.escritorio_id)
+      .eq('tipo', 'geral')
+      .eq('texto', '[SISTEMA_ARQUIVAR_SESSAO]')
+      .order('criado_em', { ascending: true })
+
+    const { data: firstMsg } = await supabase.from('chat_mensagens')
+      .select('criado_em')
+      .eq('escritorio_id', profile.escritorio_id)
+      .eq('tipo', 'geral')
+      .order('criado_em', { ascending: true })
+      .limit(1).maybeSingle()
+      
+    if (!comandos || comandos.length === 0) {
+      setSessoes([])
+      setLoadingHist(false)
+      return
+    }
+
+    const sessions = []
+    let currentStart = firstMsg ? firstMsg.criado_em : comandos[0].criado_em
+    
+    for (let i = 0; i < comandos.length; i++) {
+      sessions.push({
+        id: comandos[i].id,
+        inicio: currentStart,
+        fim: comandos[i].criado_em,
+        count: 'Várias'
+      })
+      currentStart = comandos[i].criado_em
+    }
+    
+    setSessoes(sessions.reverse())
+    setLoadingHist(false)
+  }
+
+  const openSessao = async (session) => {
+    const { data } = await supabase.from('chat_mensagens')
+      .select('*')
+      .eq('escritorio_id', profile.escritorio_id)
+      .eq('tipo', 'geral')
+      .neq('texto', '[SISTEMA_ARQUIVAR_SESSAO]')
+      .gte('criado_em', session.inicio)
+      .lte('criado_em', session.fim)
+      .order('criado_em', { ascending: true })
+    setSessaoMsgs(data||[])
+  }
+
+  return <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
     {/* Chat area */}
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:C.white}}>
       {/* Header */}
-      <div style={{padding:'12px 20px',borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:10,flexShrink:0,background:C.white}}>
-        {salaId==='geral'?<Hash size={18} color={C.muted}/>:<div style={{position:'relative'}}>{avatar(salaTitle,32)}<span style={{position:'absolute',bottom:0,right:0,width:10,height:10,borderRadius:'50%',background:onlineMap[team.find(t=>t.nome===salaTitle)?.id]?'#22c55e':'#94a3b8',border:'2px solid white'}}/></div>}
-        <div>
-          <b style={{fontSize:15,color:C.text}}>{salaTitle}</b>
-          {salaId==='geral'&&<div style={{fontSize:12,color:C.muted}}>{team.length} membros · {Object.keys(onlineMap).filter(k=>onlineMap[k]).length} online</div>}
-          {salaId!=='geral'&&<div style={{fontSize:12,color:C.muted}}>{onlineMap[team.find(t=>t.nome===salaTitle)?.id]?'🟢 Online':'⚪ Offline'}</div>}
+      <div style={{padding:'12px 20px',borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,background:C.white}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {salaId==='geral'?<Hash size={18} color={C.muted}/>:<div style={{position:'relative'}}>{avatar(salaTitle,32)}<span style={{position:'absolute',bottom:0,right:0,width:10,height:10,borderRadius:'50%',background:onlineMap[team.find(t=>t.nome===salaTitle)?.id]?'#22c55e':'#94a3b8',border:'2px solid white'}}/></div>}
+          <div>
+            <b style={{fontSize:15,color:C.text}}>{salaTitle}</b>
+            {salaId==='geral'&&<div style={{fontSize:12,color:C.muted}}>{team.length} membros · {Object.keys(onlineMap).filter(k=>onlineMap[k]).length} online</div>}
+            {salaId!=='geral'&&<div style={{fontSize:12,color:C.muted}}>{onlineMap[team.find(t=>t.nome===salaTitle)?.id]?'🟢 Online':'⚪ Offline'}</div>}
+          </div>
         </div>
+        {salaId==='geral'&&<button onClick={()=>{setHistoricoOpen(true);loadHistorico()}} style={{display:'flex',alignItems:'center',gap:6,background:C.grayBg,border:'1px solid '+C.border,color:C.text,padding:'6px 12px',borderRadius:6,fontSize:13,cursor:'pointer',fontWeight:600}}><Archive size={14}/> Histórico</button>}
       </div>
 
       {/* Messages */}
       <div style={{flex:1,overflowY:'auto',padding:'16px 20px',display:'flex',flexDirection:'column',gap:2}}>
-        {msgs.length===0&&<div style={{textAlign:'center',padding:'60px 0',color:C.muted}}><MessageSquare size={32} style={{display:'block',margin:'0 auto 12px',opacity:.3}}/><p style={{margin:0,fontSize:14}}>Nenhuma mensagem ainda. Seja o primeiro!</p></div>}
+        {msgs.length===0&&<div style={{textAlign:'center',padding:'60px 0',color:C.muted}}><MessageSquare size={32} style={{display:'block',margin:'0 auto 12px',opacity:.3}}/><p style={{margin:0,fontSize:14}}>Nenhuma mensagem ativa. A sala foi limpa recentemente.</p></div>}
         {msgs.map((m,i)=>{
           const meu=m.remetente_id===profile.id
           const prev=msgs[i-1]
@@ -218,6 +278,68 @@ function ChatPane({profile,team,onlineMap}){
         </div>
       </div>
     </div>
+
+    {/* Sidebar */}
+    <div style={{width:240,background:'#f8fafc',display:'flex',flexDirection:'column',flexShrink:0,borderLeft:'1px solid '+C.border}}>
+      {/* Geral */}
+      <div style={{padding:'16px 10px 8px'}}>
+        <div style={{fontSize:10,fontWeight:900,color:C.muted,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6,paddingLeft:8}}>Canais</div>
+        <button onClick={()=>{setSalaId('geral');setSalaTitle('Sala Geral')}} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 10px',border:0,borderRadius:8,cursor:'pointer',background:salaId==='geral'?'white':'transparent',color:salaId==='geral'?C.navy:C.text,fontSize:14,fontWeight:salaId==='geral'?700:400,textAlign:'left',transition:'all .12s',boxShadow:salaId==='geral'?'0 1px 3px rgba(0,0,0,0.05)':'none'}}>
+          <Hash size={15}/> Sala Geral
+        </button>
+      </div>
+      {/* DMs */}
+      <div style={{padding:'8px 10px',flex:1,overflowY:'auto'}}>
+        <div style={{fontSize:10,fontWeight:900,color:C.muted,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6,paddingLeft:8}}>Mensagens Diretas</div>
+        {outrosDM.map(u=>{
+          const isOnline=!!onlineMap[u.id]
+          const active=salaId!=='geral'&&salaTitle===u.nome
+          return <button key={u.id} onClick={()=>abrirDM(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 10px',border:0,borderRadius:8,cursor:'pointer',background:active?'white':'transparent',color:active?C.navy:C.text,fontSize:13,fontWeight:active?700:400,textAlign:'left',transition:'all .12s',marginBottom:1,boxShadow:active?'0 1px 3px rgba(0,0,0,0.05)':'none'}}>
+            <div style={{position:'relative',flexShrink:0}}>
+              {avatar(u.nome,26)}
+              <span style={{position:'absolute',bottom:-1,right:-1,width:9,height:9,borderRadius:'50%',background:isOnline?'#22c55e':'#94a3b8',border:'1.5px solid '+(active?'white':'#f8fafc')}}/>
+            </div>
+            <span style={{flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.nome}</span>
+          </button>
+        })}
+      </div>
+    </div>
+
+    {historicoOpen && <Modal title="Histórico da Sala Geral" onClose={()=>{setHistoricoOpen(false);setSessaoMsgs(null)}} width={600}>
+      {sessaoMsgs ? (
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <button onClick={()=>setSessaoMsgs(null)} style={{alignSelf:'flex-start',background:'none',border:'none',color:C.blue,cursor:'pointer',fontWeight:600,fontSize:13}}>← Voltar às sessões</button>
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {sessaoMsgs.map((m,i)=>{
+              const prev=sessaoMsgs[i-1]
+              const agrup=prev?.remetente_id===m.remetente_id&&(new Date(m.criado_em)-new Date(prev.criado_em))<120000
+              return <div key={m.id} style={{display:'flex',gap:10,alignItems:'flex-start',marginTop:agrup?0:8}}>
+                <div style={{width:32,flexShrink:0}}>{!agrup&&avatar(m.remetente_nome,32)}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  {!agrup&&<div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:2}}>
+                    <span style={{fontSize:13,fontWeight:700,color:C.text}}>{m.remetente_nome}</span>
+                    <span style={{fontSize:11,color:C.muted}}>{timeLabel(m.criado_em)}</span>
+                  </div>}
+                  {m.texto&&<p style={{margin:0,fontSize:14,color:C.text,lineHeight:1.5,wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{m.texto}</p>}
+                </div>
+              </div>
+            })}
+          </div>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {loadingHist ? <div style={{textAlign:'center',padding:30,color:C.muted}}>Carregando histórico...</div> : sessoes.length === 0 ? <div style={{textAlign:'center',padding:30,color:C.muted}}>Nenhuma sessão arquivada encontrada.</div> : sessoes.map(s => (
+            <div key={s.id} onClick={()=>openSessao(s)} style={{padding:'14px 16px',border:'1px solid '+C.border,borderRadius:8,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',background:C.grayBg}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:14,color:C.text}}>Sessão de {new Date(s.inicio).toLocaleDateString('pt-BR')}</div>
+                <div style={{fontSize:12,color:C.muted}}>Das {new Date(s.inicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} às {new Date(s.fim).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+              </div>
+              <div style={{fontSize:13,color:C.muted}}>{s.count} mensagens</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>}
   </div>
 }
 
@@ -418,6 +540,25 @@ export default function Forum({profile}){
     })
     .subscribe(async status=>{
       if(status==='SUBSCRIBED'){
+        const state = ch.presenceState()
+        let count = 0
+        Object.values(state).forEach(arr => count += arr.length)
+        
+        if (count === 0) {
+          const { data: lastMsg } = await supabase.from('chat_mensagens').select('criado_em, tipo, texto').eq('escritorio_id', profile.escritorio_id).eq('tipo', 'geral').order('criado_em', { ascending: false }).limit(1).maybeSingle()
+          if (lastMsg && lastMsg.texto !== '[SISTEMA_ARQUIVAR_SESSAO]') {
+            const msAgo = Date.now() - new Date(lastMsg.criado_em).getTime()
+            if (msAgo > 2 * 60 * 1000) {
+               await supabase.from('chat_mensagens').insert({
+                 escritorio_id: profile.escritorio_id,
+                 remetente_id: profile.id,
+                 remetente_nome: 'Sistema Automático',
+                 texto: '[SISTEMA_ARQUIVAR_SESSAO]',
+                 tipo: 'geral'
+               })
+            }
+          }
+        }
         await ch.track({userId:profile.id,nome:profile.nome||profile.email||'?',at:new Date().toISOString()})
       }
     })
