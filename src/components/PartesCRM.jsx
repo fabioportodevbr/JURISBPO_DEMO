@@ -93,7 +93,7 @@ export default function PartesCRM({profile}){
   const[partes,setPartes]=useState([])
   const[processos,setProcessos]=useState([])
   const[q,setQ]=useState('')
-  const[tipo,setTipo]=useState('todos')
+  const[tipo,setTipo]=useState('empresa_grupo')
   const[modal,setModal]=useState(false)
   const[form,setForm]=useState(empty)
   const[loading,setLoading]=useState(true)
