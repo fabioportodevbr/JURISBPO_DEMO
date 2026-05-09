@@ -3,8 +3,8 @@ import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Plus, RefreshCw, Pencil, Trash2, X, CalendarDays, Paperclip, Archive, RotateCcw, Search, ChevronDown } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
 
-const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',red:'#dc2626',redBg:'#fee2e2',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',purple:'#10b981',purpleBg:'#dcfce7',grayBg:'#f1f5f9'}
-const INP={width:'100%',padding:'10px 12px',border:'1px solid #e5e7eb',borderRadius:8,boxSizing:'border-box',fontSize:14,background:'#fff',color:'#0f172a'}
+import { C } from '../lib/theme'
+const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const TIPOS=[['tarefa','Tarefas'],['prazo_processual','Prazos processuais'],['audiencia','Audiências'],['reuniao','Reuniões']]
 const STATUS=[['a_fazer','A fazer'],['em_andamento','Em andamento'],['concluida','Concluída'],['cancelada','Cancelada']]
 const PRIOR=[['baixa','Baixa'],['media','Média'],['alta','Alta'],['urgente','Urgente']]
@@ -33,7 +33,7 @@ function AtividadeCard({t,team,cont,onOpen}){
       onClick={()=>onOpen(t)}
       onMouseEnter={()=>setHov(true)}
       onMouseLeave={()=>setHov(false)}
-      style={{width:'100%',textAlign:'left',cursor:'pointer',background:hov?C.grayBg:(arq?'#f8fafc':C.white),border:'1px solid '+(hov?'#94a3b8':C.border),borderRadius:12,padding:'12px 14px',display:'grid',gap:8,opacity:arq?0.85:1,fontFamily:'inherit',transition:'all .12s',boxShadow:hov?'0 2px 8px rgba(0,0,0,0.08)':'none'}}
+      style={{width:'100%',textAlign:'left',cursor:'pointer',background:hov?C.grayBg:(arq?C.soft:C.white),border:'1px solid '+(hov?C.muted:C.border),borderRadius:12,padding:'12px 14px',display:'grid',gap:8,opacity:arq?0.85:1,fontFamily:'inherit',transition:'all .12s',boxShadow:hov?'0 2px 8px rgba(0,0,0,0.08)':'none'}}
     >
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <Chip kind={typeKind[t.tipo]}>{label(TIPOS,t.tipo)}</Chip>
@@ -75,7 +75,7 @@ export default function Atividades({profile}){
   const [rotinaTarget,setRotinaTarget]=useState(null)
   const [rotinasSaving,setRotinasSaving]=useState(false)
   const [novoItem,setNovoItem]=useState('')
-  const [rotinaExpanded,setRotinaExpanded]=useState(false)
+  const [rotinaExpanded,setRotinaExpanded]=useState(true)
   const [expandedTipos,setExpandedTipos]=useState({})
   const [arquivoTipos,setArquivoTipos]=useState({})
   const [ordemTipos,setOrdemTipos]=useState({})
@@ -249,7 +249,7 @@ export default function Atividades({profile}){
         </div>
 
         {/* Linha 2: busca */}
-        <div style={{display:'flex',alignItems:'center',gap:8,background:'#f8fafc',border:'1px solid '+C.border,borderRadius:8,padding:'2px 12px',marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,background:C.bg,border:'1px solid '+C.border,borderRadius:8,padding:'2px 12px',marginBottom:12}}>
           <Search size={14} color={C.muted}/>
           <input
             value={buscaGeral}
@@ -261,7 +261,7 @@ export default function Atividades({profile}){
         </div>
 
         {/* Linha 3: Minhas Rotinas (colapsável) */}
-        <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,overflow:'hidden'}}>
+        <div style={{background:C.greenBg,border:'1px solid '+C.green,borderRadius:10,overflow:'hidden'}}>
           <div
             onClick={()=>setRotinaExpanded(v=>!v)}
             style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',cursor:'pointer',userSelect:'none'}}
@@ -271,7 +271,7 @@ export default function Atividades({profile}){
             <span style={{fontSize:12,color:C.muted,marginRight:4}}>{myRotinas.length} procedimento(s)</span>
             {canCreate&&<button
               onClick={e=>{e.stopPropagation();setRotinaForm({id:null,texto:'',recorrencia:'',cor:'#10b981',itens:[]});setRotinaTarget(null);setRotinaModal(true)}}
-              style={{border:'1px solid #86efac',background:'white',color:C.green,borderRadius:6,padding:'3px 10px',fontWeight:700,fontSize:12,cursor:'pointer',marginRight:6}}
+              style={{border:'1px solid '+C.green,background:C.white,color:C.green,borderRadius:6,padding:'3px 10px',fontWeight:700,fontSize:12,cursor:'pointer',marginRight:6}}
             >+ Adicionar</button>}
             <ChevronDown size={14} color={C.green} style={{transform:rotinaExpanded?'rotate(180deg)':'none',transition:'transform .2s'}}/>
           </div>
@@ -281,7 +281,7 @@ export default function Atividades({profile}){
               {myRotinas.length===0&&<p style={{margin:'0 0 8px',fontSize:13,color:C.muted}}>Nenhuma rotina cadastrada. Clique em "+ Adicionar" para começar.</p>}
               <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
                 {myRotinas.map(r=>(
-                  <div key={r.id} style={{background:'white',border:'2px solid '+(r.cor||C.green),borderRadius:10,padding:'10px 14px',minWidth:180,maxWidth:260,flex:'1 1 180px',boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
+                  <div key={r.id} style={{background:C.white,border:'2px solid '+(r.cor||C.green),borderRadius:10,padding:'10px 14px',minWidth:180,maxWidth:260,flex:'1 1 180px',boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                       <div style={{flex:1}}>
                         <p style={{margin:'0 0 6px',fontSize:13,fontWeight:600,color:C.text,lineHeight:1.4}}>{r.texto}</p>
@@ -324,7 +324,7 @@ export default function Atividades({profile}){
                         <div style={{fontSize:12,fontWeight:800,color:C.muted,marginBottom:4}}>{nome}</div>
                         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
                           {rs.map(r=>(
-                            <div key={r.id} style={{background:'white',border:'1.5px solid '+(r.cor||C.green),borderRadius:8,padding:'8px 12px',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                            <div key={r.id} style={{background:C.white,border:'1.5px solid '+(r.cor||C.green),borderRadius:8,padding:'8px 12px',fontSize:12,color:C.text,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
                               <span style={{flex:1}}>{r.texto}</span>
                               <span style={{fontSize:10,fontWeight:700,color:'white',background:r.cor||C.green,borderRadius:20,padding:'1px 8px',whiteSpace:'nowrap'}}>{r.recorrencia}</span>
                               {canDelete&&<button onClick={()=>deleteRotina(r.id)} style={{border:0,background:'none',cursor:'pointer',color:C.red,padding:2,display:'flex'}}><Trash2 size={12}/></button>}
@@ -487,17 +487,17 @@ export default function Atividades({profile}){
               <div style={{display:'flex',justifyContent:'space-between',gap:10,marginTop:18,paddingTop:14,borderTop:'1px solid '+C.border,flexWrap:'wrap',alignItems:'center'}}>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                   {form.id&&canArchive&&!isArquivada(form)&&(
-                    <button type="button" onClick={()=>{setModal(false);arquivar(form)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #bbf7d0',background:'#f0fdf4',borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.green,fontSize:13}}>
+                    <button type="button" onClick={()=>{setModal(false);arquivar(form)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid '+C.green,background:C.greenBg,borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.green,fontSize:13}}>
                       <Archive size={14}/>Arquivar
                     </button>
                   )}
                   {form.id&&canArchive&&isArquivada(form)&&(
-                    <button type="button" onClick={()=>{setModal(false);reabrir(form)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #fef3c7',background:'#fffbeb',borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.amber,fontSize:13}}>
+                    <button type="button" onClick={()=>{setModal(false);reabrir(form)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid '+C.amberBg,background:C.amberBg,borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.amber,fontSize:13}}>
                       <RotateCcw size={14}/>Reabrir
                     </button>
                   )}
                   {form.id&&canDelete&&(
-                    <button type="button" onClick={()=>{setModal(false);del(form)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #fca5a5',background:'#fee2e2',borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.red,fontSize:13}}>
+                    <button type="button" onClick={()=>{setModal(false);del(form)}} style={{display:'flex',alignItems:'center',gap:6,border:'1px solid '+C.red,background:C.redBg,borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.red,fontSize:13}}>
                       <Trash2 size={14}/>Excluir
                     </button>
                   )}
@@ -554,17 +554,17 @@ export default function Atividades({profile}){
             )}
             <div>
               <label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:5}}>Descrição da rotina</label>
-              <textarea value={rotinaForm.texto} onChange={e=>setRotinaForm(f=>({...f,texto:e.target.value}))} placeholder="Ex: Enviar relatório de processos para a gestão" style={{width:'100%',minHeight:80,padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,fontSize:14,resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
+              <textarea value={rotinaForm.texto} onChange={e=>setRotinaForm(f=>({...f,texto:e.target.value}))} placeholder="Ex: Enviar relatório de processos para a gestão" style={{width:'100%',minHeight:80,padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,fontSize:14,resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',background:C.white,color:C.text}}/>
             </div>
             <div>
               <label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:5}}>Recorrência</label>
-              <input value={rotinaForm.recorrencia} onChange={e=>setRotinaForm(f=>({...f,recorrencia:e.target.value}))} placeholder="Ex: Toda segunda-feira, Todo dia 5, Quinzenal…" style={{width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,fontSize:14,boxSizing:'border-box'}}/>
+              <input value={rotinaForm.recorrencia} onChange={e=>setRotinaForm(f=>({...f,recorrencia:e.target.value}))} placeholder="Ex: Toda segunda-feira, Todo dia 5, Quinzenal…" style={{width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,fontSize:14,boxSizing:'border-box',background:C.white,color:C.text}}/>
             </div>
             <div>
               <label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:8}}>Lista de tarefas</label>
               <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8}}>
                 {(rotinaForm.itens||[]).map(it=>(
-                  <div key={it.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:'#f8fafc',borderRadius:7,border:'1px solid '+C.border}}>
+                  <div key={it.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:C.bg,borderRadius:7,border:'1px solid '+C.border}}>
                     <span style={{flex:1,fontSize:13,color:C.text}}>{it.texto}</span>
                     <button onClick={()=>removeItem(it.id)} style={{border:0,background:'none',cursor:'pointer',color:C.red,padding:2,display:'flex'}}><Trash2 size={13}/></button>
                   </div>
@@ -584,8 +584,8 @@ export default function Atividades({profile}){
               </div>
             </div>
             <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
-              <button onClick={()=>setRotinaModal(false)} style={{border:'1px solid '+C.border,background:'white',borderRadius:8,padding:'10px 16px',cursor:'pointer',fontWeight:700}}>Cancelar</button>
-              <button onClick={saveRotina} disabled={rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()} style={{background:rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()?C.muted:'#10b981',color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>
+              <button onClick={()=>setRotinaModal(false)} style={{border:'1px solid '+C.border,background:C.white,borderRadius:8,padding:'10px 16px',cursor:'pointer',fontWeight:700}}>Cancelar</button>
+              <button onClick={saveRotina} disabled={rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()} style={{background:rotinasSaving||!rotinaForm.texto.trim()||!rotinaForm.recorrencia.trim()?C.muted:C.green,color:'white',border:0,borderRadius:8,padding:'10px 16px',fontWeight:800,cursor:'pointer'}}>
                 {rotinasSaving?'Salvando…':rotinaForm.id?'Salvar alterações':'Adicionar rotina'}
               </button>
             </div>

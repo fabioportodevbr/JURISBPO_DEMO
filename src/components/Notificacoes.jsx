@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Bell, CheckCircle, RefreshCw, Inbox, X, Archive, ArchiveRestore } from 'lucide-react'
 
-const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',amber:'#b45309',amberBg:'#fef3c7',green:'#16a34a',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',purple:'#10b981',purpleBg:'#ede9fe'}
+import { C } from '../lib/theme'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 
 const tipoInfo={
@@ -17,7 +17,7 @@ const tipoInfo={
 
 function Modal({title,onClose,children,width=720}){return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}><div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:width,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}><div style={{display:'flex',justifyContent:'space-between',padding:18,borderBottom:'1px solid '+C.border,alignItems:'center',gap:12}}><b>{title}</b><button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',display:'flex',padding:4}}><X/></button></div><div style={{padding:18,overflow:'auto'}}>{children}</div></div></div>}
 
-function Chip({tipo}){const [label,bg,color]=tipoInfo[tipo]||[tipo||'Aviso','#f1f5f9','#64748b'];return <span style={{fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:20,background:bg,color,textTransform:'uppercase',whiteSpace:'nowrap'}}>{label}</span>}
+function Chip({tipo}){const [label,bg,color]=tipoInfo[tipo]||[tipo||'Aviso',C.grayBg,C.muted];return <span style={{fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:20,background:bg,color,textTransform:'uppercase',whiteSpace:'nowrap'}}>{label}</span>}
 
 function Empty({text}){return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:28,textAlign:'center',color:C.muted}}><Inbox size={28} style={{display:'block',margin:'0 auto 8px'}}/>{text}</div>}
 

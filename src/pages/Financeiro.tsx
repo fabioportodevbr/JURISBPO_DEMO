@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { can, fetchAllRows, supabase } from "@/lib/supabase.js";
+import { C } from "@/lib/theme";
 
 type Processo = {
   id: string;
@@ -85,24 +86,6 @@ type FormState = {
   seguro_premio: string;
   valor_restituido: string;
   observacoes: string;
-};
-
-const C = {
-  navy: "#022c22",
-  white: "#fff",
-  text: "#0f172a",
-  muted: "#64748b",
-  border: "#e5e7eb",
-  bg: "#f8fafc",
-  grayBg: "#f1f5f9",
-  blue: "#1d4ed8",
-  blueBg: "#dbeafe",
-  green: "#16a34a",
-  greenBg: "#dcfce7",
-  amber: "#b45309",
-  amberBg: "#fef3c7",
-  red: "#dc2626",
-  redBg: "#fee2e2",
 };
 
 const INP = {

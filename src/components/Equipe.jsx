@@ -3,7 +3,7 @@ import { supabase, ROLES, can } from '../lib/supabase.js'
 import AvatarUsuario from './common/AvatarUsuario.jsx'
 import { X, Send, Mail, Phone, Briefcase, Scale, Paperclip, UserRound, Plus, Trash2, UserPlus, ShieldCheck } from 'lucide-react'
 
-const C={white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',navy:'#022c22',gold:'#10b981',green:'#10b981',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2'}
+import { C } from '../lib/theme'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:10,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const BTN={border:0,borderRadius:10,padding:'10px 14px',fontWeight:900,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}
 
@@ -20,7 +20,7 @@ function Modal({title,onClose,children,width=640}){
 }
 
 function InfoLine({icon,label,value}){
-  return <div style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 0',borderBottom:'1px solid #f1f5f9'}}>
+  return <div style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 0',borderBottom:'1px solid '+C.border}}>
     <div style={{color:C.green,marginTop:1}}>{icon}</div>
     <div style={{minWidth:0}}>
       <div style={{fontSize:11,fontWeight:900,color:C.muted,textTransform:'uppercase'}}>{label}</div>
@@ -185,7 +185,7 @@ export default function Equipe({profile}){
       {isGerente&&<button onClick={()=>setShowNovoMembro(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', border: 'none', borderRadius: 8, background: C.navy, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}><UserPlus size={14}/>Adicionar membro</button>}
     </div>
 
-    {isGerente&&<div style={{marginTop:8,marginBottom:10,border:'1px solid '+C.border,borderRadius:12,padding:12,background:'#f8fafc',display:'flex',gap:10,alignItems:'flex-start',color:C.muted,fontSize:13}}>
+    {isGerente&&<div style={{marginTop:8,marginBottom:10,border:'1px solid '+C.border,borderRadius:12,padding:12,background:C.bg,display:'flex',gap:10,alignItems:'flex-start',color:C.muted,fontSize:13}}>
       <ShieldCheck size={18} color={C.green}/>
       <div><b style={{color:C.text}}>Administração de equipe liberada para gerente.</b><br/>A inclusão e remoção dependem das Edge Functions <code>equipe-criar-membro</code> e <code>equipe-remover-membro</code>.</div>
     </div>}
@@ -209,7 +209,7 @@ export default function Equipe({profile}){
 
     {showNovoMembro&&<Modal title="Adicionar membro da equipe" onClose={()=>setShowNovoMembro(false)} width={560}>
       <div style={{display:'grid',gap:12}}>
-        <div style={{padding:12,borderRadius:12,background:'#f8fafc',border:'1px solid '+C.border,color:C.muted,fontSize:13}}>
+        <div style={{padding:12,borderRadius:12,background:C.bg,border:'1px solid '+C.border,color:C.muted,fontSize:13}}>
           Esta tela chama a Edge Function <b>equipe-criar-membro</b>. Você criará essa função no Supabase usando Service Role, como combinado.
         </div>
         <div>
@@ -249,7 +249,7 @@ export default function Equipe({profile}){
 
     {membroSelecionado&&<Modal title="Perfil do membro" onClose={()=>{setSelecionado(null);setModoMensagem(false);setMsg({assunto:'',corpo:'',arquivos:[]})}}>
       <div style={{display:'grid',gap:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:16,background:'#f8fafc',border:'1px solid '+C.border,borderRadius:14,padding:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:16,background:C.bg,border:'1px solid '+C.border,borderRadius:14,padding:16}}>
           <AvatarUsuario profile={{...membroSelecionado.profile,nome:membroSelecionado.displayName}} size={72} />
           <div style={{minWidth:0}}>
             <h2 style={{margin:'0 0 4px',fontSize:22,color:C.text}}>{membroSelecionado.displayName}</h2>
@@ -267,11 +267,11 @@ export default function Equipe({profile}){
         </div>
 
         <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}>
-          {isGerente && membroSelecionado.usuario_id!==profile.id ? <button disabled={removing===membroSelecionado.usuario_id} onClick={()=>removerMembro(membroSelecionado)} style={{...BTN,background:C.redBg,color:C.red,border:'1px solid #fecaca'}}><Trash2 size={16}/>Remover da equipe</button> : <span/>}
-          {membroSelecionado.usuario_id!==profile.id&&<button onClick={()=>setModoMensagem(v=>!v)} style={{...BTN,background:C.green,color:'white'}}><Send size={16}/>{modoMensagem?'Cancelar mensagem':'Enviar mensagem'}</button>}
+          {isGerente && membroSelecionado.usuario_id!==profile.id ? <button disabled={removing===membroSelecionado.usuario_id} onClick={()=>removerMembro(membroSelecionado)} style={{...BTN,background:C.redBg,color:C.red,border:'1px solid '+C.red}}><Trash2 size={16}/>Remover da equipe</button> : <span/>}
+          {membroSelecionado.usuario_id!==profile.id&&<button onClick={()=>setModoMensagem(v=>!v)} style={{...BTN,background:C.green,color:C.white}}><Send size={16}/>{modoMensagem?'Cancelar mensagem':'Enviar mensagem'}</button>}
         </div>
 
-        {modoMensagem&&<div style={{border:'1px solid '+C.border,borderRadius:14,padding:14,display:'grid',gap:12,background:'#f8fafc'}}>
+        {modoMensagem&&<div style={{border:'1px solid '+C.border,borderRadius:14,padding:14,display:'grid',gap:12,background:C.bg}}>
           <div>
             <label style={{fontSize:11,fontWeight:900,color:C.muted,textTransform:'uppercase'}}>Assunto</label>
             <input style={{...INP,marginTop:5}} value={msg.assunto} onChange={e=>setMsg({...msg,assunto:e.target.value})} placeholder="Assunto da mensagem" />

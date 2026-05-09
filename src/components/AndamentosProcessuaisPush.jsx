@@ -15,7 +15,7 @@ import {
   Filter,
 } from 'lucide-react'
 
-const C={white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',green:'#16a34a',greenBg:'#dcfce7',amber:'#b45309',amberBg:'#fef3c7',red:'#dc2626',redBg:'#fee2e2',grayBg:'#f8fafc',navy:'#022c22'}
+import { C } from '../lib/theme'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:10,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 
 
@@ -212,7 +212,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
       const corpoLimpo=cleanEmailDisplay(a.corpo_email_limpo || a.corpo_email || '')
       const resumo=shortText(a.corpo_email_resumo || a.corpo_resumo || corpoLimpo, 260)
       const temCorpo=Boolean(corpoLimpo)
-      return <article key={a.id} style={{border:'1px solid '+(ignored?C.redBg:C.border),borderRadius:14,padding:12,background:ignored?'#fff7f7':C.grayBg,opacity:ignored?.78:1}}>
+      return <article key={a.id} style={{border:'1px solid '+(ignored?C.redBg:C.border),borderRadius:14,padding:12,background:ignored?C.redBg:C.grayBg,opacity:ignored?.78:1}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start',flexWrap:'wrap'}}>
           <div style={{minWidth:0}}>
             <div style={{display:'flex',gap:7,alignItems:'center',flexWrap:'wrap'}}><b style={{fontSize:14}}>{a.movimento||'Andamento recebido'}</b><span style={{fontSize:11,fontWeight:900,borderRadius:999,padding:'3px 8px',background:st.bg,color:st.color,display:'inline-flex',gap:4,alignItems:'center'}}>{st.icon} {st.label}</span></div>

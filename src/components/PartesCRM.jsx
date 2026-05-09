@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Building2, Plus, Search, X, Save, Trash2 } from 'lucide-react'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 
-const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',blue:'#1d4ed8',blueBg:'#dbeafe',green:'#16a34a',greenBg:'#dcfce7',red:'#dc2626',redBg:'#fee2e2',amber:'#b45309',amberBg:'#fef3c7',purple:'#7c3aed',purpleBg:'#ede9fe',grayBg:'#f1f5f9',grayText:'#64748b'}
-const INP={width:'100%',padding:'10px 12px',border:'1px solid #e5e7eb',borderRadius:8,boxSizing:'border-box',fontSize:14,background:'#fff',color:'#0f172a'}
+import { C } from '../lib/theme'
+const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const TIPOS=[['empresa_grupo','Empresa do grupo'],['cliente','Cliente'],['fornecedor','Fornecedor/prestador'],['parte_contraria','Parte contrária'],['terceiro','Terceiro']]
 const STATUS=[['ativo','Ativo'],['inativo','Inativo']]
 const tipoKind={empresa_grupo:'blue',cliente:'green',fornecedor:'amber',parte_contraria:'red',terceiro:'gray'}
@@ -31,7 +31,7 @@ function ParteCard({p,s,onOpen}){
       style={{
         width:'100%',textAlign:'left',cursor:'pointer',fontFamily:'inherit',
         background:hov?C.grayBg:C.white,
-        border:'1px solid '+(hov?'#94a3b8':C.border),
+        border:'1px solid '+(hov?C.muted:C.border),
         borderRadius:12,padding:'14px 16px',
         display:'flex',flexDirection:'column',gap:10,
         opacity:inativo?0.72:1,
@@ -69,7 +69,7 @@ function ParteCard({p,s,onOpen}){
           {v:s.ativos,label:'ativos',   color:s.ativos>0?C.green:C.muted},
           {v:fmtBRL(s.economia),label:'economia',color:s.economia>0?C.green:C.muted,small:true},
         ].map(({v,label:lbl,color,small})=>(
-          <div key={lbl} style={{background:'#f8fafc',borderRadius:8,padding:'7px 8px',border:'1px solid '+C.border}}>
+          <div key={lbl} style={{background:C.bg,borderRadius:8,padding:'7px 8px',border:'1px solid '+C.border}}>
             <div style={{fontSize:small?11:15,fontWeight:800,color,lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v}</div>
             <div style={{fontSize:10,color:C.muted,marginTop:2}}>{lbl}</div>
           </div>
@@ -188,7 +188,7 @@ export default function PartesCRM({profile}){
         <div style={{position:'relative',flex:1,minWidth:240}}>
           <Search size={14} style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:C.muted,pointerEvents:'none'}}/>
           <input
-            style={{...INP,paddingLeft:34,background:'#f8fafc'}}
+            style={{...INP,paddingLeft:34,background:C.bg}}
             placeholder="Buscar por nome, CNPJ, grupo, contato ou e-mail…"
             value={q}
             onChange={e=>setQ(e.target.value)}
@@ -267,7 +267,7 @@ export default function PartesCRM({profile}){
                 <button
                   type="button"
                   onClick={()=>del(form)}
-                  style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #fca5a5',background:'#fee2e2',borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.red,fontSize:13}}
+                  style={{display:'flex',alignItems:'center',gap:6,border:'1px solid '+C.red,background:C.redBg,borderRadius:8,padding:'8px 14px',fontWeight:700,cursor:'pointer',color:C.red,fontSize:13}}
                 >
                   <Trash2 size={14}/>Excluir parte
                 </button>

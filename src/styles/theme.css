@@ -12,6 +12,68 @@
   --color-success: #16a34a;
   --color-warning: #f59e0b;
   --color-danger: #dc2626;
+
+  /* Variáveis globais do sistema de temas em JS (objeto C) */
+  --c-navy: #022c22;
+  --c-navyL: #064e3b;
+  --c-white: #fff;
+  --c-text: #0f172a;
+  --c-muted: #64748b;
+  --c-border: #e5e7eb;
+  --c-blue: #1d4ed8;
+  --c-blueBg: #dbeafe;
+  --c-green: #10b981;
+  --c-greenBg: #dcfce7;
+  --c-amber: #b45309;
+  --c-amberBg: #fef3c7;
+  --c-red: #dc2626;
+  --c-redBg: #fee2e2;
+  --c-purple: #7c3aed;
+  --c-purpleBg: #ede9fe;
+  --c-gray: #64748b;
+  --c-grayBg: #f8fafc;
+  --c-grayText: #64748b;
+  --c-bg: #f8fafc;
+  --c-soft: #e8edf2;
+  --c-gold: #10b981;
+  --c-sidebarBg: #0f172a;
+  --c-sidebarItem: rgba(255,255,255,0.07);
+  --c-sidebarActive: rgba(6,78,59,0.35);
+  --c-sidebarText: rgba(255,255,255,0.75);
+  --c-sidebarMuted: rgba(255,255,255,0.35);
+}
+
+:root.dark {
+  --color-bg: #181818;
+  --color-text: #e8eaed;
+
+  --c-navy: #303134;
+  --c-navyL: #3c4043;
+  --c-white: #202124;
+  --c-text: #e8eaed;
+  --c-muted: #9aa0a6;
+  --c-border: #3c4043;
+  --c-blue: #8ab4f8;
+  --c-blueBg: rgba(138, 180, 248, 0.15);
+  --c-green: #81c995;
+  --c-greenBg: rgba(129, 201, 149, 0.15);
+  --c-amber: #fde293;
+  --c-amberBg: #2a2000;
+  --c-red: #f28b82;
+  --c-redBg: rgba(242, 139, 130, 0.15);
+  --c-purple: #c58af9;
+  --c-purpleBg: rgba(197, 138, 249, 0.15);
+  --c-gray: #9aa0a6;
+  --c-grayBg: #303134;
+  --c-grayText: #bdc1c6;
+  --c-bg: #181818;
+  --c-soft: #252728;
+  --c-gold: #81c995;
+  --c-sidebarBg: #101010;
+  --c-sidebarItem: rgba(255,255,255,0.05);
+  --c-sidebarActive: rgba(129, 201, 149, 0.2);
+  --c-sidebarText: rgba(255,255,255,0.85);
+  --c-sidebarMuted: rgba(255,255,255,0.4);
 }
 
 html, body, #root, #__next {
@@ -25,12 +87,14 @@ html, body {
   height: 100%;
 }
 
-/* oculta a scrollbar global sem remover a capacidade de scroll dos painéis internos */
+/* oculta scrollbars sem remover a capacidade de scroll */
 html::-webkit-scrollbar,
-body::-webkit-scrollbar {
+body::-webkit-scrollbar,
+.app-main::-webkit-scrollbar,
+.sidebar-nav::-webkit-scrollbar {
   display: none;
 }
-html, body {
+html, body, .app-main, .sidebar-nav {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }

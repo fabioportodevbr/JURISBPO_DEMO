@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Send, Paperclip, Download, Users, MessageSquare, Hash, X, FileText, Image, Mail, Archive, ArchiveRestore, Reply, Inbox } from 'lucide-react'
 
-const C={navy:'#022c22',white:'#fff',text:'#0f172a',muted:'#64748b',border:'#e5e7eb',green:'#10b981',greenBg:'#dcfce7',blue:'#1d4ed8',blueBg:'#dbeafe',amber:'#b45309',amberBg:'#fef3c7',red:'#dc2626',redBg:'#fee2e2',grayBg:'#f8fafc',sidebarBg:'#0f172a',sidebarItem:'rgba(255,255,255,0.07)',sidebarActive:'rgba(6,78,59,0.35)',sidebarText:'rgba(255,255,255,0.75)',sidebarMuted:'rgba(255,255,255,0.35)'}
+import { C } from '../lib/theme'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 
 function avatar(nome,size=32){
@@ -280,7 +280,7 @@ function ChatPane({profile,team,onlineMap}){
     </div>
 
     {/* Sidebar */}
-    <div style={{width:240,background:'#f8fafc',display:'flex',flexDirection:'column',flexShrink:0,borderLeft:'1px solid '+C.border}}>
+    <div style={{width:240,background:C.bg,display:'flex',flexDirection:'column',flexShrink:0,borderLeft:'1px solid '+C.border}}>
       {/* Geral */}
       <div style={{padding:'16px 10px 8px'}}>
         <div style={{fontSize:10,fontWeight:900,color:C.muted,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6,paddingLeft:8}}>Canais</div>
@@ -297,7 +297,7 @@ function ChatPane({profile,team,onlineMap}){
           return <button key={u.id} onClick={()=>abrirDM(u)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 10px',border:0,borderRadius:8,cursor:'pointer',background:active?'white':'transparent',color:active?C.navy:C.text,fontSize:13,fontWeight:active?700:400,textAlign:'left',transition:'all .12s',marginBottom:1,boxShadow:active?'0 1px 3px rgba(0,0,0,0.05)':'none'}}>
             <div style={{position:'relative',flexShrink:0}}>
               {avatar(u.nome,26)}
-              <span style={{position:'absolute',bottom:-1,right:-1,width:9,height:9,borderRadius:'50%',background:isOnline?'#22c55e':'#94a3b8',border:'1.5px solid '+(active?'white':'#f8fafc')}}/>
+              <span style={{position:'absolute',bottom:-1,right:-1,width:9,height:9,borderRadius:'50%',background:isOnline?'#22c55e':'#94a3b8',border:'1.5px solid '+(active?C.white:C.bg)}}/>
             </div>
             <span style={{flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.nome}</span>
           </button>
@@ -462,7 +462,7 @@ function MensagensPane({profile,team}){
         const nlida=!m.lida&&!env
         return <div key={m.id} onClick={()=>setSelected(m)} style={{background:nlida?C.blueBg:C.white,border:'1px solid '+(nlida?'#93c5fd':C.border),borderRadius:12,padding:'14px 16px',cursor:'pointer',transition:'box-shadow .12s'}} onMouseEnter={e=>e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,.07)'} onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}>
           <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
-            <div style={{width:36,height:36,borderRadius:'50%',background:'#334155',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,flexShrink:0,fontSize:14}}>{initials(outro?.nome)}</div>
+            <div style={{width:36,height:36,borderRadius:'50%',background:C.navyL,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,flexShrink:0,fontSize:14}}>{initials(outro?.nome)}</div>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,marginBottom:4}}>
                 <span style={{fontSize:14,fontWeight:nlida?800:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.assunto}</span>
@@ -494,7 +494,7 @@ function MensagensPane({profile,team}){
           const rem=teamMap[m.remetente_id]
           const ini=initials(rem?.nome)
           return <div key={m.id} style={{display:'flex',gap:10,paddingBottom:16,borderBottom:'1px solid '+C.border}}>
-            <div style={{width:38,height:38,borderRadius:'50%',background:'#334155',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,flexShrink:0}}>{ini}</div>
+            <div style={{width:38,height:38,borderRadius:'50%',background:C.navyL,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,flexShrink:0}}>{ini}</div>
             <div style={{flex:1}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><b style={{fontSize:14}}>{rem?.nome||'?'}</b><span style={{fontSize:12,color:C.muted}}>{new Date(m.created_at).toLocaleString('pt-BR')}</span></div>
               <p style={{margin:0,fontSize:14,lineHeight:1.6,whiteSpace:'pre-wrap',color:C.text}}>{m.corpo}</p>

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
-import { Bell, AlertTriangle, Mail, CheckCircle, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff } from 'lucide-react'
+import { Bell, AlertTriangle, Mail, CheckCircle, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff, Sun, Moon } from 'lucide-react'
 import ClippingJuridico from './ClippingJuridico.jsx'
 import MuralRecados from './MuralRecados.jsx'
 import { FinanceiroResumoDashboard } from './FinanceiroResumoDashboard.tsx'
 
-const C={text:'#0f172a',muted:'#64748b',border:'#e5e7eb',white:'#fff',blue:'#1d4ed8',green:'#16a34a',amber:'#b45309',red:'#dc2626',redBg:'#fee2e2',amberBg:'#fef3c7',blueBg:'#dbeafe',greenBg:'#dcfce7',grayBg:'#f8fafc'}
+import { C } from '../lib/theme'
+import { useTheme } from '../lib/ThemeContext'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const Card=({title,value,sub,color})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:18}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div style={{fontSize:30,fontWeight:900,color,marginTop:8}}>{value}</div><div style={{fontSize:13,color:C.muted}}>{sub}</div></div>
 
@@ -279,10 +280,17 @@ export default function Dashboard({profile}){
     abrirProcesso(data.id)
   }
 
+  const { theme, toggleTheme } = useTheme()
+
   return <div style={{padding:24}}>
-    <div>
-      <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
-      <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+      <div>
+        <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
+        <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
+      </div>
+      <button onClick={toggleTheme} title="Alternar modo Claro / Escuro" style={{border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
+        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
     </div>
 
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14,marginTop:22}}>
@@ -307,7 +315,7 @@ export default function Dashboard({profile}){
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Notificações e mensagens não lidas</h2>
       {totalAvisos?<div>
-        {st.notificacoes.map(n=><div key={'n-'+n.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:'#fffbeb'}}><b>{n.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{n.descricao||'Notificação interna'} · {new Date(n.created_at).toLocaleString('pt-BR')}</div></div>)}
+        {st.notificacoes.map(n=><div key={'n-'+n.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:C.amberBg}}><b>{n.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{n.descricao||'Notificação interna'} · {new Date(n.created_at).toLocaleString('pt-BR')}</div></div>)}
         {st.mensagens.map(m=><div key={'m-'+m.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:C.blueBg}}><b style={{display:'flex',alignItems:'center',gap:6}}><Mail size={14}/> {m.assunto}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{m.corpo?.slice(0,160)}{m.corpo?.length>160?'...':''} · {new Date(m.created_at).toLocaleString('pt-BR')}</div></div>)}
       </div>:<div style={{padding:24,textAlign:'center',color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><CheckCircle size={16}/>Nenhuma notificação ou mensagem nova.</div>}
     </div>

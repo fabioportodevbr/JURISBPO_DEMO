@@ -2,12 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import AvatarUsuario from './common/AvatarUsuario.jsx'
 import { MessageSquare, PenLine, Send, Trash2, Edit2, Check, X } from 'lucide-react'
-
-const Y = {
-  bg: '#fefce8', mid: '#fef9c3', header: '#fef08a',
-  border: '#fde047', dark: '#92400e', btn: '#78350f',
-}
-const C = { text: '#0f172a', muted: '#64748b', red: '#dc2626' }
+import { C } from '../lib/theme'
+import { useTheme } from '../lib/ThemeContext'
 
 function fullDate(iso) {
   if (!iso) return '—'
@@ -18,7 +14,7 @@ function fullDate(iso) {
 }
 
 /* ── Barra de formatação ── */
-function RichToolbar({ editorRef }) {
+function RichToolbar({ editorRef, Y }) {
   const [active, setActive] = useState({ bold: false, italic: false, underline: false })
 
   const updateActive = () => {
@@ -51,7 +47,7 @@ function RichToolbar({ editorRef }) {
           title={b.title}
           style={{
             border: '1px solid ' + Y.border,
-            background: active[b.cmd] ? '#fde047' : Y.mid,
+            background: active[b.cmd] ? Y.border : Y.mid,
             color: Y.dark,
             borderRadius: 5,
             padding: '3px 10px',
@@ -73,7 +69,7 @@ function RichToolbar({ editorRef }) {
 }
 
 /* ── Editor contentEditable ── */
-function RichEditor({ editorRef, placeholder, onKeyDown, minHeight = 80 }) {
+function RichEditor({ editorRef, placeholder, onKeyDown, minHeight = 80, Y }) {
   const [empty, setEmpty] = useState(true)
   return (
     <div style={{ position: 'relative' }}>
@@ -99,7 +95,7 @@ function RichEditor({ editorRef, placeholder, onKeyDown, minHeight = 80 }) {
           borderRadius: 8,
           fontSize: 13,
           outline: 'none',
-          background: '#fffde7',
+          background: Y.bg,
           lineHeight: 1.5,
           wordBreak: 'break-word',
           color: C.text,
@@ -111,6 +107,14 @@ function RichEditor({ editorRef, placeholder, onKeyDown, minHeight = 80 }) {
 
 /* ── Componente principal ── */
 export default function MuralRecados({ profile }) {
+  const { theme } = useTheme()
+  const Y = theme === 'dark' ? {
+    bg: '#2a2000', mid: '#332800', header: '#3d3000',
+    border: '#6b5500', dark: '#fde68a', btn: '#a07800',
+  } : {
+    bg: '#fefce8', mid: '#fef9c3', header: '#fef08a',
+    border: '#fde047', dark: '#92400e', btn: '#78350f',
+  }
   const [recados, setRecados]     = useState([])
   const [sending, setSending]     = useState(false)
   const [showInput, setShowInput] = useState(false)
@@ -266,11 +270,12 @@ export default function MuralRecados({ profile }) {
           borderBottom: '1px solid ' + Y.border,
           background: Y.mid,
         }}>
-          <RichToolbar editorRef={newEditorRef} />
+          <RichToolbar editorRef={newEditorRef} Y={Y} />
           <RichEditor
             editorRef={newEditorRef}
             placeholder="Escreva um recado para a equipe…"
             onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) publicar() }}
+            Y={Y}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
             <button
@@ -311,7 +316,7 @@ export default function MuralRecados({ profile }) {
         }}>
           {recados.map(r => (
             <div key={r.id} style={{
-              background: '#fffff7',
+              background: Y.mid,
               border: '1px solid ' + (editingId === r.id ? Y.dark : Y.border),
               borderRadius: 10,
               padding: '10px 12px',
@@ -351,7 +356,7 @@ export default function MuralRecados({ profile }) {
                             onClick={() => excluir(r)}
                             title="Excluir definitivamente"
                             style={{
-                              border: '1px solid #fca5a5', background: '#fee2e2',
+                              border: '1px solid ' + C.red, background: C.redBg,
                               borderRadius: 6, padding: '3px 6px', cursor: 'pointer',
                               color: C.red, display: 'flex', alignItems: 'center',
                             }}>
@@ -365,12 +370,13 @@ export default function MuralRecados({ profile }) {
                   {/* Texto ou editor de edição */}
                   {editingId === r.id ? (
                     <div>
-                      <RichToolbar editorRef={editEditorRef} />
+                      <RichToolbar editorRef={editEditorRef} Y={Y} />
                       <RichEditor
                         editorRef={editEditorRef}
                         placeholder="Edite o recado…"
                         minHeight={64}
                         onKeyDown={e => { if (e.key === 'Escape') setEditingId(null) }}
+                        Y={Y}
                       />
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
                         <button
