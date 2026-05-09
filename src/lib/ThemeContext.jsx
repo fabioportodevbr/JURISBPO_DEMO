@@ -2,13 +2,22 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 
 const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} })
 
-export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState('light')
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem('jurisbpo-theme')
+    if (saved === 'dark' || saved === 'light') return saved
+  } catch {}
+  return 'light'
+}
 
-  useEffect(() => {
-    const saved = localStorage.getItem('jurisbpo-theme') || 'light'
-    setTheme(saved)
-  }, [])
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState(() => {
+    const initial = getInitialTheme()
+    // Aplica a classe imediatamente para evitar flash antes do primeiro render
+    if (initial === 'dark') document.documentElement.classList.add('dark')
+    else document.documentElement.classList.remove('dark')
+    return initial
+  })
 
   useEffect(() => {
     if (theme === 'dark') {
