@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase, can } from '../lib/supabase.js'
 import { Upload, Trash2, Eye, AlertCircle, File } from 'lucide-react'
 
-const C = { white:'#fff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', red:'#dc2626', redBg:'#fee2e2', purple:'#10b981', grayBg:'#f1f5f9' }
+import { C as GlobalC } from '../lib/theme'
+const C = {
+  ...GlobalC
+}
 const fmb = (b=0) => b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'
 const fdt = (s) => s ? new Date(s).toLocaleString('pt-BR') : '—'
 const icon = (name='') => name.match(/\.pdf$/i)?'📄':name.match(/\.docx?$/i)?'📝':name.match(/\.(jpg|jpeg|png|gif|webp)$/i)?'🖼️':name.match(/\.txt$/i)?'📃':'📎'
@@ -85,7 +88,7 @@ export default function DocumentosVinculados({ profile, processoId = null, contr
     </div>
     {erro && <div style={{ display:'flex', gap:8, alignItems:'flex-start', padding:10, borderRadius:8, background:C.redBg, color:C.red, fontSize:13, marginBottom:10 }}><AlertCircle size={16}/><span>{erro}</span></div>}
     {canUpload&&<div onDragEnter={e=>{e.preventDefault();setDrag(true)}} onDragOver={e=>e.preventDefault()} onDragLeave={e=>{e.preventDefault();setDrag(false)}} onDrop={e=>{e.preventDefault();handleFiles(e.dataTransfer.files)}} onClick={()=>fileRef.current?.click()}
-      style={{ border:'2px dashed '+(drag?C.purple:C.border), background:drag?'#faf5ff':C.white, borderRadius:10, padding:'18px 16px', textAlign:'center', cursor:uploading?'wait':'pointer', marginBottom:12 }}>
+      style={{ border:'2px dashed '+(drag?C.purple:C.border), background:drag?C.purpleBg:C.white, borderRadius:10, padding:'18px 16px', textAlign:'center', cursor:uploading?'wait':'pointer', marginBottom:12 }}>
       <input ref={fileRef} type="file" multiple style={{ display:'none' }} onChange={e=>handleFiles(e.target.files)} />
       <Upload size={24} color={C.muted} />
       <div style={{ fontSize:13, fontWeight:700, color:C.text, marginTop:6 }}>{uploading ? 'Enviando...' : 'Clique ou arraste documentos aqui'}</div>

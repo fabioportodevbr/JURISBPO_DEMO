@@ -23,15 +23,9 @@ type RegistroFinanceiro = {
   observacoes?: string | null;
 };
 
+import { C as GlobalC } from "../lib/theme"
 const C = {
-  white: "#fff",
-  text: "#0f172a",
-  muted: "#64748b",
-  border: "#e5e7eb",
-  grayBg: "#f1f5f9",
-  blue: "#1d4ed8",
-  green: "#16a34a",
-  amber: "#b45309",
+  ...GlobalC
 };
 
 const CAMPOS_ENCARGOS = [

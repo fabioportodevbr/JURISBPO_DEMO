@@ -10,6 +10,7 @@ import { supabase, signOut, can, ROLES } from './lib/supabase.js'
 import Auth from './components/Auth.jsx'
 import { APP_CONFIG } from './config/appConfig.js'
 import AvatarUsuario from './components/common/AvatarUsuario.jsx'
+import { ThemeProvider } from './lib/ThemeContext.jsx'
 
 // ── Importa as páginas ────────────────────────────────────────────────────
 // (cada uma em seu próprio arquivo para facilitar manutenção)
@@ -30,11 +31,7 @@ import Financeiro  from './pages/Financeiro.tsx'
 import ConfiguracaoCalendario from './pages/ConfiguracaoCalendario.jsx'
 
 // ── Tema ─────────────────────────────────────────────────────────────────
-const C = {
-  navy: '#022c22', navyL: '#064e3b', gold: '#10b981',
-  bg: '#f8fafc', white: '#ffffff', text: '#0f172a',
-  muted: '#64748b', border: '#e5e7eb', red: '#dc2626',
-}
+import { C } from './lib/theme'
 
 // ── Sidebar ───────────────────────────────────────────────────────────────
 function buildNav(profile) {
@@ -283,8 +280,10 @@ function AppRouter() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRouter />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRouter />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

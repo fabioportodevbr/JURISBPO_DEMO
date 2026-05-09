@@ -6,7 +6,10 @@ import mammoth from 'mammoth'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
 
-const C = { navy:'#022c22', white:'#fff', text:'#0f172a', muted:'#64748b', border:'#e5e7eb', red:'#dc2626', redBg:'#fee2e2', purple:'#10b981', purpleBg:'#ede9fe', grayBg:'#f1f5f9', green:'#10b981', greenBg:'#d1fae5' }
+import { C as GlobalC } from '../lib/theme'
+const C = {
+  ...GlobalC
+}
 const INP = { width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid '+C.border, fontSize:14, color:C.text, background:C.white, boxSizing:'border-box', outline:'none', fontFamily:'inherit', lineHeight:1.6, resize:'vertical' }
 
 const callAI = async ({ prompt, mode='chat', maxTokens=2500, format='text', context=null }) => {
@@ -112,7 +115,7 @@ function ChatBasico({ profile }) {
   return <div style={{ background:C.white, borderRadius:12, border:'1px solid '+C.border, padding:20 }}>
     <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:6 }}>💬 Assistente jurídico básico</div>
     <p style={{ fontSize:13, color:C.muted, margin:'0 0 16px' }}>Use para perguntas gerais, estruturação de ideias, revisão de texto e rascunhos. Não cole dados sensíveis desnecessários.</p>
-    <div style={{ border:'1px solid '+C.border, borderRadius:12, padding:14, background:'#f8fafc', height:420, overflowY:'auto', marginBottom:12 }}>
+    <div style={{ border:'1px solid '+C.border, borderRadius:12, padding:14, background:C.grayBg, height:420, overflowY:'auto', marginBottom:12 }}>
       {messages.map((m,i)=>(
         <div key={i} style={{ display:'flex', justifyContent:m.role==='user'?'flex-end':'flex-start', marginBottom:10 }}>
           <div style={{ maxWidth:'82%', padding:'10px 12px', borderRadius:12, background:m.role==='user'?C.purple:C.white, color:m.role==='user'?'white':C.text, border:m.role==='user'?'none':'1px solid '+C.border, whiteSpace:'pre-wrap', lineHeight:1.6, fontSize:14 }}>

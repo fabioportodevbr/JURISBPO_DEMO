@@ -7,19 +7,15 @@ import {
 } from 'lucide-react'
 
 // ── Cores (mesmas do App.jsx) ─────────────────────────────────────────────
+import { C as GlobalC } from '../lib/theme'
 const C = {
-  navy:         '#022c22',
-  bg:           '#f8fafc',
-  white:        '#ffffff',
-  text:         '#0f172a',
-  muted:        '#64748b',
-  border:       '#e5e7eb',
-  primary:      '#10b981',
-  primaryLight: '#d1fae5',
-  primaryMid:   '#059669',
-  danger:       '#dc2626',
-  dangerLight:  '#fee2e2',
-  warning:      '#f59e0b',
+  ...GlobalC,
+  primary: GlobalC.green,
+  primaryLight: GlobalC.greenBg,
+  primaryMid: GlobalC.green,
+  danger: GlobalC.red,
+  dangerLight: GlobalC.redBg,
+  warning: GlobalC.amber,
 }
 
 // ── Utilitários ───────────────────────────────────────────────────────────
@@ -130,7 +126,7 @@ function Field({ label, children, required }) {
     </div>
   )
 }
-const inp = { width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, color: '#0f172a', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }
+const inp = { width: '100%', padding: '8px 12px', border: '1px solid '+C.border, borderRadius: 8, fontSize: 14, color: C.text, outline: 'none', background: C.white, boxSizing: 'border-box', fontFamily: 'inherit' }
 
 // ── Modal: Novo / Editar Ofício ───────────────────────────────────────────
 function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, onSave, onClose, profile }) {
@@ -285,7 +281,7 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
             <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => setFiles(Array.from(e.target.files))} />
           </div>
           {files.map((f, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: '#f0fdf4', border: '1px solid ' + C.primaryLight, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: C.greenBg, border: '1px solid ' + C.primaryLight, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}>
               <Paperclip size={12} color={C.primary} />
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
               <span style={{ fontSize: 11, color: C.muted, flexShrink: 0 }}>novo</span>
@@ -293,7 +289,7 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
             </div>
           ))}
         </Field>
-        {err && <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.dangerLight, border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}><AlertCircle size={14} />{err}</div>}
+        {err && <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.dangerLight, border: '1px solid '+C.border, borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}><AlertCircle size={14} />{err}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
           <button type="button" onClick={onClose} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
           <button type="submit" disabled={saving} style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1, fontFamily: 'inherit' }}>{saving ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Registrar ofício'}</button>
@@ -540,7 +536,7 @@ function ModeloUploadModal({ profile, onSave, onClose }) {
           </div>
           {files.map((f, i) => <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: C.bg, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}><Paperclip size={12} color={C.muted} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span><button type="button" onClick={() => setFiles(ff => ff.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 0 }}><X size={13} /></button></div>)}
         </Field>
-        {err && <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.dangerLight, border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}><AlertCircle size={14} />{err}</div>}
+        {err && <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.dangerLight, border: '1px solid '+C.border, borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}><AlertCircle size={14} />{err}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button type="button" onClick={onClose} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
           <button type="submit" disabled={saving} style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>{saving ? 'Anexando...' : 'Anexar modelo'}</button>
@@ -742,7 +738,7 @@ export default function Acervo({ profile }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <div style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>{m.updated_at ? fmtDate(m.updated_at.split('T')[0]) : '—'}</div>
                   {canDelete && <button onClick={() => excluirModelo(m.id)} title="Excluir modelo"
-                    style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', border: '1px solid #fca5a5', borderRadius: 6, background: C.dangerLight, color: C.danger, cursor: 'pointer' }}>
+                    style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', border: '1px solid '+C.danger, borderRadius: 6, background: C.dangerLight, color: C.danger, cursor: 'pointer' }}>
                     <Trash2 size={12} />
                   </button>}
                 </div>

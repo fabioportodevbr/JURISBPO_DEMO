@@ -1,6 +1,6 @@
 import React from 'react'
 
-const C={border:'#e5e7eb',white:'#fff',text:'#0f172a',muted:'#64748b'}
+import { C } from '../lib/theme'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 
 function F({label,children}) {

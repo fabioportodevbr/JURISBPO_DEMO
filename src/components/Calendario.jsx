@@ -3,12 +3,9 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { X, ExternalLink, Settings } from 'lucide-react'
 
+import { C as GlobalC } from '../lib/theme'
 const C = {
-  navy: '#022c22', white: '#fff', text: '#0f172a', muted: '#64748b',
-  border: '#e5e7eb', blue: '#1d4ed8', red: '#dc2626',
-  green: '#16a34a', amber: '#b45309', purple: '#10b981',
-  bg: '#f8fafc', greenBg: '#dcfce7', blueBg: '#dbeafe',
-  amberBg: '#fef3c7',
+  ...GlobalC,
 }
 
 const colorsSystem = {
@@ -254,12 +251,12 @@ export default function Calendario({ profile }) {
       </div>
 
       {successMsg && (
-        <div style={{ background: C.greenBg, border: '1px solid #86efac', borderRadius: 8, padding: '10px 14px', marginTop: 12, color: C.green, fontWeight: 700 }}>
+        <div style={{ background: C.greenBg, border: '1px solid '+C.green, borderRadius: 8, padding: '10px 14px', marginTop: 12, color: C.green, fontWeight: 700 }}>
           ✓ {successMsg}
         </div>
       )}
       {googleError && (
-        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginTop: 12, color: C.red }}>
+        <div style={{ background: C.redBg, border: '1px solid '+C.red, borderRadius: 8, padding: '10px 14px', marginTop: 12, color: C.red }}>
           {googleError}
         </div>
       )}

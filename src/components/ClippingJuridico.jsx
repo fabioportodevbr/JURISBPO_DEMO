@@ -2,16 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Newspaper, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react'
 
+import { C as GlobalC } from '../lib/theme'
 const C = {
-  white:'#fff',
-  border:'#e5e7eb',
-  text:'#0f172a',
-  muted:'#64748b',
-  green:'#10b981',
-  amber:'#b45309',
-  amberBg:'#fef3c7',
-  red:'#dc2626',
-  redBg:'#fee2e2'
+  ...GlobalC
 }
 
 const FALLBACK_URL = 'https://stemzefgvtpaldvjtvmt.supabase.co/functions/v1/clipping-juridico'
@@ -149,7 +142,7 @@ export default function ClippingJuridico() {
                   border:'1px solid '+C.border,
                   borderRadius:12,
                   padding:14,
-                  background:'#fff'
+                  background:C.white
                 }}
               >
                 <div style={{fontSize:11,fontWeight:900,color:C.green,textTransform:'uppercase',marginBottom:6}}>
