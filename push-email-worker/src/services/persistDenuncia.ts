@@ -8,7 +8,11 @@
 import { supabase } from '../db/supabase.js'
 import { ParsedDenuncia } from '../types.js'
 
-export async function persistDenuncia(d: ParsedDenuncia): Promise<boolean> {
+export type PersistResult =
+  | { isNew: false }
+  | { isNew: true; denunciaId: string; mensagemRecebidaId: string }
+
+export async function persistDenuncia(d: ParsedDenuncia): Promise<PersistResult> {
   // --- 1. Deduplicação: verifica se já existe pelo hash -------------------------
   const { data: existing } = await supabase
     .from('compliance_denuncias')
@@ -18,7 +22,7 @@ export async function persistDenuncia(d: ParsedDenuncia): Promise<boolean> {
 
   if (existing) {
     console.log(`[compliance] Denúncia duplicada ignorada (hash já existe, id=${existing.id})`)
-    return false
+    return { isNew: false }
   }
 
   // --- 2. Insere a denúncia (trigger gera o número DEN-YYYY-NNN) ---------------
@@ -77,14 +81,28 @@ export async function persistDenuncia(d: ParsedDenuncia): Promise<boolean> {
     // meta auxiliar para o outbox construir o HTML
   }
 
-  const { error: errMsgs } = await supabase
+  // Insere separadamente para capturar o ID da mensagem 'recebida'
+  const { data: msgRec, error: errRec } = await supabase
     .from('compliance_mensagens')
-    .insert([msgRecebida, msgAutoResposta])
+    .insert(msgRecebida)
+    .select('id')
+    .single()
 
-  if (errMsgs) {
-    // Não reverte a denúncia — o outbox pode ser reinserido manualmente pelo gerente se necessário
-    console.error('[compliance] Erro ao inserir mensagens iniciais:', errMsgs)
+  if (errRec) {
+    console.error('[compliance] Erro ao inserir mensagem recebida:', errRec)
   }
 
-  return true
+  const { error: errAuto } = await supabase
+    .from('compliance_mensagens')
+    .insert(msgAutoResposta)
+
+  if (errAuto) {
+    console.error('[compliance] Erro ao inserir auto_resposta:', errAuto)
+  }
+
+  return {
+    isNew:              true,
+    denunciaId:         inserted.id,
+    mensagemRecebidaId: msgRec?.id ?? '',
+  }
 }

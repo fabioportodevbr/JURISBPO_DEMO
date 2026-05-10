@@ -19,7 +19,7 @@ import {
   Calendar, ArrowRight, Loader, Settings,
   Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
   AlertCircle, CheckCircle2, Wifi, HelpCircle, Reply,
-  Archive, RotateCcw,
+  Archive, RotateCcw, Paperclip, Download,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { C } from '../lib/theme.js'
@@ -76,6 +76,16 @@ const fmt = (ts) => ts
 const fmtDate = (ts) => ts
   ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(ts))
   : '—'
+
+const formatBytes = (bytes) => {
+  if (!bytes || bytes === 0) return '—'
+  if (bytes < 1024)        return `${bytes} B`
+  if (bytes < 1_048_576)   return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1_048_576).toFixed(1)} MB`
+}
+
+const sanitizeFileName = (name) =>
+  name.replace(/[^\w.\-() ]/g, '_').replace(/_{2,}/g, '_').slice(0, 200)
 
 function StatusBadge({ status, small }) {
   const s = STATUS_LABELS[status] || { label: status, color: C.gray, bg: C.grayBg }
@@ -241,6 +251,140 @@ function StatusStepper({ current, onChange, disabled }) {
   )
 }
 
+// ── Aba de documentos ─────────────────────────────────────────────────────────
+
+function DocumentosTab({ denuncia, mensagens }) {
+  const [anexos, setAnexos]         = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [downloading, setDownloading] = useState(null)
+
+  useEffect(() => {
+    supabase
+      .from('compliance_anexos')
+      .select('*')
+      .eq('denuncia_id', denuncia.id)
+      .order('criado_em', { ascending: true })
+      .then(({ data }) => { setAnexos(data || []); setLoading(false) })
+  }, [denuncia.id])
+
+  // Agrupa por mensagem_id
+  const grupos = useMemo(() => {
+    const map = new Map()
+    anexos.forEach(a => {
+      const key = a.mensagem_id ?? '__sem_msg__'
+      if (!map.has(key)) {
+        map.set(key, { msg: mensagens.find(m => m.id === a.mensagem_id) ?? null, files: [] })
+      }
+      map.get(key).files.push(a)
+    })
+    return [...map.values()]
+  }, [anexos, mensagens])
+
+  async function handleDownload(anexo) {
+    setDownloading(anexo.id)
+    try {
+      const { data } = await supabase.storage
+        .from('compliance-anexos')
+        .createSignedUrl(anexo.storage_path, 120)
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    } finally { setDownloading(null) }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '32px 0', textAlign: 'center', color: C.muted, fontSize: 13 }}>
+        <Loader size={20} style={{ animation: 'spin 0.8s linear infinite', display: 'block', margin: '0 auto 8px' }} />
+        Carregando documentos…
+      </div>
+    )
+  }
+
+  if (!grupos.length) {
+    return (
+      <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+        <Paperclip size={36} color={C.border} style={{ display: 'block', margin: '0 auto 12px' }} />
+        <p style={{ color: C.muted, fontSize: 14, margin: '0 0 6px', fontWeight: 700 }}>Nenhum documento anexado</p>
+        <p style={{ color: C.muted, fontSize: 12, margin: 0 }}>
+          Arquivos enviados ou recebidos nas mensagens desta denúncia aparecerão aqui.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {grupos.map(({ msg, files }, gi) => {
+        const meta = msg ? (TIPO_MSG_LABELS[msg.tipo] || { label: msg.tipo, icon: FileText, color: C.gray }) : null
+        const Icon = meta?.icon ?? Paperclip
+        return (
+          <div key={gi} style={{ border: '1px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
+            {/* Cabeçalho da mensagem relacionada */}
+            <div style={{ padding: '9px 14px', background: C.soft, borderBottom: '1px solid ' + C.border,
+              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {meta ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700,
+                    color: meta.color, background: C.white, border: '1px solid ' + C.border,
+                    padding: '2px 8px', borderRadius: 10 }}>
+                    <Icon size={11} />{meta.label}
+                  </div>
+                  <span style={{ fontSize: 11, color: C.muted }}>{fmt(msg.criado_em)}</span>
+                  {msg.enviado_por_nome && (
+                    <span style={{ fontSize: 11, color: C.muted }}>· {msg.enviado_por_nome}</span>
+                  )}
+                  {msg.assunto && (
+                    <span style={{ fontSize: 11, color: C.muted, fontStyle: 'italic' }}>· {msg.assunto}</span>
+                  )}
+                </>
+              ) : (
+                <span style={{ fontSize: 11, color: C.muted, fontStyle: 'italic' }}>Origem não vinculada</span>
+              )}
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: C.muted, fontWeight: 600 }}>
+                {files.length} arquivo{files.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Lista de arquivos */}
+            <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {files.map(a => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '7px 10px', borderRadius: 8, background: C.bg, border: '1px solid ' + C.border }}>
+                  <FileText size={15} color={a.direcao === 'recebido' ? C.blue : C.green} style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.nome_arquivo}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.muted }}>
+                      {formatBytes(a.tamanho_bytes)}
+                      {' · '}
+                      <span style={{ color: a.direcao === 'recebido' ? C.blue : C.green, fontWeight: 700 }}>
+                        {a.direcao === 'recebido' ? '↓ Recebido' : '↑ Enviado'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDownload(a)}
+                    disabled={downloading === a.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '5px 12px', borderRadius: 7, border: '1px solid ' + C.border,
+                      background: C.white, color: C.navy, fontSize: 12, fontWeight: 600,
+                      cursor: downloading === a.id ? 'not-allowed' : 'pointer',
+                      opacity: downloading === a.id ? 0.6 : 1 }}>
+                    {downloading === a.id
+                      ? <Loader size={12} style={{ animation: 'spin 0.8s linear infinite' }} />
+                      : <Download size={12} />}
+                    {downloading === a.id ? 'Aguarde…' : 'Baixar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Composer de mensagens ─────────────────────────────────────────────────────
 
 function MessageComposer({ denuncia, profile, onSent, preset }) {
@@ -249,8 +393,10 @@ function MessageComposer({ denuncia, profile, onSent, preset }) {
   const [setor, setSetor] = useState('')
   const [paraEmail, setParaEmail] = useState('')  // para diligencia: e-mail do setor
   const [assunto, setAssunto] = useState(`Atualização da denúncia ${denuncia.numero}`)
+  const [arquivos, setArquivos] = useState([])    // File[] para upload
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState(null)
+  const fileInputRef = useRef(null)
 
   const isEmailTipo = tipo === 'officer_reply' || tipo === 'diligencia'
   const isDiligencia = tipo === 'diligencia'
@@ -298,10 +444,46 @@ function MessageComposer({ denuncia, profile, onSent, preset }) {
         status_envio:     isEmailTipo ? 'pendente' : 'nao_aplicavel',
       }
 
-      const { error } = await supabase.from('compliance_mensagens').insert(msgData)
+      // Insere a mensagem e obtém o ID para vincular os anexos
+      const { data: msgRow, error } = await supabase
+        .from('compliance_mensagens')
+        .insert(msgData)
+        .select('id')
+        .single()
       if (error) throw error
 
-      setCorpo(''); setSetor(''); setParaEmail('')
+      // Faz upload de cada arquivo selecionado
+      for (const file of arquivos) {
+        try {
+          const ext  = file.name.includes('.') ? file.name.split('.').pop() : 'bin'
+          const safe = sanitizeFileName(file.name)
+          const path = `${denuncia.escritorio_id}/${denuncia.id}/${msgRow.id}/${crypto.randomUUID()}.${ext}`
+
+          const { error: upErr } = await supabase.storage
+            .from('compliance-anexos')
+            .upload(path, file, { contentType: file.type || 'application/octet-stream' })
+
+          if (!upErr) {
+            await supabase.from('compliance_anexos').insert({
+              denuncia_id:   denuncia.id,
+              mensagem_id:   msgRow.id,
+              escritorio_id: denuncia.escritorio_id,
+              nome_arquivo:  safe,
+              storage_path:  path,
+              tamanho_bytes: file.size,
+              content_type:  file.type || 'application/octet-stream',
+              direcao:       'enviado',
+            })
+          } else {
+            console.warn('[compliance-upload] Falha ao enviar', file.name, upErr.message)
+          }
+        } catch (uploadErr) {
+          console.warn('[compliance-upload] Erro no arquivo', file.name, uploadErr)
+        }
+      }
+
+      setCorpo(''); setArquivos([]); setSetor(''); setParaEmail('')
+      if (fileInputRef.current) fileInputRef.current.value = ''
       // Restaura o assunto para o padrão do tipo atual (useEffect só dispara quando tipo muda)
       if (tipo === 'diligencia') setAssunto(`Solicitação de Diligência — ${denuncia.numero}`)
       else if (tipo === 'officer_reply') setAssunto(`Atualização da denúncia ${denuncia.numero}`)
@@ -378,6 +560,54 @@ function MessageComposer({ denuncia, profile, onSent, preset }) {
         <textarea style={{ ...INP, height: 110, resize: 'vertical', fontFamily: 'inherit' }}
           value={corpo} onChange={e => setCorpo(e.target.value)}
           placeholder={tipo === 'interna' ? 'Escreva uma nota interna (não será enviada por e-mail)…' : 'Escreva a mensagem…'} />
+      </div>
+
+      {/* Anexar arquivos (disponível para todos os tipos de e-mail + nota interna) */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: arquivos.length ? 8 : 0 }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '5px 12px', borderRadius: 7, border: '1px solid ' + C.border,
+            background: C.white, color: C.navy, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <Paperclip size={12} />Anexar arquivo
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              onChange={e => {
+                const novos = Array.from(e.target.files || [])
+                setArquivos(prev => {
+                  const existentes = new Set(prev.map(f => f.name + f.size))
+                  return [...prev, ...novos.filter(f => !existentes.has(f.name + f.size))]
+                })
+                e.target.value = ''
+              }}
+            />
+          </label>
+          {arquivos.length > 0 && (
+            <span style={{ fontSize: 11, color: C.muted }}>
+              {arquivos.length} arquivo{arquivos.length !== 1 ? 's' : ''} selecionado{arquivos.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        {arquivos.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {arquivos.map((f, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8,
+                padding: '5px 10px', background: C.soft, borderRadius: 6,
+                border: '1px solid ' + C.border, fontSize: 12 }}>
+                <FileText size={12} color={C.navy} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                <span style={{ color: C.muted, flexShrink: 0 }}>{formatBytes(f.size)}</span>
+                <button
+                  onClick={() => setArquivos(prev => prev.filter((_, j) => j !== i))}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, padding: 2, flexShrink: 0 }}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {isEmailTipo && (
@@ -601,6 +831,9 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
                 </span>
               )}
             </button>
+            <button style={tabStyle(tab === 'documentos')} onClick={() => setTab('documentos')}>
+              <Paperclip size={12} style={{ marginRight: 4 }} />Documentos
+            </button>
           </div>
         </div>
 
@@ -670,6 +903,11 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
                 {saving ? 'Salvando…' : 'Salvar dados'}
               </button>
             </div>
+          )}
+
+          {/* ── TAB: DOCUMENTOS ────────────────────────────────── */}
+          {tab === 'documentos' && (
+            <DocumentosTab denuncia={denuncia} mensagens={mensagens} />
           )}
 
           {/* ── TAB: MENSAGENS ─────────────────────────────────── */}

@@ -5,6 +5,10 @@
  */
 import { supabase } from '../db/supabase.js'
 
+export type DiligenciaReplyResult =
+  | { saved: false }
+  | { saved: true; denunciaId: string; mensagemId: string }
+
 export async function persistDiligenciaReply(opts: {
   denunciaNumero: string
   escritorioId: string
@@ -13,7 +17,7 @@ export async function persistDiligenciaReply(opts: {
   assunto: string | undefined
   corpo: string
   rawTextHash: string
-}): Promise<boolean> {
+}): Promise<DiligenciaReplyResult> {
   // 1. Encontra a denúncia pelo número dentro do escritório
   const { data: denuncia } = await supabase
     .from('compliance_denuncias')
@@ -24,7 +28,7 @@ export async function persistDiligenciaReply(opts: {
 
   if (!denuncia) {
     console.warn(`[compliance-reply] Denúncia ${opts.denunciaNumero} não encontrada para escritório ${opts.escritorioId}`)
-    return false
+    return { saved: false }
   }
 
   // 2. Deduplicação: evita salvar a mesma resposta duas vezes
@@ -38,7 +42,7 @@ export async function persistDiligenciaReply(opts: {
 
   if (existing) {
     console.log(`[compliance-reply] Resposta já registrada para ${opts.denunciaNumero} — ignorado.`)
-    return false
+    return { saved: false }
   }
 
   // 3. Salva como mensagem de resposta_diligencia
@@ -46,7 +50,7 @@ export async function persistDiligenciaReply(opts: {
     ? `${opts.remetenteNome} <${opts.remetenteEmail}>`
     : opts.remetenteEmail
 
-  const { error } = await supabase
+  const { data: msg, error } = await supabase
     .from('compliance_mensagens')
     .insert({
       denuncia_id:   denuncia.id,
@@ -58,12 +62,14 @@ export async function persistDiligenciaReply(opts: {
       corpo:         opts.corpo,
       status_envio:  'nao_aplicavel',
     })
+    .select('id')
+    .single()
 
-  if (error) {
+  if (error || !msg) {
     console.error('[compliance-reply] Erro ao salvar resposta de diligência:', error)
-    return false
+    return { saved: false }
   }
 
   console.log(`[compliance-reply] ✓ Resposta de diligência salva para ${opts.denunciaNumero} de ${opts.remetenteEmail}`)
-  return true
+  return { saved: true, denunciaId: denuncia.id, mensagemId: msg.id }
 }

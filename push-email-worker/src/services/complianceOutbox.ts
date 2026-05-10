@@ -8,7 +8,7 @@
  */
 import { supabase } from '../db/supabase.js'
 import { ComplianceDbConfig } from '../types.js'
-import { sendEmail, buildAutoReplyHtml, buildOfficerMessageHtml } from './emailSender.js'
+import { sendEmail, buildAutoReplyHtml, buildOfficerMessageHtml, EmailAttachment } from './emailSender.js'
 
 const BATCH_SIZE = 10   // mensagens por ciclo para não sobrecarregar o SMTP
 
@@ -109,9 +109,35 @@ export async function processComplianceOutbox(cfg: ComplianceDbConfig): Promise<
         )
       }
 
+      // Busca anexos enviados para esta mensagem (upload feito pelo officer no frontend)
+      const attachments: EmailAttachment[] = []
+      const { data: anexos } = await supabase
+        .from('compliance_anexos')
+        .select('nome_arquivo, storage_path, content_type')
+        .eq('mensagem_id', row.id)
+        .eq('direcao', 'enviado')
+
+      for (const anexo of (anexos ?? [])) {
+        try {
+          const { data: blob } = await supabase.storage
+            .from('compliance-anexos')
+            .download(anexo.storage_path)
+          if (blob) {
+            const buf = Buffer.from(await blob.arrayBuffer())
+            attachments.push({
+              filename:    anexo.nome_arquivo,
+              content:     buf.toString('base64'),
+              contentType: anexo.content_type ?? 'application/octet-stream',
+            })
+          }
+        } catch (e) {
+          console.warn(`[compliance-outbox] Falha ao carregar anexo "${anexo.nome_arquivo}":`, e)
+        }
+      }
+
       // For diligência, set reply-to to the monitored IMAP inbox so sector replies are auto-ingested
       const replyTo = row.tipo === 'diligencia' ? cfg.imapUser : undefined
-      await sendEmail({ to: toEmail, subject, html, replyTo }, cfg)
+      await sendEmail({ to: toEmail, subject, html, replyTo, attachments }, cfg)
 
       await supabase
         .from('compliance_mensagens')

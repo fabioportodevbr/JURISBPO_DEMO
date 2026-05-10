@@ -8,8 +8,14 @@ import { ComplianceDbConfig } from '../types.js'
 // Docs: https://resend.com/docs/api-reference/emails/send-email
 // ---------------------------------------------------------------------------
 
+export interface EmailAttachment {
+  filename:    string
+  content:     string   // base64
+  contentType: string
+}
+
 async function sendViaResend(
-  opts: { to: string; subject: string; html: string; replyTo?: string },
+  opts: { to: string; subject: string; html: string; replyTo?: string; attachments?: EmailAttachment[] },
   cfg: ComplianceDbConfig,
   apiKey: string
 ): Promise<void> {
@@ -17,12 +23,19 @@ async function sendViaResend(
     ? `${cfg.smtpFromName} <${cfg.smtpFromEmail}>`
     : cfg.smtpFromEmail
 
-  const body = {
+  const body: Record<string, unknown> = {
     from,
     to:       [opts.to],
     subject:  opts.subject,
     html:     opts.html,
     reply_to: opts.replyTo ?? cfg.smtpFromEmail,
+  }
+
+  if (opts.attachments?.length) {
+    body.attachments = opts.attachments.map(a => ({
+      filename: a.filename,
+      content:  a.content,
+    }))
   }
 
   const res = await fetch('https://api.resend.com/emails', {
@@ -72,7 +85,7 @@ async function createSmtpTransporter(cfg: ComplianceDbConfig): Promise<nodemaile
 // ---------------------------------------------------------------------------
 
 export async function sendEmail(
-  opts: { to: string; subject: string; html: string; replyTo?: string },
+  opts: { to: string; subject: string; html: string; replyTo?: string; attachments?: EmailAttachment[] },
   cfg: ComplianceDbConfig
 ): Promise<void> {
   const resendKey = process.env.RESEND_API_KEY?.trim()
@@ -82,11 +95,16 @@ export async function sendEmail(
   } else {
     const t = await createSmtpTransporter(cfg)
     await t.sendMail({
-      from:    `"${cfg.smtpFromName}" <${cfg.smtpFromEmail}>`,
-      to:      opts.to,
-      subject: opts.subject,
-      html:    opts.html,
-      replyTo: opts.replyTo ?? cfg.smtpFromEmail,
+      from:        `"${cfg.smtpFromName}" <${cfg.smtpFromEmail}>`,
+      to:          opts.to,
+      subject:     opts.subject,
+      html:        opts.html,
+      replyTo:     opts.replyTo ?? cfg.smtpFromEmail,
+      attachments: opts.attachments?.map(a => ({
+        filename: a.filename,
+        content:  Buffer.from(a.content, 'base64'),
+        contentType: a.contentType,
+      })),
     })
   }
 }
