@@ -126,9 +126,16 @@ async function testImap(
       if (line.startsWith("A001 ")) { loginResp = line; break }
     }
     if (!loginResp.startsWith("A001 OK")) {
-      const hint = /AUTHENTICATIONFAILED|invalid credentials/i.test(loginResp)
-        ? "Usuário ou senha incorretos."
-        : loginResp
+      let hint: string
+      if (/NO LOGIN failed|LOGIN failed/i.test(loginResp)) {
+        hint = "O servidor rejeitou a autenticação básica (LOGIN). " +
+          "Se for uma conta Microsoft 365 ou Outlook.com, a autenticação básica está desabilitada — " +
+          "gere uma Senha de App em: conta.microsoft.com → Segurança → Senhas de App."
+      } else if (/AUTHENTICATIONFAILED|invalid credentials|Bad credentials/i.test(loginResp)) {
+        hint = "Usuário ou senha incorretos."
+      } else {
+        hint = loginResp
+      }
       throw new Error(`Falha de autenticação IMAP: ${hint}`)
     }
 

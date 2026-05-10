@@ -989,6 +989,22 @@ function ComplianceSettings({ profile }) {
             />
           </FieldRow>
         </div>
+
+        {/* Aviso Microsoft 365 / Outlook */}
+        {/outlook\.|office365/i.test(form.imap_host) && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#eff6ff',
+            border: '1px solid #93c5fd', borderRadius: 8, padding: '10px 13px', marginTop: 4 }}>
+            <AlertCircle size={14} color="#2563eb" style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 12, color: '#1e40af', lineHeight: 1.6 }}>
+              <strong>Microsoft 365 / Outlook.com detectado.</strong> A Microsoft desabilitou a autenticação básica para IMAP.
+              Use uma <strong>Senha de App</strong> no campo acima (não a senha normal da conta):{' '}
+              <a href="https://account.microsoft.com/security" target="_blank" rel="noopener noreferrer"
+                style={{ color: '#1d4ed8', fontWeight: 700 }}>
+                conta.microsoft.com → Segurança → Senhas de App
+              </a>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Status da conexão + botão de teste ────────────────── */}
