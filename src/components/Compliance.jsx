@@ -247,12 +247,24 @@ function MessageComposer({ denuncia, profile, onSent }) {
   const [corpo, setCorpo] = useState('')
   const [setor, setSetor] = useState('')
   const [paraEmail, setParaEmail] = useState('')  // para diligencia: e-mail do setor
-  const [assunto, setAssunto] = useState('')
+  const [assunto, setAssunto] = useState(`Atualização da denúncia ${denuncia.numero}`)
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState(null)
 
   const isEmailTipo = tipo === 'officer_reply' || tipo === 'diligencia'
   const isDiligencia = tipo === 'diligencia'
+
+  // Preenche o assunto automaticamente quando o tipo muda.
+  // Diligências têm assunto FIXO — o filtro do Gmail depende desse padrão exato.
+  useEffect(() => {
+    if (tipo === 'diligencia') {
+      setAssunto(`Solicitação de Diligência — ${denuncia.numero}`)
+    } else if (tipo === 'officer_reply') {
+      setAssunto(`Atualização da denúncia ${denuncia.numero}`)
+    } else {
+      setAssunto('')
+    }
+  }, [tipo, denuncia.numero])
 
   async function handleSend() {
     if (!corpo.trim()) return
@@ -263,7 +275,7 @@ function MessageComposer({ denuncia, profile, onSent }) {
         escritorio_id:    denuncia.escritorio_id,
         tipo,
         corpo:            corpo.trim(),
-        assunto:          assunto.trim() || null,
+        assunto:          isDiligencia ? `Solicitação de Diligência — ${denuncia.numero}` : (assunto.trim() || null),
         setor_acionado:   isDiligencia ? setor.trim() || null : null,
         para_email:       isDiligencia ? paraEmail.trim() || null : null,
         para_exibicao:    tipo === 'interna'
@@ -279,7 +291,11 @@ function MessageComposer({ denuncia, profile, onSent }) {
       const { error } = await supabase.from('compliance_mensagens').insert(msgData)
       if (error) throw error
 
-      setCorpo(''); setAssunto(''); setSetor(''); setParaEmail('')
+      setCorpo(''); setSetor(''); setParaEmail('')
+      // Restaura o assunto para o padrão do tipo atual (useEffect só dispara quando tipo muda)
+      if (tipo === 'diligencia') setAssunto(`Solicitação de Diligência — ${denuncia.numero}`)
+      else if (tipo === 'officer_reply') setAssunto(`Atualização da denúncia ${denuncia.numero}`)
+      else setAssunto('')
       onSent()
     } catch (e) {
       setErr(e.message)
@@ -330,9 +346,19 @@ function MessageComposer({ denuncia, profile, onSent }) {
 
       {isEmailTipo && (
         <div style={{ marginBottom: 10 }}>
-          <label style={LBL}>Assunto do e-mail (opcional)</label>
-          <input style={INP} value={assunto} onChange={e => setAssunto(e.target.value)}
-            placeholder={tipo === 'diligencia' ? `Solicitação de Diligência — ${denuncia.numero}` : `Atualização da denúncia ${denuncia.numero}`} />
+          <label style={LBL}>
+            Assunto do e-mail
+            {isDiligencia
+              ? <span style={{ color: C.amber, fontWeight: 600, marginLeft: 4 }}>— fixo (necessário para rastreamento)</span>
+              : <span style={{ color: C.muted, fontWeight: 400, marginLeft: 4 }}>(opcional)</span>}
+          </label>
+          <input
+            style={{ ...INP, ...(isDiligencia ? { background: '#f8fafc', color: C.muted, cursor: 'default' } : {}) }}
+            value={assunto}
+            onChange={isDiligencia ? undefined : e => setAssunto(e.target.value)}
+            readOnly={isDiligencia}
+            placeholder={isDiligencia ? '' : `Atualização da denúncia ${denuncia.numero}`}
+          />
         </div>
       )}
 
