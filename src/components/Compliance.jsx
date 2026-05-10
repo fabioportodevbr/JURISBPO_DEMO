@@ -689,11 +689,19 @@ function ComplianceSettings({ profile }) {
   const [saving, setSaving]       = useState(false)
   const [saved, setSaved]         = useState(false)
   const [err, setErr]             = useState(null)
-  const [exists, setExists]       = useState(false)  // já tem linha no banco?
+  const [exists, setExists]       = useState(false)
 
-  // Carrega config atual (sem expor senhas: usa placeholder se já configuradas)
+  // Senhas — nunca carregadas na UI
   const [hasPwImap, setHasPwImap] = useState(false)
   const [hasPwSmtp, setHasPwSmtp] = useState(false)
+
+  // Teste de conexão IMAP
+  const [testing, setTesting]       = useState(false)
+  const [testResult, setTestResult] = useState(null)   // { ok, erro?, mensagens?, naolidas? }
+  // Status persistido no banco (da última conexão — worker ou teste manual)
+  const [connStatus, setConnStatus]     = useState('desconhecido')
+  const [connErro, setConnErro]         = useState('')
+  const [connUltimaVez, setConnUltimaVez] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -707,6 +715,9 @@ function ComplianceSettings({ profile }) {
         setExists(true)
         setHasPwImap(!!data.imap_password)
         setHasPwSmtp(!!data.smtp_password)
+        setConnStatus(data.conn_status    || 'desconhecido')
+        setConnErro(data.conn_erro        || '')
+        setConnUltimaVez(data.conn_ultima_vez || null)
         setForm({
           enabled:           data.enabled,
           imap_host:         data.imap_host         || '',
@@ -779,6 +790,28 @@ function ComplianceSettings({ profile }) {
       setErr(e.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleTest() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await supabase.functions.invoke('compliance-test-imap', {
+        body: { escritorio_id: profile.escritorio_id },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const result = res.data ?? { ok: false, erro: res.error?.message ?? 'Erro desconhecido.' }
+      setTestResult(result)
+      // Atualiza status local para refletir o que o banco recebeu
+      setConnStatus(result.ok ? 'ok' : 'erro')
+      setConnErro(result.ok ? '' : result.erro)
+      setConnUltimaVez(new Date().toISOString())
+    } catch (e) {
+      setTestResult({ ok: false, erro: e.message })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -856,6 +889,93 @@ function ComplianceSettings({ profile }) {
             />
           </FieldRow>
         </div>
+      </div>
+
+      {/* ── Status da conexão + botão de teste ────────────────── */}
+      <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 10, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+
+          {/* Status persistido */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {connStatus === 'ok' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.green }}>
+                <CheckCircle2 size={16} />
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Conexão OK</span>
+              </div>
+            )}
+            {connStatus === 'erro' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.red }}>
+                <AlertCircle size={16} />
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Falha na conexão</span>
+              </div>
+            )}
+            {connStatus === 'desconhecido' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.muted }}>
+                <Wifi size={16} />
+                <span style={{ fontSize: 13 }}>Conexão não testada</span>
+              </div>
+            )}
+            {connUltimaVez && (
+              <span style={{ fontSize: 11, color: C.muted }}>
+                · último teste {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(connUltimaVez))}
+              </span>
+            )}
+          </div>
+
+          {/* Botão de teste */}
+          <button onClick={handleTest} disabled={testing || !exists}
+            title={!exists ? 'Salve as configurações antes de testar' : 'Testar conexão com a caixa IMAP'}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px',
+              border: '1px solid ' + C.border, borderRadius: 8, background: C.white,
+              color: testing ? C.muted : C.navy, fontWeight: 700, fontSize: 13,
+              cursor: testing || !exists ? 'not-allowed' : 'pointer',
+              opacity: !exists ? 0.5 : 1, transition: 'all 0.15s' }}>
+            {testing
+              ? <><Loader size={13} style={{ animation: 'spin 0.8s linear infinite' }} />Conectando…</>
+              : <><Wifi size={13} />Testar conexão</>}
+          </button>
+        </div>
+
+        {/* Detalhes do erro de conexão */}
+        {connStatus === 'erro' && connErro && !testResult && (
+          <div style={{ marginTop: 10, padding: '8px 12px', background: '#fef2f2',
+            border: '1px solid #fecaca', borderRadius: 7, fontSize: 12, color: C.red, wordBreak: 'break-word' }}>
+            <strong>Erro registrado:</strong> {connErro}
+          </div>
+        )}
+
+        {/* Resultado do teste imediato */}
+        {testResult && (
+          <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, wordBreak: 'break-word',
+            background: testResult.ok ? '#f0fdf4' : '#fef2f2',
+            border: `1px solid ${testResult.ok ? '#86efac' : '#fecaca'}` }}>
+            {testResult.ok ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 size={14} color={C.green} />
+                <span style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
+                  Conexão estabelecida com sucesso!
+                </span>
+                <span style={{ fontSize: 12, color: '#15803d', marginLeft: 4 }}>
+                  {testResult.mensagens} mensagen{testResult.mensagens !== 1 ? 's' : ''} na caixa
+                  · {testResult.naolidas} não lida{testResult.naolidas !== 1 ? 's' : ''}
+                </span>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <AlertCircle size={14} color={C.red} />
+                  <span style={{ fontSize: 13, color: '#991b1b', fontWeight: 700 }}>Falha na conexão</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>
+                  {testResult.erro}
+                </div>
+                <div style={{ fontSize: 11, color: '#9f1239', marginTop: 6 }}>
+                  Verifique: host, porta, SSL/TLS, usuário, senha e se o servidor aceita conexões externas.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── SMTP ──────────────────────────────────────────────── */}
