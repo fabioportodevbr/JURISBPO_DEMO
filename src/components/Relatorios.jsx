@@ -4,6 +4,8 @@ import { BarChart3, FileText, DollarSign, Scale, Download, Printer, SlidersHoriz
 import { APP_CONFIG } from '../config/appConfig.js'
 
 import { C } from '../lib/theme'
+import { pickDefaultEmpresaGrupoId, scopeDataByEmpresaGrupo } from '../lib/empresaGrupoFilter.js'
+import EmpresaGrupoToggleBar from './EmpresaGrupoToggleBar.jsx'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const TIPOS_ATIVIDADE={tarefa:'Tarefa',prazo_processual:'Prazo processual',audiencia:'Audiência',reuniao:'Reunião'}
 const STATUS_ATIVIDADE={a_fazer:'A fazer',em_andamento:'Em andamento',concluida:'Concluída',cancelada:'Cancelada'}
@@ -93,6 +95,8 @@ export default function Relatorios({profile}){
   const [campos,setCampos]=useState(defaultFields('processos'))
   const [preview,setPreview]=useState(null)
   const [parteFilter,setParteFilter]=useState('')
+  const [empresasGrupo,setEmpresasGrupo]=useState([])
+  const [empresaVista,setEmpresaVista]=useState('')
 
   useEffect(()=>{(async()=>{
     const eid=profile.escritorio_id
@@ -113,14 +117,26 @@ export default function Relatorios({profile}){
     setLoading(false)
   })()},[profile.escritorio_id])
 
+  useEffect(()=>{(async()=>{
+    const { data }=await supabase.from('partes_crm').select('id,nome,nome_fantasia').eq('escritorio_id',profile.escritorio_id).eq('tipo','empresa_grupo').eq('status','ativo').order('nome')
+    setEmpresasGrupo(data||[])
+  })()},[profile.escritorio_id])
+
+  useEffect(()=>{
+    if(!empresasGrupo.length)return
+    setEmpresaVista(v=>v||pickDefaultEmpresaGrupoId(empresasGrupo))
+  },[empresasGrupo])
+
+  const viewData=useMemo(()=>scopeDataByEmpresaGrupo(data,empresasGrupo,empresaVista),[data,empresasGrupo,empresaVista])
+
   const maps=useMemo(()=>({
-    processos:Object.fromEntries(data.processos.map(p=>[p.id,p])),
-    contratos:Object.fromEntries(data.contratos.map(c=>[c.id,c])),
-    equipe:Object.fromEntries(data.equipe.map(u=>[u.id,u])),
-  }),[data])
+    processos:Object.fromEntries(viewData.processos.map(p=>[p.id,p])),
+    contratos:Object.fromEntries(viewData.contratos.map(c=>[c.id,c])),
+    equipe:Object.fromEntries(viewData.equipe.map(u=>[u.id,u])),
+  }),[viewData])
 
   const st=useMemo(()=>{
-    const ps=data.processos, fs=data.financeiros.filter(f=>!financeiroExcluido(f)), as=data.atividades
+    const ps=viewData.processos, fs=viewData.financeiros.filter(f=>!financeiroExcluido(f)), as=viewData.atividades
     const hoje=new Date()
     const anoAtual=hoje.getFullYear()
     const mesAnterior=new Date(anoAtual,hoje.getMonth()-1,1)
@@ -140,7 +156,7 @@ export default function Relatorios({profile}){
     const acordos=fs.filter(f=>f.natureza==='acordo')
     const execs=fs.filter(f=>f.natureza==='execucao')
     return {processos:ps.length,ativos:ps.filter(p=>p.status!=='encerrado'&&p.status!=='arquivado').length,encerrados:ps.filter(p=>p.status==='encerrado'||p.status==='arquivado').length,acordos:acordos.length,execucoes:execs.length,totalGasto:gastosMesAtual.total,totalAnoAtual:gastosAnoAtual.total,totalAnoAnterior:gastosAnoAnterior.total,gastosMesAtual,gastosMesAnterior,gastosAnoAtual,gastosAnoAnterior,variacaoMes,anoAtual,anoAnterior:anoAtual-1,mesAtualLabel:monthName(hoje),mesAnteriorLabel:monthName(mesAnterior),economia,improcedentes:ps.filter(p=>String(p.resultado||'').toLowerCase().includes('improced')).length,procedentes:ps.filter(p=>String(p.resultado||'').toLowerCase().includes('proced')&&!String(p.resultado||'').toLowerCase().includes('improced')).length,atividades:as.length,prazos:as.filter(a=>a.tipo==='prazo_processual').length,audiencias:as.filter(a=>a.tipo==='audiencia').length,percAcordo:fs.length?Math.round(acordos.length/fs.length*100):0,percExec:fs.length?Math.round(execs.length/fs.length*100):0}
-  },[data])
+  },[viewData])
   const kind=useMemo(()=>tipo.includes('acordos')||tipo.includes('execu')||tipo==='gastos'?'financeiro':tipo.includes('tarefas')||tipo.includes('prazos')||tipo.includes('audiencias')||tipo.includes('reunioes')||tipo.includes('atividades')?'atividades':'processos',[tipo])
   useEffect(()=>{setCampos(defaultFields(kind))},[kind])
 
@@ -167,21 +183,21 @@ export default function Relatorios({profile}){
     let title=REPORTS.find(r=>r.id===tipo)?.nome||'Relatório'
     let rows=[]
     if(kind==='processos'){
-      rows=data.processos.filter(p=>categoria==='todas'||(p.categoria||'trabalhista')===categoria)
+      rows=viewData.processos.filter(p=>categoria==='todas'||(p.categoria||'trabalhista')===categoria)
       if(tipo==='processos_ativos')rows=rows.filter(p=>p.status!=='encerrado'&&p.status!=='arquivado')
       if(tipo==='processos_arquivados')rows=rows.filter(p=>p.status==='encerrado'||p.status==='arquivado'||p.fase==='arquivo_definitivo')
       if(tipo==='sentencas_procedentes')rows=rows.filter(p=>String(p.resultado||'').toLowerCase().includes('proced')&&!String(p.resultado||'').toLowerCase().includes('improced'))
       if(tipo==='sentencas_improcedentes')rows=rows.filter(p=>String(p.resultado||'').toLowerCase().includes('improced'))
       rows=rows.filter(p=>within(p.data_ajuizamento||p.updated_at||p.created_at,inicio,fim))
       if(parteFilter.trim())rows=rows.filter(p=>String(p.parte_contraria||'').toLowerCase().includes(parteFilter.trim().toLowerCase()))
-      rows=rows.map(p=>({...p,__kind:'processo',valor_gasto:totalGastoDoProcesso(p,data.financeiros),valor_economizado:economiaReal(p,data.financeiros)}))
+      rows=rows.map(p=>({...p,__kind:'processo',valor_gasto:totalGastoDoProcesso(p,viewData.financeiros),valor_economizado:economiaReal(p,viewData.financeiros)}))
     } else if(kind==='financeiro'){
-      rows=data.financeiros.filter(f=>!financeiroExcluido(f))
+      rows=viewData.financeiros.filter(f=>!financeiroExcluido(f))
       if(tipo==='acordos')rows=rows.filter(f=>f.natureza==='acordo')
       if(tipo==='execucoes')rows=rows.filter(f=>f.natureza==='execucao')
       rows=rows.filter(f=>itensFinanceiros(f).some(item=>within(item.data,inicio,fim))).map(f=>({...f,__kind:'financeiro',valor_restituido:valorRestituidoFinanceiro(f),total:totalFinanceiro(f)}))
     } else {
-      rows=data.atividades
+      rows=viewData.atividades
       if(tipo==='tarefas')rows=rows.filter(a=>a.tipo==='tarefa')
       if(tipo==='prazos')rows=rows.filter(a=>a.tipo==='prazo_processual')
       if(tipo==='audiencias')rows=rows.filter(a=>a.tipo==='audiencia')
@@ -234,6 +250,7 @@ export default function Relatorios({profile}){
   return <div style={{padding:24}}>
     {mode==='dashboard'?<>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}><div><h1 style={{margin:0,fontSize:22}}>Relatórios</h1><p style={{color:C.muted}}>Dados consolidados e geração de relatórios customizados.</p></div><button onClick={()=>{setMode('gerador');setPreview(null)}} style={{background:C.navy,color:'white',border:0,borderRadius:10,padding:'11px 16px',fontWeight:900,display:'flex',alignItems:'center',gap:8}}><SlidersHorizontal size={16}/>Gerar relatório</button></div>
+      <EmpresaGrupoToggleBar empresas={empresasGrupo} value={empresaVista} onChange={setEmpresaVista}/>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:14,marginTop:18}}><Card title="Processos" value={st.processos} sub={`${st.ativos} ativos · ${st.encerrados} encerrados`} icon={<Scale size={15}/>} color={C.blue}/><Card title="Gasto do mês" value={money(st.totalGasto)} sub={st.mesAtualLabel} icon={<DollarSign size={15}/>} color={C.red}/><Card title={`Acumulado ${st.anoAtual}`} value={money(st.totalAnoAtual)} sub="janeiro até o mês atual" icon={<BarChart3 size={15}/>} color={C.amber}/><Card title={`Total ${st.anoAnterior}`} value={money(st.totalAnoAnterior)} sub="histórico resumido do ano anterior" icon={<DollarSign size={15}/>} color={C.muted}/><Card title="Mês atual vs anterior" value={`${st.variacaoMes>=0?'+':''}${st.variacaoMes.toFixed(1)}%`} sub={`${money(st.gastosMesAtual.total)} vs ${money(st.gastosMesAnterior.total)}`} icon={<BarChart3 size={15}/>} color={st.variacaoMes>0?C.red:st.variacaoMes<0?C.green:C.muted}/><Card title="Atividades" value={st.atividades} sub={`${st.prazos} prazos · ${st.audiencias} audiências`} icon={<CheckSquare size={15}/>} color={C.blue}/></div>
       <section style={{background:C.white,border:'1px solid '+C.border,borderRadius:14,marginTop:20,overflow:'hidden'}}><h2 style={{fontSize:16,margin:0,padding:16,borderBottom:'1px solid '+C.border}}>Gastos do mês e natureza — {st.mesAtualLabel}</h2><div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}><thead><tr style={{background:C.bg,color:C.muted,textAlign:'left'}}><th style={{padding:12}}>Acordo</th><th style={{padding:12}}>Execução</th><th style={{padding:12}}>Seguro-garantia</th><th style={{padding:12}}>Encargos</th><th style={{padding:12}}>Restituicoes</th><th style={{padding:12}}>Total do mês</th></tr></thead><tbody><tr style={{borderTop:'1px solid '+C.border}}><td style={{padding:12}}>{money(st.gastosMesAtual.acordo)}</td><td style={{padding:12}}>{money(st.gastosMesAtual.execucao)}</td><td style={{padding:12}}>{money(st.gastosMesAtual.seguro)}</td><td style={{padding:12}}>{money(st.gastosMesAtual.encargos)}</td><td style={{padding:12,color:C.green}}>{money(st.gastosMesAtual.restituicoes)}</td><td style={{padding:12,fontWeight:900}}>{money(st.gastosMesAtual.total)}</td></tr></tbody></table></div></section>
       <section style={{background:C.white,border:'1px solid '+C.border,borderRadius:14,marginTop:20,overflow:'hidden'}}><h2 style={{fontSize:16,margin:0,padding:16,borderBottom:'1px solid '+C.border}}>Acumulados gerenciais</h2><div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}><thead><tr style={{background:C.bg,color:C.muted,textAlign:'left'}}><th style={{padding:12}}>Período</th><th style={{padding:12}}>Acordo</th><th style={{padding:12}}>Execução</th><th style={{padding:12}}>Seguro-garantia</th><th style={{padding:12}}>Encargos</th><th style={{padding:12}}>Restituicoes</th><th style={{padding:12}}>Total</th></tr></thead><tbody>{[[`Ano atual ${st.anoAtual}`,st.gastosAnoAtual],[`Ano anterior ${st.anoAnterior}`,st.gastosAnoAnterior]].map(([periodo,v])=><tr key={periodo} style={{borderTop:'1px solid '+C.border}}><td style={{padding:12,fontWeight:800}}>{periodo}</td><td style={{padding:12}}>{money(v.acordo)}</td><td style={{padding:12}}>{money(v.execucao)}</td><td style={{padding:12}}>{money(v.seguro)}</td><td style={{padding:12}}>{money(v.encargos)}</td><td style={{padding:12,color:C.green}}>{money(v.restituicoes)}</td><td style={{padding:12,fontWeight:900}}>{money(v.total)}</td></tr>)}</tbody></table></div></section>
@@ -241,6 +258,7 @@ export default function Relatorios({profile}){
     </>:<>
       <button onClick={()=>setMode('dashboard')} style={{border:0,background:'none',color:C.muted,cursor:'pointer',display:'flex',alignItems:'center',gap:6,marginBottom:12}}><ArrowLeft size={16}/>Voltar ao painel de relatórios</button>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}><div><h1 style={{margin:0,fontSize:22}}>Gerar relatório</h1><p style={{color:C.muted}}>Escolha tipo, período e campos. O PDF será gerado pela janela de impressão do navegador.</p></div></div>
+      <EmpresaGrupoToggleBar empresas={empresasGrupo} value={empresaVista} onChange={setEmpresaVista}/>
       <section style={{background:C.white,border:'1px solid '+C.border,borderRadius:14,padding:16,marginTop:14}}>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}><F label="Tipo de relatório"><select style={INP} value={tipo} onChange={e=>{setTipo(e.target.value);setPreview(null)}}>{Object.entries(REPORTS.reduce((a,r)=>{(a[r.grupo]||=[]).push(r);return a},{})).map(([g,rs])=><optgroup key={g} label={g}>{rs.map(r=><option key={r.id} value={r.id}>{r.nome}</option>)}</optgroup>)}</select></F><F label="Data inicial"><input style={INP} type="date" value={inicio} onChange={e=>setInicio(e.target.value)}/></F><F label="Data final"><input style={INP} type="date" value={fim} onChange={e=>setFim(e.target.value)}/></F>{kind==='processos'&&<F label="Categoria"><select style={INP} value={categoria} onChange={e=>setCategoria(e.target.value)}><option value="todas">Todas</option>{Object.entries(CATEGORIAS).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></F>}{kind==='processos'&&<F label="Parte contrária / reclamada"><input style={INP} value={parteFilter} onChange={e=>{setParteFilter(e.target.value);setPreview(null)}} placeholder="Filtrar por empresa…"/></F>}{kind==='atividades'&&<F label="Status"><select style={INP} value={statusAtividade} onChange={e=>setStatusAtividade(e.target.value)}><option value="todos">Todos</option>{Object.entries(STATUS_ATIVIDADE).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></F>}</div>
         <F label="Campos do relatório"><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:8}}>{currentFields.map(([v,l])=><label key={v} style={{display:'flex',gap:8,alignItems:'center',fontSize:13,padding:8,border:'1px solid '+C.border,borderRadius:8,background:campos.includes(v)?C.greenBg:C.white}}><input type="checkbox" checked={campos.includes(v)} onChange={e=>setCampos(e.target.checked?[...campos,v]:campos.filter(c=>c!==v))}/>{l}</label>)}</div></F>

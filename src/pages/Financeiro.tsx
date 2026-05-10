@@ -12,18 +12,28 @@ import {
   Wallet,
 } from "lucide-react";
 import { can, fetchAllRows, supabase } from "@/lib/supabase.js";
+import {
+  CONSOLIDADO_KEY,
+  pickDefaultEmpresaGrupoId,
+  processoPertenceAlgumaEmpresaGrupo,
+  processoPertenceEmpresaGrupo,
+} from "@/lib/empresaGrupoFilter.js";
 import { C } from "@/lib/theme";
+import EmpresaGrupoToggleBar from "@/components/EmpresaGrupoToggleBar.jsx";
 
 type Processo = {
   id: string;
   numero?: string | null;
   titulo?: string | null;
   parte_contraria?: string | null;
+  parte_contraria_id?: string | null;
   categoria?: string | null;
   status?: string | null;
   valor_acao?: number | null;
   transito_julgado?: boolean | null;
 };
+
+type EmpresaGrupoRow = { id: string; nome?: string | null; nome_fantasia?: string | null };
 
 type RegistroFinanceiro = {
   id: string;
@@ -320,6 +330,8 @@ export default function Financeiro({ profile }: { profile: any }) {
     data_fim: "",
     apolice: "todos",
   });
+  const [empresasGrupo, setEmpresasGrupo] = useState<EmpresaGrupoRow[]>([]);
+  const [empresaVista, setEmpresaVista] = useState("");
 
   const canCreate = can(profile, "financeiro.criar");
   const canEdit = can(profile, "financeiro.editar");
@@ -336,7 +348,7 @@ export default function Financeiro({ profile }: { profile: any }) {
         .order("created_at", { ascending: false })),
       fetchAllRows(() => supabase
         .from("processos")
-        .select("id, numero, titulo, parte_contraria, categoria, status, valor_acao, transito_julgado")
+        .select("id, numero, titulo, parte_contraria, parte_contraria_id, categoria, status, valor_acao, transito_julgado")
         .eq("escritorio_id", profile.escritorio_id)
         .order("updated_at", { ascending: false })),
     ]);
@@ -352,6 +364,23 @@ export default function Financeiro({ profile }: { profile: any }) {
     load();
   }, [profile?.escritorio_id]);
 
+  useEffect(() => {
+    if (!profile?.escritorio_id) return;
+    supabase
+      .from("partes_crm")
+      .select("id,nome,nome_fantasia")
+      .eq("escritorio_id", profile.escritorio_id)
+      .eq("tipo", "empresa_grupo")
+      .eq("status", "ativo")
+      .order("nome")
+      .then(({ data }) => setEmpresasGrupo((data || []) as EmpresaGrupoRow[]));
+  }, [profile?.escritorio_id]);
+
+  useEffect(() => {
+    if (!empresasGrupo.length) return;
+    setEmpresaVista((v) => v || pickDefaultEmpresaGrupoId(empresasGrupo));
+  }, [empresasGrupo]);
+
   const processoById = useMemo(() => {
     const map = new Map<string, Processo>();
     processos.forEach((processo) => map.set(processo.id, processo));
@@ -364,6 +393,15 @@ export default function Financeiro({ profile }: { profile: any }) {
     const term = filters.search.trim().toLowerCase();
     return ativos.filter((registro) => {
       const processo = registro.processo_id ? processoById.get(registro.processo_id) : undefined;
+      if (empresasGrupo.length && empresaVista) {
+        if (!registro.processo_id) return false;
+        if (empresaVista === CONSOLIDADO_KEY) {
+          if (!processoPertenceAlgumaEmpresaGrupo(processo, empresasGrupo)) return false;
+        } else {
+          const emp = empresasGrupo.find((e) => String(e.id) === String(empresaVista));
+          if (!processo || !emp || !processoPertenceEmpresaGrupo(processo, emp)) return false;
+        }
+      }
       if (filters.natureza !== "todos" && registro.natureza !== filters.natureza) return false;
       if (filters.status !== "todos" && String(registro.status_pagamento || "pendente") !== filters.status) return false;
       if (filters.categoria !== "todas" && processoCategoria(processo) !== filters.categoria) return false;
@@ -388,7 +426,14 @@ export default function Financeiro({ profile }: { profile: any }) {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [ativos, filters, processoById]);
+  }, [ativos, filters, processoById, empresasGrupo, empresaVista]);
+
+  const processosParaSelect = useMemo(() => {
+    if (!empresasGrupo.length || !empresaVista || empresaVista === CONSOLIDADO_KEY) return processos;
+    const emp = empresasGrupo.find((e) => String(e.id) === String(empresaVista));
+    if (!emp) return processos;
+    return processos.filter((p) => processoPertenceEmpresaGrupo(p, emp));
+  }, [processos, empresasGrupo, empresaVista]);
 
   const resumo = useMemo(() => {
     const total = filtered.reduce((sum, registro) => sum + totalRegistro(registro), 0);
@@ -563,6 +608,8 @@ export default function Financeiro({ profile }: { profile: any }) {
         </div>
       </div>
 
+      <EmpresaGrupoToggleBar empresas={empresasGrupo} value={empresaVista} onChange={setEmpresaVista} />
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 14, marginTop: 22 }}>
         {cards.map((card) => {
           const Icon = card.icon;
@@ -698,7 +745,7 @@ export default function Financeiro({ profile }: { profile: any }) {
               <F label="Processo vinculado">
                 <select required style={INP} value={form.processo_id} onChange={(event) => setForm((old) => ({ ...old, processo_id: event.target.value }))}>
                   <option value="">Selecione</option>
-                  {processos.map((processo) => <option key={processo.id} value={processo.id}>{processoLabel(processo)}</option>)}
+                  {processosParaSelect.map((processo) => <option key={processo.id} value={processo.id}>{processoLabel(processo)}</option>)}
                 </select>
               </F>
               <F label="Natureza">

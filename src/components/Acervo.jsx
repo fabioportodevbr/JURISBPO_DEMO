@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase, can } from '../lib/supabase'
+import { normalizeEmpresaNome, pickDefaultEmpresaGrupoId } from '../lib/empresaGrupoFilter.js'
 import {
   FileText, Send, Plus, Search, Edit2, Trash2, Download,
   ChevronRight, X, Paperclip, Eye, Building2, BookOpen,
-  Check, ChevronDown, ChevronUp, Upload, AlertCircle,
+  Check, ChevronDown, ChevronUp, Upload, AlertCircle, HelpCircle, Archive,
 } from 'lucide-react'
 
 // ── Cores (mesmas do App.jsx) ─────────────────────────────────────────────
@@ -42,6 +44,81 @@ function ultimoOficio(oficios = []) {
 }
 function uniq(values = []) {
   return [...new Set(values.map(v => String(v || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
+
+function nomeEmpresaAcervo(e) {
+  if (!e) return 'Empresa'
+  const f = e.nome_fantasia?.trim()
+  return f || e.nome || 'Empresa'
+}
+
+/** Cruza CRM (empresa do grupo) com linhas antigas de oficios_empresas pelo nome. */
+function nomeLegadoCombinaCrm(crmEmpresa, nomeLegado) {
+  const leg = normalizeEmpresaNome(nomeLegado)
+  if (!leg) return false
+  const nomes = [crmEmpresa?.nome, crmEmpresa?.nome_fantasia].map(normalizeEmpresaNome).filter(Boolean)
+  for (const en of nomes) {
+    if (leg === en) return true
+    const lc = leg.replace(/[^a-z0-9]/g, '')
+    const ec = en.replace(/[^a-z0-9]/g, '')
+    if (lc && ec && lc === ec) return true
+    if (lc.length >= 8 && ec.length >= 8 && (lc.includes(ec) || ec.includes(lc))) return true
+  }
+  return false
+}
+
+async function resolverLegacyOficiosEmpresaId(supabase, crmEmpresa) {
+  if (!crmEmpresa?.id) return null
+  const { data, error } = await supabase.from('oficios_empresas').select('id,nome').order('nome')
+  if (error || !data?.length) return null
+  const hit = data.find((row) => nomeLegadoCombinaCrm(crmEmpresa, row.nome))
+  return hit?.id || null
+}
+
+/** Ofícios do ano: modelo novo (parte_grupo_id + escritório) + legado (empresa_id em oficios_empresas). */
+async function carregarOficiosAnoMesclados(supabase, crmEmpresa, ano, escritorioId, legacyEmpresaId) {
+  const byId = {}
+  const { data: novos } = await supabase.from('oficios').select('*')
+    .eq('parte_grupo_id', crmEmpresa.id)
+    .eq('escritorio_id', escritorioId)
+    .eq('ano', ano)
+    .eq('controle_arquivado', false)
+  ;(novos || []).forEach((o) => { byId[o.id] = o })
+
+  if (legacyEmpresaId) {
+    const { data: leg } = await supabase.from('oficios').select('*')
+      .eq('empresa_id', legacyEmpresaId)
+      .eq('ano', ano)
+      .eq('controle_arquivado', false)
+    ;(leg || []).forEach((o) => {
+      if (!byId[o.id]) byId[o.id] = o
+    })
+  }
+  return Object.values(byId)
+}
+
+/** Mescla CRM + legado para consultas com filtros opcionais de ano e arquivado. */
+async function carregarOficiosConsultaMesclados(supabase, { crmEmpresa, escritorioId, legacyEmpresaId, anoFiltro, apenasArquivados }) {
+  const mergeRows = (rows, into) => {
+    ;(rows || []).forEach((o) => { if (!into[o.id]) into[o.id] = o })
+  }
+  const byId = {}
+  let q1 = supabase.from('oficios').select('*').eq('parte_grupo_id', crmEmpresa.id).eq('escritorio_id', escritorioId)
+  if (anoFiltro != null && anoFiltro !== undefined) q1 = q1.eq('ano', anoFiltro)
+  if (apenasArquivados) q1 = q1.eq('controle_arquivado', true)
+  else q1 = q1.eq('controle_arquivado', false)
+  const { data: d1 } = await q1.order('created_at', { ascending: false })
+  mergeRows(d1, byId)
+
+  if (legacyEmpresaId) {
+    let q2 = supabase.from('oficios').select('*').eq('empresa_id', legacyEmpresaId)
+    if (anoFiltro != null && anoFiltro !== undefined) q2 = q2.eq('ano', anoFiltro)
+    if (apenasArquivados) q2 = q2.eq('controle_arquivado', true)
+    else q2 = q2.eq('controle_arquivado', false)
+    const { data: d2 } = await q2.order('created_at', { ascending: false })
+    mergeRows(d2, byId)
+  }
+  return Object.values(byId).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
 }
 
 // ── Modal base ────────────────────────────────────────────────────────────
@@ -129,7 +206,7 @@ function Field({ label, children, required }) {
 const inp = { width: '100%', padding: '8px 12px', border: '1px solid '+C.border, borderRadius: 8, fontSize: 14, color: C.text, outline: 'none', background: C.white, boxSizing: 'border-box', fontFamily: 'inherit' }
 
 // ── Modal: Novo / Editar Ofício ───────────────────────────────────────────
-function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, onSave, onClose, profile }) {
+function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, onSave, onClose, profile, anoControle }) {
   const isEdit = !!oficio
   const [form, setForm] = useState({
     numero:       oficio?.numero       || numeroSugerido || '',
@@ -171,7 +248,11 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
   }
 
   async function addDestinatario(nome) {
-    await supabase.from('oficios_destinatarios').insert({ empresa_id: empresa.id, nome })
+    await supabase.from('oficios_destinatarios').insert({
+      parte_grupo_id: empresa.id,
+      escritorio_id: profile?.escritorio_id,
+      nome,
+    })
     setDestOpts(prev => [...prev, nome].sort())
   }
   function addLocalOption(key, nome) {
@@ -183,7 +264,18 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
     if (!form.numero || !form.destinatario || !form.data) { setErr('Preencha Número, Destinatário e Data.'); return }
     setSaving(true)
     try {
-      const payload = { ...form, empresa_id: empresa.id, ano: new Date(form.data).getFullYear(), updated_at: new Date().toISOString(), updated_by: profile?.id, updated_by_nome: profile?.nome || profile?.email }
+      const anoDoc = isEdit ? (oficio.ano ?? new Date(oficio.data).getFullYear()) : anoControle
+      const payload = {
+        ...form,
+        empresa_id: null,
+        parte_grupo_id: empresa.id,
+        escritorio_id: profile?.escritorio_id,
+        ano: anoDoc,
+        controle_arquivado: false,
+        updated_at: new Date().toISOString(),
+        updated_by: profile?.id,
+        updated_by_nome: profile?.nome || profile?.email,
+      }
       let ofId = oficio?.id, action = 'editado'
       if (isEdit) {
         await supabase.from('oficios').update(payload).eq('id', oficio.id)
@@ -192,7 +284,17 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
         const { data } = await supabase.from('oficios').insert(payload).select().single()
         ofId = data.id; action = 'criado'
       }
-      await supabase.from('oficios_auditoria').insert({ oficio_id: ofId, empresa_id: empresa.id, numero_oficio: form.numero, acao: action, usuario_id: profile?.id, usuario_nome: profile?.nome || profile?.email, dados_json: payload })
+      await supabase.from('oficios_auditoria').insert({
+        oficio_id: ofId,
+        empresa_id: empresa.id,
+        parte_grupo_id: empresa.id,
+        escritorio_id: profile?.escritorio_id,
+        numero_oficio: form.numero,
+        acao: action,
+        usuario_id: profile?.id,
+        usuario_nome: profile?.nome || profile?.email,
+        dados_json: payload,
+      })
       for (const file of files) {
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader()
@@ -216,7 +318,7 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
   }
 
   return (
-    <Modal title={isEdit ? `Editar — ${oficio.numero}` : `Novo Ofício — ${empresa.nome}`} onClose={onClose}>
+    <Modal title={isEdit ? `Editar — ${oficio.numero}` : `Novo Ofício — ${nomeEmpresaAcervo(empresa)}`} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Número" required><input style={inp} value={form.numero} onChange={e => set('numero', e.target.value)} placeholder="ex: 124/2026" /></Field>
@@ -331,7 +433,7 @@ function AnexosOficioModal({ oficio, onClose }) {
 }
 
 // ── Modal: Consultar Todos ────────────────────────────────────────────────
-function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit }) {
+function ConsultarModal({ empresa, escritorioId, legacyEmpresaId, onClose, profile, onEdit, canEdit, readOnly, anoFiltro, apenasArquivados }) {
   const [oficios, setOficios] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -341,9 +443,15 @@ function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('oficios').select('*').eq('empresa_id', empresa.id).order('created_at', { ascending: false })
-    setOficios(data || []); setLoading(false)
-  }, [empresa.id])
+    const merged = await carregarOficiosConsultaMesclados(supabase, {
+      crmEmpresa: empresa,
+      escritorioId,
+      legacyEmpresaId,
+      anoFiltro,
+      apenasArquivados,
+    })
+    setOficios(merged); setLoading(false)
+  }, [empresa, escritorioId, legacyEmpresaId, anoFiltro, apenasArquivados])
   useEffect(() => { fetchAll() }, [fetchAll])
 
   async function selectOficio(of) {
@@ -357,8 +465,9 @@ function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit }) {
 
   const filtered = oficios.filter(o => (o.numero + o.destinatario + o.referencia + o.responsavel + o.departamento).toLowerCase().includes(search.toLowerCase()))
 
+  const tituloBase = readOnly && anoFiltro != null ? `Arquivo ${anoFiltro} — ${nomeEmpresaAcervo(empresa)}` : `Todos os Ofícios — ${nomeEmpresaAcervo(empresa)}`
   return (
-    <Modal title={`Todos os Ofícios — ${empresa.nome}`} onClose={onClose} wide>
+    <Modal title={tituloBase} onClose={onClose} wide>
       <div style={{ display: 'flex', gap: 20, minHeight: 440 }}>
         <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ position: 'relative' }}>
@@ -387,7 +496,7 @@ function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit }) {
           ) : (<>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: C.primary }}>{selected.numero}</span>
-              {canEdit && <button onClick={() => { onEdit(selected); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Edit2 size={13} />Editar</button>}
+              {canEdit && !readOnly && <button onClick={() => { onEdit(selected); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}><Edit2 size={13} />Editar</button>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[['Data', fmtDate(selected.data)], ['Departamento', selected.departamento], ['Responsável', selected.responsavel], ['Remetente', selected.remetente], ['Forma de Envio', selected.forma_envio], ['Arquivado', selected.arquivado]].map(([k, v]) => (
@@ -417,26 +526,36 @@ function ConsultarModal({ empresa, onClose, profile, onEdit, canEdit }) {
   )
 }
 
-// ── Modal: Nova Empresa ───────────────────────────────────────────────────
-function NovaEmpresaModal({ onSave, onClose }) {
-  const [nome, setNome] = useState('')
-  const [saving, setSaving] = useState(false)
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!nome.trim()) return
-    setSaving(true)
-    await supabase.from('oficios_empresas').insert({ nome: nome.trim() })
-    onSave(); setSaving(false)
-  }
+// ── Modal: Lista anos arquivados (escolhe ano para ver só leitura) ─────────
+function AnosArquivadosModal({ empresa, escritorioId, legacyEmpresaId, onClose, onPickAno }) {
+  const [anos, setAnos] = useState([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    ;(async () => {
+      const s = new Set()
+      const { data: d1 } = await supabase.from('oficios').select('ano').eq('parte_grupo_id', empresa.id).eq('escritorio_id', escritorioId).eq('controle_arquivado', true)
+      ;(d1 || []).forEach((r) => { if (r.ano != null) s.add(r.ano) })
+      if (legacyEmpresaId) {
+        const { data: d2 } = await supabase.from('oficios').select('ano').eq('empresa_id', legacyEmpresaId).eq('controle_arquivado', true)
+        ;(d2 || []).forEach((r) => { if (r.ano != null) s.add(r.ano) })
+      }
+      setAnos([...s].sort((a, b) => b - a))
+      setLoading(false)
+    })()
+  }, [empresa.id, escritorioId, legacyEmpresaId])
   return (
-    <Modal title="Novo Controle de Ofícios" onClose={onClose}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Field label="Nome da empresa / contrato" required><input autoFocus style={inp} value={nome} onChange={e => setNome(e.target.value)} placeholder="ex: NOVA EMPRESA LTDA" /></Field>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button type="button" onClick={onClose} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
-          <button type="submit" disabled={saving} style={{ padding: '8px 20px', border: 'none', borderRadius: 8, background: C.primary, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>{saving ? 'Criando...' : 'Criar'}</button>
-        </div>
-      </form>
+    <Modal title={`Controles arquivados — ${nomeEmpresaAcervo(empresa)}`} onClose={onClose}>
+      <p style={{ fontSize: 13, color: C.muted, margin: '0 0 14px' }}>Selecione o ano para consultar os ofícios arquivados (somente leitura).</p>
+      {loading ? <p style={{ color: C.muted }}>Carregando...</p>
+        : anos.length === 0 ? <p style={{ color: C.muted }}>Nenhum controle arquivado para esta empresa.</p>
+        : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {anos.map(ano => (
+            <button key={ano} type="button" onClick={() => onPickAno(ano)}
+              style={{ textAlign: 'left', padding: '12px 16px', borderRadius: 10, border: '1px solid ' + C.border, background: C.white, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: C.primary, fontFamily: 'inherit' }}>
+              Ano {ano}
+            </button>
+          ))}
+        </div>}
     </Modal>
   )
 }
@@ -547,6 +666,7 @@ function ModeloUploadModal({ profile, onSave, onClose }) {
 }
 
 export default function Acervo({ profile }) {
+  const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState('oficios')
   const [modelos, setModelos] = useState([])
   const [loadingModelos, setLoadingModelos] = useState(true)
@@ -554,13 +674,17 @@ export default function Acervo({ profile }) {
   const [showUploadModelo, setShowUploadModelo] = useState(false)
   const [empresas, setEmpresas] = useState([])
   const [selectedEmpresa, setSelectedEmpresa] = useState(null)
+  const [anoVigente, setAnoVigente] = useState(() => new Date().getFullYear())
   const [oficiosList, setOficiosList] = useState([])
   const [destinatarios, setDestinatarios] = useState([])
   const [opcoesOficios, setOpcoesOficios] = useState({ departamentos: [], responsaveis: [], remetentes: [], formasEnvio: [] })
   const [loadingOficios, setLoadingOficios] = useState(false)
   const [showNovoOficio, setShowNovoOficio] = useState(false)
   const [showConsultar, setShowConsultar] = useState(false)
-  const [showNovaEmpresa, setShowNovaEmpresa] = useState(false)
+  const [showHelpNovaEmpresa, setShowHelpNovaEmpresa] = useState(false)
+  const [showEncerrarModal, setShowEncerrarModal] = useState(false)
+  const [showAnosArquivados, setShowAnosArquivados] = useState(false)
+  const [consultarArquivadoAno, setConsultarArquivadoAno] = useState(null)
   const [editingOficio, setEditingOficio] = useState(null)
   const [anexosOficio, setAnexosOficio] = useState(null)
   const [sortCol, setSortCol] = useState('numero')
@@ -577,42 +701,142 @@ export default function Acervo({ profile }) {
   useEffect(() => { fetchModelos() }, [fetchModelos])
 
   useEffect(() => {
-    supabase.from('oficios_empresas').select('*').order('nome').then(({ data }) => {
-      setEmpresas(data || [])
-      if (data?.length && !selectedEmpresa) setSelectedEmpresa(data[0])
-    })
-  }, [])
-
-  const fetchOficios = useCallback(async (empresa) => {
-    if (!empresa) return
-    setLoadingOficios(true)
-    const { data } = await supabase.from('oficios').select('*').eq('empresa_id', empresa.id).eq('ano', new Date().getFullYear())
-    setOficiosList(data || []); setLoadingOficios(false)
-  }, [])
-
-  const fetchOpcoesOficios = useCallback(async (empresa) => {
-    if (!empresa) return
-    const { data } = await supabase.from('oficios').select('departamento,responsavel,remetente,forma_envio').eq('empresa_id', empresa.id)
-    setOpcoesOficios({
-      departamentos: uniq((data || []).map(x => x.departamento)),
-      responsaveis: uniq((data || []).map(x => x.responsavel)),
-      remetentes: uniq((data || []).map(x => x.remetente)),
-      formasEnvio: uniq((data || []).map(x => x.forma_envio)),
-    })
-  }, [])
+    if (!profile?.escritorio_id) return
+    supabase.from('partes_crm').select('id,nome,nome_fantasia').eq('escritorio_id', profile.escritorio_id).eq('tipo', 'empresa_grupo').eq('status', 'ativo').order('nome')
+      .then(({ data }) => {
+        const list = data || []
+        setEmpresas(list)
+        setSelectedEmpresa(prev => {
+          if (prev && list.some(x => x.id === prev.id)) return prev
+          if (!list.length) return null
+          const preferId = pickDefaultEmpresaGrupoId(list)
+          return list.find(x => String(x.id) === String(preferId)) || list[0]
+        })
+      })
+  }, [profile?.escritorio_id])
 
   useEffect(() => {
-    if (!selectedEmpresa) return
-    fetchOficios(selectedEmpresa)
-    fetchOpcoesOficios(selectedEmpresa)
-    supabase.from('oficios_destinatarios').select('*').eq('empresa_id', selectedEmpresa.id).order('nome').then(({ data }) => setDestinatarios(data || []))
-  }, [selectedEmpresa, fetchOficios, fetchOpcoesOficios])
+    if (!selectedEmpresa?.id || !profile?.escritorio_id) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase.from('oficios_controle_ano').select('ano_vigente').eq('escritorio_id', profile.escritorio_id).eq('parte_grupo_id', selectedEmpresa.id).maybeSingle()
+      if (cancelled) return
+      const cy = new Date().getFullYear()
+      setAnoVigente(typeof data?.ano_vigente === 'number' ? data.ano_vigente : cy)
+    })()
+    return () => { cancelled = true }
+  }, [selectedEmpresa?.id, profile?.escritorio_id])
+
+  useEffect(() => {
+    setConsultarArquivadoAno(null)
+    setShowAnosArquivados(false)
+    setShowHelpNovaEmpresa(false)
+  }, [selectedEmpresa?.id])
+
+  const [legacyOficiosEmpresaId, setLegacyOficiosEmpresaId] = useState(null)
+
+  useEffect(() => {
+    if (!selectedEmpresa) {
+      setLegacyOficiosEmpresaId(null)
+      return
+    }
+    let cancelled = false
+    resolverLegacyOficiosEmpresaId(supabase, selectedEmpresa).then((id) => {
+      if (!cancelled) setLegacyOficiosEmpresaId(id)
+    })
+    return () => { cancelled = true }
+  }, [selectedEmpresa])
+
+  const refreshOficiosPainel = useCallback(async () => {
+    if (!selectedEmpresa || !profile?.escritorio_id || !anoVigente) return
+    setLoadingOficios(true)
+    try {
+      const rows = await carregarOficiosAnoMesclados(supabase, selectedEmpresa, anoVigente, profile.escritorio_id, legacyOficiosEmpresaId)
+      setOficiosList(rows)
+      setOpcoesOficios({
+        departamentos: uniq(rows.map(x => x.departamento)),
+        responsaveis: uniq(rows.map(x => x.responsavel)),
+        remetentes: uniq(rows.map(x => x.remetente)),
+        formasEnvio: uniq(rows.map(x => x.forma_envio)),
+      })
+    } finally {
+      setLoadingOficios(false)
+    }
+  }, [selectedEmpresa, anoVigente, profile?.escritorio_id, legacyOficiosEmpresaId])
+
+  useEffect(() => {
+    refreshOficiosPainel()
+  }, [refreshOficiosPainel])
+
+  useEffect(() => {
+    if (!selectedEmpresa || !profile?.escritorio_id) return
+    ;(async () => {
+      const { data: d1 } = await supabase.from('oficios_destinatarios').select('*').eq('parte_grupo_id', selectedEmpresa.id).eq('escritorio_id', profile.escritorio_id).order('nome')
+      let list = d1 || []
+      if (legacyOficiosEmpresaId) {
+        const { data: d2 } = await supabase.from('oficios_destinatarios').select('*').eq('empresa_id', legacyOficiosEmpresaId).order('nome')
+        const seen = new Set(list.map(x => String(x.nome || '').toLowerCase()))
+        ;(d2 || []).forEach((x) => {
+          const k = String(x.nome || '').toLowerCase()
+          if (k && !seen.has(k)) { seen.add(k); list.push(x) }
+        })
+      }
+      list.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'))
+      setDestinatarios(list)
+    })()
+  }, [selectedEmpresa, profile?.escritorio_id, legacyOficiosEmpresaId])
 
   function nextNumero() {
-    const year = new Date().getFullYear()
     const nums = oficiosList.map(o => numSeq(o.numero)).filter(n => !isNaN(n))
     const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
-    return `${String(next).padStart(3, '0')}/${year}`
+    return `${String(next).padStart(3, '0')}/${anoVigente}`
+  }
+
+  async function confirmEncerrarControleAnual() {
+    if (!canEdit) {
+      alert('Apenas usuários com permissão para incluir ou editar documentos podem arquivar o controle anual.')
+      setShowEncerrarModal(false)
+      return
+    }
+    if (!selectedEmpresa || !profile?.escritorio_id || !anoVigente) return
+    const y = anoVigente
+    const { error: upErr } = await supabase.from('oficios').update({ controle_arquivado: true })
+      .eq('parte_grupo_id', selectedEmpresa.id)
+      .eq('escritorio_id', profile.escritorio_id)
+      .eq('ano', y)
+      .eq('controle_arquivado', false)
+    if (upErr) {
+      alert('Erro ao arquivar: ' + upErr.message)
+      setShowEncerrarModal(false)
+      return
+    }
+    if (legacyOficiosEmpresaId) {
+      const { error: legErr } = await supabase.from('oficios').update({ controle_arquivado: true })
+        .eq('empresa_id', legacyOficiosEmpresaId)
+        .eq('ano', y)
+        .eq('controle_arquivado', false)
+      if (legErr) console.warn('Arquivo legado:', legErr.message)
+    }
+    const prox = y + 1
+    const { error: cfgErr } = await supabase.from('oficios_controle_ano').upsert({
+      escritorio_id: profile.escritorio_id,
+      parte_grupo_id: selectedEmpresa.id,
+      ano_vigente: prox,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'escritorio_id,parte_grupo_id' })
+    if (cfgErr) {
+      alert('Ofícios arquivados, mas falhou ao registrar o novo ano vigente: ' + cfgErr.message)
+    }
+    setAnoVigente(prox)
+    setShowEncerrarModal(false)
+    const rows = await carregarOficiosAnoMesclados(supabase, selectedEmpresa, prox, profile.escritorio_id, legacyOficiosEmpresaId)
+    setOficiosList(rows)
+    setOpcoesOficios({
+      departamentos: uniq(rows.map(x => x.departamento)),
+      responsaveis: uniq(rows.map(x => x.responsavel)),
+      remetentes: uniq(rows.map(x => x.remetente)),
+      formasEnvio: uniq(rows.map(x => x.forma_envio)),
+    })
   }
 
   async function excluirModelo(id) {
@@ -660,7 +884,7 @@ export default function Acervo({ profile }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `oficios_${String(selectedEmpresa?.nome || 'acervo').replace(/\s+/g,'_')}_${new Date().getFullYear()}.csv`
+    a.download = `oficios_${String(nomeEmpresaAcervo(selectedEmpresa)).replace(/\s+/g,'_')}_${anoVigente}.csv`
     document.body.appendChild(a); a.click()
     document.body.removeChild(a); URL.revokeObjectURL(url)
   }
@@ -756,7 +980,7 @@ export default function Acervo({ profile }) {
       {/* ── OFÍCIOS ── */}
       {activeSection === 'oficios' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Seletor empresa */}
+          {/* Seletor empresa (Partes / CRM — empresas do grupo) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', gap: 4, background: C.bg, border: '1px solid ' + C.border, borderRadius: 10, padding: 4 }}>
               {empresas.map(emp => {
@@ -764,26 +988,49 @@ export default function Acervo({ profile }) {
                 return (
                   <button key={emp.id} onClick={() => setSelectedEmpresa(emp)}
                     style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: sel ? 700 : 400, background: sel ? C.white : 'transparent', color: sel ? C.primary : C.muted, boxShadow: sel ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', fontFamily: 'inherit' }}>
-                    <Building2 size={13} />{emp.nome}
+                    <Building2 size={13} />{nomeEmpresaAcervo(emp)}
                   </button>
                 )
               })}
             </div>
-            {canEdit && <button onClick={() => setShowNovaEmpresa(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px dashed ' + C.border, borderRadius: 8, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
-              <Plus size={13} />Nova empresa
-            </button>}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button type="button" onClick={() => navigate('/partes')}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px dashed ' + C.border, borderRadius: 8, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
+                <Plus size={13} />Nova empresa
+              </button>
+              <button type="button" aria-label="Ajuda sobre cadastro de empresas" title="Ajuda"
+                onClick={() => setShowHelpNovaEmpresa(h => !h)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.primary, cursor: 'pointer' }}>
+                <HelpCircle size={18} />
+              </button>
+              {showHelpNovaEmpresa && (
+                <div style={{ position: 'absolute', left: 0, top: '100%', marginTop: 8, zIndex: 50, maxWidth: 360, padding: '12px 14px', background: C.white, border: '1px solid ' + C.border, borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.12)', fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+                  Para incluir o controle de ofícios de <strong>outra empresa</strong>, cadastre-a antes em <strong>Partes / CRM</strong>, escolhendo o tipo <strong>Empresa do grupo</strong>. Depois ela aparecerá automaticamente nestes botões.
+                  <button type="button" onClick={() => setShowHelpNovaEmpresa(false)} style={{ marginTop: 10, border: 'none', background: 'none', color: C.primary, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', padding: 0 }}>Fechar</button>
+                </div>
+              )}
+            </div>
           </div>
+
+          {!empresas.length && (
+            <div style={{ padding: '20px 18px', background: C.white, border: '1px solid ' + C.border, borderRadius: 12, fontSize: 14, color: C.muted }}>
+              Nenhuma <strong>empresa do grupo</strong> cadastrada. Acesse <strong>Partes / CRM</strong> e inclua pelo menos uma empresa com esse tipo para usar o controle de ofícios.
+            </div>
+          )}
 
           {selectedEmpresa && (<>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <h2 style={{ fontSize: 19, fontWeight: 800, color: C.text, margin: 0 }}>Controle de Ofícios — {selectedEmpresa.nome}</h2>
+                <h2 style={{ fontSize: 19, fontWeight: 800, color: C.text, margin: 0 }}>Controle de Ofícios — {nomeEmpresaAcervo(selectedEmpresa)}</h2>
                 <p style={{ fontSize: 13, color: C.muted, margin: '4px 0 0' }}>
-                  Ano {new Date().getFullYear()} · {oficiosList.length} ofício(s) · Próximo: <strong style={{ color: C.primary }}>{nextNumero()}</strong>
+                  Ano <strong style={{ color: C.text }}>{anoVigente}</strong> · {oficiosList.length} ofício(s) · Próximo: <strong style={{ color: C.primary }}>{nextNumero()}</strong>
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setShowAnosArquivados(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
+                  <Archive size={14} />Controles arquivados
+                </button>
                 <button onClick={() => setShowConsultar(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
                   <Eye size={14} />Consultar todos
@@ -837,7 +1084,7 @@ export default function Acervo({ profile }) {
                   </thead>
                   <tbody>
                     {loadingOficios ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Carregando...</td></tr>
-                      : sortedOficios.length === 0 ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum ofício registrado em {new Date().getFullYear()}.</td></tr>
+                      : sortedOficios.length === 0 ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: C.muted }}>Nenhum ofício registrado em {anoVigente}.</td></tr>
                       : sortedOficios.map((of, i) => (
                       <tr key={of.id} style={{ borderTop: i === 0 ? 'none' : '1px solid ' + C.border }}
                         onMouseEnter={e => e.currentTarget.style.background = C.bg}
@@ -875,6 +1122,12 @@ export default function Acervo({ profile }) {
                   </tbody>
                 </table>
               </div>
+              <div style={{ padding: '14px 16px', borderTop: '1px solid ' + C.border, background: C.bg, display: 'flex', justifyContent: 'center' }}>
+                <button type="button" onClick={() => setShowEncerrarModal(true)}
+                  style={{ padding: '10px 18px', border: '1px solid ' + C.amber, borderRadius: 8, background: C.white, color: C.warning, cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
+                  Encerrar o controle de ofícios de {anoVigente}
+                </button>
+              </div>
             </div>
           </>)}
         </div>
@@ -883,22 +1136,47 @@ export default function Acervo({ profile }) {
       {/* Modais */}
       {showTodosModelos && <TodosModelosModal modelos={modelos} onClose={() => setShowTodosModelos(false)} />}
       {showUploadModelo && <ModeloUploadModal profile={profile} onSave={() => { setShowUploadModelo(false); fetchModelos() }} onClose={() => setShowUploadModelo(false)} />}
-      {showNovoOficio && selectedEmpresa && (
-        <OficioModal oficio={editingOficio} empresa={selectedEmpresa} destinatarios={destinatarios} opcoes={opcoesOficios} numeroSugerido={nextNumero()} profile={profile}
-          onSave={() => { setShowNovoOficio(false); setEditingOficio(null); fetchOficios(selectedEmpresa); fetchOpcoesOficios(selectedEmpresa); supabase.from('oficios_destinatarios').select('*').eq('empresa_id', selectedEmpresa.id).order('nome').then(({ data }) => setDestinatarios(data || [])) }}
+      {showNovoOficio && selectedEmpresa && profile?.escritorio_id && (
+        <OficioModal oficio={editingOficio} empresa={selectedEmpresa} destinatarios={destinatarios} opcoes={opcoesOficios} numeroSugerido={nextNumero()} profile={profile} anoControle={anoVigente}
+          onSave={() => {
+            setShowNovoOficio(false); setEditingOficio(null)
+            refreshOficiosPainel()
+            supabase.from('oficios_destinatarios').select('*').eq('parte_grupo_id', selectedEmpresa.id).eq('escritorio_id', profile.escritorio_id).order('nome').then(({ data }) => setDestinatarios(data || []))
+          }}
           onClose={() => { setShowNovoOficio(false); setEditingOficio(null) }} />
       )}
-      {showConsultar && selectedEmpresa && (
-        <ConsultarModal empresa={selectedEmpresa} profile={profile} canEdit={canEdit}
+      {showConsultar && selectedEmpresa && profile?.escritorio_id && (
+        <ConsultarModal empresa={selectedEmpresa} escritorioId={profile.escritorio_id} legacyEmpresaId={legacyOficiosEmpresaId} profile={profile} canEdit={canEdit} readOnly={false}
           onClose={() => setShowConsultar(false)}
           onEdit={of => { setEditingOficio(of); setShowNovoOficio(true) }} />
       )}
-      {anexosOficio && <AnexosOficioModal oficio={anexosOficio} onClose={() => setAnexosOficio(null)} />}
-      {showNovaEmpresa && (
-        <NovaEmpresaModal
-          onSave={() => { setShowNovaEmpresa(false); supabase.from('oficios_empresas').select('*').order('nome').then(({ data }) => setEmpresas(data || [])) }}
-          onClose={() => setShowNovaEmpresa(false)} />
+      {consultarArquivadoAno != null && selectedEmpresa && profile?.escritorio_id && (
+        <ConsultarModal empresa={selectedEmpresa} escritorioId={profile.escritorio_id} legacyEmpresaId={legacyOficiosEmpresaId} profile={profile} canEdit={false} readOnly apenasArquivados anoFiltro={consultarArquivadoAno}
+          onClose={() => setConsultarArquivadoAno(null)}
+          onEdit={() => {}} />
       )}
+      {showAnosArquivados && selectedEmpresa && profile?.escritorio_id && (
+        <AnosArquivadosModal empresa={selectedEmpresa} escritorioId={profile.escritorio_id} legacyEmpresaId={legacyOficiosEmpresaId} onClose={() => setShowAnosArquivados(false)}
+          onPickAno={(ano) => { setShowAnosArquivados(false); setConsultarArquivadoAno(ano) }} />
+      )}
+      {showEncerrarModal && selectedEmpresa && (
+        <Modal title={`Encerrar controle de ofícios de ${anoVigente}`} onClose={() => setShowEncerrarModal(false)}>
+          <p style={{ fontSize: 14, color: C.text, lineHeight: 1.55, margin: '0 0 12px' }}>
+            O controle do ano <strong>{anoVigente}</strong> será <strong>arquivado</strong>. Os registros passarão para <strong>Controles arquivados</strong>, em modo somente leitura.
+          </p>
+          <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.55, margin: '0 0 18px' }}>
+            Em seguida abriremos automaticamente o controle do ano <strong>{anoVigente + 1}</strong>, com numeração reiniciada para novos documentos.
+          </p>
+          {!canEdit && (
+            <p style={{ fontSize: 13, color: C.danger, margin: '0 0 14px' }}>Seu perfil não tem permissão para arquivar; somente usuários autorizados conseguem confirmar.</p>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => setShowEncerrarModal(false)} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
+            <button type="button" onClick={confirmEncerrarControleAnual} style={{ padding: '8px 18px', border: 'none', borderRadius: 8, background: C.navy, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>Confirmar arquivamento</button>
+          </div>
+        </Modal>
+      )}
+      {anexosOficio && <AnexosOficioModal oficio={anexosOficio} onClose={() => setAnexosOficio(null)} />}
     </div>
   )
 }
