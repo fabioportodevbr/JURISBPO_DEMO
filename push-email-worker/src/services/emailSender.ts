@@ -3,63 +3,92 @@ import dns from 'dns/promises'
 import { ComplianceDbConfig } from '../types.js'
 
 // ---------------------------------------------------------------------------
-// Criação de transporter por configuração
-// O worker cria um transporter por ciclo (não singleton) para suportar
-// múltiplos escritórios com configs distintas.
+// Envio via Resend (HTTP API — funciona em Railway, sem SMTP bloqueado)
+// Configurar a variável de ambiente RESEND_API_KEY no Railway.
+// Docs: https://resend.com/docs/api-reference/emails/send-email
 // ---------------------------------------------------------------------------
 
-/**
- * Resolve o host SMTP para um endereço IPv4 explicitamente.
- * Railway (e alguns provedores) não têm roteamento IPv6 — se o DNS retornar
- * um AAAA record, a conexão falha com ENETUNREACH.
- * Usar dns.resolve4() garante que só registros A (IPv4) sejam usados.
- */
+async function sendViaResend(
+  opts: { to: string; subject: string; html: string; replyTo?: string },
+  cfg: ComplianceDbConfig,
+  apiKey: string
+): Promise<void> {
+  const from = cfg.smtpFromName
+    ? `${cfg.smtpFromName} <${cfg.smtpFromEmail}>`
+    : cfg.smtpFromEmail
+
+  const body = {
+    from,
+    to:       [opts.to],
+    subject:  opts.subject,
+    html:     opts.html,
+    reply_to: opts.replyTo ?? cfg.smtpFromEmail,
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText)
+    throw new Error(`Resend API ${res.status}: ${detail}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fallback: SMTP via nodemailer (pode não funcionar em Railway)
+// ---------------------------------------------------------------------------
+
 async function resolveToIPv4(host: string): Promise<string> {
   try {
     const addresses = await dns.resolve4(host)
-    if (addresses.length > 0) {
-      return addresses[0]
-    }
-  } catch {
-    // Se a resolução IPv4 falhar, tenta usar o hostname direto
-  }
+    if (addresses.length > 0) return addresses[0]
+  } catch { /* usa hostname direto */ }
   return host
 }
 
-async function createTransporter(cfg: ComplianceDbConfig): Promise<nodemailer.Transporter> {
+async function createSmtpTransporter(cfg: ComplianceDbConfig): Promise<nodemailer.Transporter> {
   if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPassword) {
-    throw new Error(
-      '[compliance-smtp] SMTP não configurado para o escritório ' + cfg.escritorioId
-    )
+    throw new Error('[compliance-smtp] SMTP não configurado para o escritório ' + cfg.escritorioId)
   }
   const resolvedHost = await resolveToIPv4(cfg.smtpHost)
   return nodemailer.createTransport({
-    host: resolvedHost,
-    port: cfg.smtpPort,
+    host:   resolvedHost,
+    port:   cfg.smtpPort,
     secure: cfg.smtpSecure,
-    auth: {
-      user: cfg.smtpUser,
-      pass: cfg.smtpPassword,
-    },
-    tls: {
-      rejectUnauthorized: false, // compatibilidade com certificados self-signed / Railway
-      servername: cfg.smtpHost,  // envia o SNI correto (smtp.gmail.com) mesmo usando IP
-    },
+    auth:   { user: cfg.smtpUser, pass: cfg.smtpPassword },
+    tls:    { rejectUnauthorized: false, servername: cfg.smtpHost },
   })
 }
+
+// ---------------------------------------------------------------------------
+// Função principal: usa Resend se RESEND_API_KEY estiver definido,
+// caso contrário tenta SMTP direto.
+// ---------------------------------------------------------------------------
 
 export async function sendEmail(
   opts: { to: string; subject: string; html: string; replyTo?: string },
   cfg: ComplianceDbConfig
 ): Promise<void> {
-  const t = await createTransporter(cfg)
-  await t.sendMail({
-    from:    `"${cfg.smtpFromName}" <${cfg.smtpFromEmail}>`,
-    to:      opts.to,
-    subject: opts.subject,
-    html:    opts.html,
-    replyTo: opts.replyTo ?? cfg.smtpFromEmail,
-  })
+  const resendKey = process.env.RESEND_API_KEY?.trim()
+
+  if (resendKey) {
+    await sendViaResend(opts, cfg, resendKey)
+  } else {
+    const t = await createSmtpTransporter(cfg)
+    await t.sendMail({
+      from:    `"${cfg.smtpFromName}" <${cfg.smtpFromEmail}>`,
+      to:      opts.to,
+      subject: opts.subject,
+      html:    opts.html,
+      replyTo: opts.replyTo ?? cfg.smtpFromEmail,
+    })
+  }
 }
 
 /** HTML da auto-resposta de protocolo enviada ao denunciante */
