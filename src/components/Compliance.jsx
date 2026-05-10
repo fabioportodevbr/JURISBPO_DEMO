@@ -737,6 +737,7 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
   const [mensagens, setMensagens]   = useState([])
   const [loadingMsgs, setLoadingMsgs] = useState(true)
   const [saving, setSaving]         = useState(false)
+  const [sancaoEmail, setSancaoEmail] = useState('')   // e-mail do destinatário da notificação de sanção
   const [composerPreset, setComposerPreset] = useState(null)
   const composerRef = useRef(null)
   const [editData, setEditData]     = useState({
@@ -792,6 +793,33 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
       .eq('id', denuncia.id)
       .select('*')
       .single()
+
+    // Se há sanção + e-mail + mensagem, envia notificação como diligência e registra no histórico
+    if (!error && editData.sancao_tipo && sancaoEmail.trim() && editData.sancao_mensagem.trim()) {
+      const SANCAO_SETOR = {
+        feedback:                 'Setor competente (Feedback)',
+        advertencia:              'Setor competente (Advertência)',
+        suspensao:                'Setor competente (Suspensão)',
+        desligamento_justa_causa: 'Departamento de Pessoal (Desligamento JC)',
+      }
+      const setorLabel = SANCAO_SETOR[editData.sancao_tipo] || editData.sancao_tipo
+      await supabase.from('compliance_mensagens').insert({
+        denuncia_id:      denuncia.id,
+        escritorio_id:    denuncia.escritorio_id,
+        tipo:             'diligencia',
+        para_email:       sancaoEmail.trim(),
+        para_exibicao:    `Setor: ${setorLabel}`,
+        assunto:          `Aplicação de Sanção — ${denuncia.numero}`,
+        corpo:            editData.sancao_mensagem.trim(),
+        setor_acionado:   setorLabel,
+        enviado_por_nome: profile.nome,
+        enviado_por_id:   profile.id,
+        status_envio:     'pendente',
+      })
+      setSancaoEmail('')
+      fetchMensagens()   // atualiza o badge e a aba Mensagens
+    }
+
     setSaving(false)
     if (!error && data) { setDenuncia(data); onUpdated(data) }
   }
@@ -944,22 +972,56 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
                     </label>
                   ))}
 
-                  {/* Campo de mensagem — aparece ao selecionar qualquer sanção */}
+                  {/* Campos de mensagem e e-mail — aparecem ao selecionar qualquer sanção */}
                   {editData.sancao_tipo && (
                     <div style={{ marginTop: 4, padding: '10px 12px', background: C.soft, borderRadius: 8,
-                      border: '1px solid ' + C.border }}>
-                      <label style={{ ...LBL, marginBottom: 6 }}>
-                        Mensagem ao setor / departamento competente
-                        <span style={{ color: C.muted, fontWeight: 400, marginLeft: 4 }}>(preenchimento livre)</span>
-                      </label>
-                      <textarea
-                        style={{ ...INP, height: 90, resize: 'vertical', fontFamily: 'inherit' }}
-                        value={editData.sancao_mensagem}
-                        onChange={e => setEditData(p => ({ ...p, sancao_mensagem: e.target.value }))}
-                        placeholder={`Descreva as orientações para o ${
-                          editData.sancao_tipo === 'desligamento_justa_causa' ? 'Departamento de Pessoal' : 'setor competente'
-                        } quanto à aplicação da sanção…`}
-                      />
+                      border: '1px solid ' + C.border, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                      {/* Mensagem livre */}
+                      <div>
+                        <label style={{ ...LBL, marginBottom: 6 }}>
+                          Mensagem ao setor / departamento competente
+                          <span style={{ color: C.muted, fontWeight: 400, marginLeft: 4 }}>(preenchimento livre)</span>
+                        </label>
+                        <textarea
+                          style={{ ...INP, height: 90, resize: 'vertical', fontFamily: 'inherit' }}
+                          value={editData.sancao_mensagem}
+                          onChange={e => setEditData(p => ({ ...p, sancao_mensagem: e.target.value }))}
+                          placeholder={`Descreva as orientações para o ${
+                            editData.sancao_tipo === 'desligamento_justa_causa' ? 'Departamento de Pessoal' : 'setor competente'
+                          } quanto à aplicação da sanção…`}
+                        />
+                      </div>
+
+                      {/* E-mail do destinatário */}
+                      <div>
+                        <label style={{ ...LBL, marginBottom: 4 }}>
+                          E-mail do responsável pela aplicação
+                          <span style={{ color: C.muted, fontWeight: 400, marginLeft: 4 }}>(opcional — preencha para enviar por e-mail ao salvar)</span>
+                        </label>
+                        <input
+                          type="email"
+                          style={INP}
+                          value={sancaoEmail}
+                          onChange={e => setSancaoEmail(e.target.value)}
+                          placeholder={
+                            editData.sancao_tipo === 'desligamento_justa_causa'
+                              ? 'dp@empresa.com'
+                              : 'rh@empresa.com, juridico@empresa.com…'
+                          }
+                        />
+                        {sancaoEmail.trim() && editData.sancao_mensagem.trim() && (
+                          <div style={{ fontSize: 11, color: C.navy, marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <Send size={11} />
+                            Ao salvar, a mensagem será enviada por e-mail e registrada no histórico de mensagens da denúncia.
+                          </div>
+                        )}
+                        {sancaoEmail.trim() && !editData.sancao_mensagem.trim() && (
+                          <div style={{ fontSize: 11, color: C.amber, marginTop: 3 }}>
+                            Preencha a mensagem acima para que o envio seja realizado.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
