@@ -109,7 +109,9 @@ export async function processComplianceOutbox(cfg: ComplianceDbConfig): Promise<
         )
       }
 
-      await sendEmail({ to: toEmail, subject, html }, cfg)
+      // For diligência, set reply-to to the monitored IMAP inbox so sector replies are auto-ingested
+      const replyTo = row.tipo === 'diligencia' ? cfg.imapUser : undefined
+      await sendEmail({ to: toEmail, subject, html, replyTo }, cfg)
 
       await supabase
         .from('compliance_mensagens')

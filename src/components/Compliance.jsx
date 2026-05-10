@@ -18,7 +18,7 @@ import {
   X, Lock, Inbox, Activity, Tag,
   Calendar, ArrowRight, Loader, Settings,
   Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
-  AlertCircle, CheckCircle2, Wifi, HelpCircle,
+  AlertCircle, CheckCircle2, Wifi, HelpCircle, Reply,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { C } from '../lib/theme.js'
@@ -51,11 +51,12 @@ const CATEGORIA_LABELS = {
 }
 
 const TIPO_MSG_LABELS = {
-  recebida:      { label: 'E-mail recebido',       icon: Inbox,       color: C.blue   },
-  auto_resposta: { label: 'Protocolo automático',  icon: CheckCircle, color: C.green  },
-  officer_reply: { label: 'Resposta ao denunciante', icon: Send,      color: C.navy   },
-  diligencia:    { label: 'Diligência',             icon: FileText,   color: C.purple },
-  interna:       { label: 'Nota interna',           icon: Lock,       color: C.gray   },
+  recebida:            { label: 'E-mail recebido',        icon: Inbox,       color: C.blue   },
+  auto_resposta:       { label: 'Protocolo automático',   icon: CheckCircle, color: C.green  },
+  officer_reply:       { label: 'Resposta ao denunciante', icon: Send,       color: C.navy   },
+  diligencia:          { label: 'Diligência',              icon: FileText,   color: C.purple },
+  interna:             { label: 'Nota interna',            icon: Lock,       color: C.gray   },
+  resposta_diligencia: { label: 'Resposta do setor',       icon: Reply,      color: C.green  },
 }
 
 const STATUS_FLOW = [
