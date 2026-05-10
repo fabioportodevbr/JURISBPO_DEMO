@@ -676,6 +676,7 @@ const EMPTY_CFG = {
   enabled:           false,
   imap_host:         '', imap_port: 993, imap_secure: true,
   imap_user:         '', imap_password: '',
+  imap_mailbox:      'INBOX',
   smtp_host:         '', smtp_port: 587, smtp_secure: false,
   smtp_user:         '', smtp_password: '',
   smtp_from_name:    'Canal de Compliance', smtp_from_email: '',
@@ -767,6 +768,7 @@ function ComplianceSettings({ profile }) {
           imap_secure:       data.imap_secure       ?? true,
           imap_user:         data.imap_user         || '',
           imap_password:     '',   // nunca carrega senha na UI
+          imap_mailbox:      data.imap_mailbox      || 'INBOX',
           smtp_host:         data.smtp_host         || '',
           smtp_port:         data.smtp_port         || 587,
           smtp_secure:       data.smtp_secure       ?? false,
@@ -795,6 +797,7 @@ function ComplianceSettings({ profile }) {
         imap_port:         Number(form.imap_port) || 993,
         imap_secure:       form.imap_secure,
         imap_user:         form.imap_user.trim(),
+        imap_mailbox:      form.imap_mailbox.trim() || 'INBOX',
         smtp_host:         form.smtp_host.trim(),
         smtp_port:         Number(form.smtp_port) || 587,
         smtp_secure:       form.smtp_secure,
@@ -988,6 +991,40 @@ function ComplianceSettings({ profile }) {
               placeholder={hasPwImap && !pwChanged.imap ? '••••••••  (configurada)' : 'Senha da caixa de e-mail'}
             />
           </FieldRow>
+        </div>
+
+        {/* Pasta / Label IMAP */}
+        <div style={{ marginBottom: 4 }}>
+          <label style={{ ...LBL, display: 'flex', alignItems: 'center' }}>
+            Pasta / Label IMAP
+            <HelpPopup>
+              <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Qual pasta monitorar?</div>
+              <div style={{ marginBottom: 8 }}>
+                Por padrão o sistema lê a <strong style={{ color: '#7dd3fc' }}>INBOX</strong> (caixa de entrada).
+                Se quiser usar um label do Gmail para separar as denúncias das demais mensagens, siga os passos:
+              </div>
+              <ol style={{ margin: '0 0 8px', paddingLeft: 16, lineHeight: 1.8 }}>
+                <li>No Gmail, crie um label chamado <strong style={{ color: '#7dd3fc' }}>Compliance</strong> (Configurações → Labels → Criar).</li>
+                <li>Crie um filtro (Configurações → Filtros) que envie as mensagens de denúncia para esse label.</li>
+                <li>Digite aqui o nome exato do label: <strong style={{ color: '#7dd3fc' }}>Compliance</strong></li>
+              </ol>
+              <div style={{ padding: '6px 8px', background: '#0f172a', borderRadius: 6, color: '#94a3b8', fontSize: 11 }}>
+                💡 O nome do label é sensível a maiúsculas. Use exatamente o mesmo nome criado no Gmail.
+                Para INBOX (comportamento padrão), deixe em branco ou escreva <em>INBOX</em>.
+              </div>
+            </HelpPopup>
+          </label>
+          <input
+            style={INP}
+            value={form.imap_mailbox}
+            onChange={e => set('imap_mailbox', e.target.value)}
+            placeholder="INBOX  (ou nome do label Gmail, ex: Compliance)"
+          />
+          {/gmail/i.test(form.imap_host) && form.imap_mailbox.trim() && form.imap_mailbox.trim() !== 'INBOX' && (
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>
+              O worker vai monitorar apenas o label <strong>"{form.imap_mailbox.trim()}"</strong> — e-mails fora desse label não serão processados.
+            </div>
+          )}
         </div>
 
         {/* Aviso Microsoft 365 / Outlook */}

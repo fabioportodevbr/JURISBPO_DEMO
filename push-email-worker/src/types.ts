@@ -54,4 +54,6 @@ export type ComplianceDbConfig = {
   // Filtros
   filtroRemetentes: string   // padrões separados por vírgula; ex: "compliance,naorespondabrbpo"
   aceitarTodos: boolean      // true = aceita tudo (sem filtro)
+  // Pasta IMAP
+  imapMailbox: string        // pasta/label a monitorar; padrão 'INBOX'
 }

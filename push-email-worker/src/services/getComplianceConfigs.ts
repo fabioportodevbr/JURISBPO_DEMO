@@ -11,7 +11,7 @@ export async function getComplianceConfigs(): Promise<ComplianceDbConfig[]> {
     .from('compliance_config')
     .select(`
       id, escritorio_id, enabled,
-      imap_host, imap_port, imap_secure, imap_user, imap_password,
+      imap_host, imap_port, imap_secure, imap_user, imap_password, imap_mailbox,
       smtp_host, smtp_port, smtp_secure, smtp_user, smtp_password,
       smtp_from_name, smtp_from_email,
       filtro_remetentes, aceitar_todos
@@ -43,5 +43,6 @@ export async function getComplianceConfigs(): Promise<ComplianceDbConfig[]> {
     smtpFromEmail:    row.smtp_from_email,
     filtroRemetentes: row.filtro_remetentes ?? '',
     aceitarTodos:     row.aceitar_todos ?? false,
+    imapMailbox:      row.imap_mailbox  || 'INBOX',
   }))
 }
