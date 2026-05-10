@@ -1,3 +1,8 @@
+import dns from 'dns'
+// Railway (e alguns provedores) não têm IPv6 — força resolução para IPv4
+// para evitar "ENETUNREACH" ao conectar no smtp.gmail.com / outros SMTP.
+dns.setDefaultResultOrder('ipv4first')
+
 import cron from 'node-cron'
 import { config } from './config.js'
 import { ingestUnreadEmails } from './services/emailIngestor.js'
