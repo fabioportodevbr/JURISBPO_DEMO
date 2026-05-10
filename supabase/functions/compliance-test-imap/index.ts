@@ -41,6 +41,7 @@ async function testImap(
   secure: boolean,
   user: string,
   pass: string,
+  mailbox = "INBOX",
 ): Promise<{ messages: number; unseen: number }> {
   const TIMEOUT_MS = 18_000
 
@@ -140,7 +141,9 @@ async function testImap(
     }
 
     // STATUS INBOX
-    await send("A002 STATUS INBOX (MESSAGES UNSEEN)")
+    // Usa o mailbox configurado (ex: COMPLIANCE) em vez de INBOX fixo
+    const mbEncoded = mailbox.includes(" ") ? `"${mailbox}"` : mailbox
+    await send(`A002 STATUS ${mbEncoded} (MESSAGES UNSEEN)`)
     let statusLine = "", statusResp = ""
     while (true) {
       const line = await readLine()
@@ -148,7 +151,7 @@ async function testImap(
       if (line.startsWith("A002 "))    { statusResp = line; break }
     }
     if (!statusResp.startsWith("A002 OK")) {
-      throw new Error(`Falha ao consultar INBOX: ${statusResp}`)
+      throw new Error(`Falha ao consultar a pasta "${mailbox}": ${statusResp}. Verifique se o label existe no Gmail com o nome exato.`)
     }
 
     const messages = parseInt(statusLine.match(/MESSAGES\s+(\d+)/i)?.[1] ?? "0", 10)
@@ -206,12 +209,14 @@ serve(async (req) => {
     // ── Lê configuração via SERVICE_ROLE ──────────────────────────────────
     const { data: cfg } = await admin
       .from("compliance_config")
-      .select("imap_host, imap_port, imap_secure, imap_user, imap_password")
+      .select("imap_host, imap_port, imap_secure, imap_user, imap_password, imap_mailbox")
       .eq("escritorio_id", escritorio_id)
       .maybeSingle()
 
     if (!cfg?.imap_host || !cfg?.imap_user || !cfg?.imap_password)
       return json({ ok: false, erro: "Preencha e salve o servidor IMAP, usuário e senha antes de testar." })
+
+    const mailbox = cfg.imap_mailbox?.trim() || "INBOX"
 
     // ── Teste IMAP ────────────────────────────────────────────────────────
     const { messages, unseen } = await testImap(
@@ -220,6 +225,7 @@ serve(async (req) => {
       cfg.imap_secure  ?? true,
       cfg.imap_user,
       cfg.imap_password,
+      mailbox,
     )
 
     await admin
