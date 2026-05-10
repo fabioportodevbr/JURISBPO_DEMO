@@ -11,7 +11,7 @@
  * - Anonimização do remetente (UI nunca exibe remetente_email)
  * - Aba Configurações: gerente configura IMAP + SMTP diretamente na UI
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   ShieldAlert, Search, RefreshCw, ChevronRight,
   MessageSquare, Send, FileText, CheckCircle,
@@ -19,6 +19,7 @@ import {
   Calendar, ArrowRight, Loader, Settings,
   Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
   AlertCircle, CheckCircle2, Wifi, HelpCircle, Reply,
+  Archive, RotateCcw,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { C } from '../lib/theme.js'
@@ -242,7 +243,7 @@ function StatusStepper({ current, onChange, disabled }) {
 
 // ── Composer de mensagens ─────────────────────────────────────────────────────
 
-function MessageComposer({ denuncia, profile, onSent }) {
+function MessageComposer({ denuncia, profile, onSent, preset }) {
   const [tipo, setTipo] = useState('officer_reply')
   const [corpo, setCorpo] = useState('')
   const [setor, setSetor] = useState('')
@@ -265,6 +266,15 @@ function MessageComposer({ denuncia, profile, onSent }) {
       setAssunto('')
     }
   }, [tipo, denuncia.numero])
+
+  // Aplica preset externo (ex: "Responder ao setor" clicado no histórico)
+  useEffect(() => {
+    if (!preset) return
+    if (preset.tipo)                   setTipo(preset.tipo)
+    if (preset.paraEmail !== undefined) setParaEmail(preset.paraEmail)
+    if (preset.setor     !== undefined) setSetor(preset.setor)
+    if (preset.corpo     !== undefined) setCorpo(preset.corpo)
+  }, [preset])
 
   async function handleSend() {
     if (!corpo.trim()) return
@@ -394,7 +404,7 @@ function MessageComposer({ denuncia, profile, onSent }) {
 
 // ── Thread de mensagens ───────────────────────────────────────────────────────
 
-function MessageThread({ mensagens, profile, denuncia, onRefresh }) {
+function MessageThread({ mensagens, profile, denuncia, onRefresh, onReplyToSector }) {
   if (!mensagens.length) {
     return <div style={{ padding: '24px 0', textAlign: 'center', color: C.muted, fontSize: 13 }}>Nenhuma mensagem ainda.</div>
   }
@@ -454,6 +464,23 @@ function MessageThread({ mensagens, profile, denuncia, onRefresh }) {
                   </span>
                 )}
               </div>
+              {msg.tipo === 'resposta_diligencia' && onReplyToSector && (
+                <div style={{ marginTop: 6 }}>
+                  <button
+                    onClick={() => {
+                      const emailMatch = (msg.para_exibicao || '').match(/<([^>]+)>/)
+                      const lastDilig  = [...mensagens].reverse().find(m => m.tipo === 'diligencia' && m.setor_acionado)
+                      onReplyToSector({ paraEmail: emailMatch?.[1] ?? '', setor: lastDilig?.setor_acionado ?? '' })
+                    }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 11px', borderRadius: 8,
+                      border: '1px solid ' + C.border,
+                      background: C.white, color: C.navy,
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    <Reply size={11} />Responder ao setor
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )
@@ -470,6 +497,8 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
   const [mensagens, setMensagens]   = useState([])
   const [loadingMsgs, setLoadingMsgs] = useState(true)
   const [saving, setSaving]         = useState(false)
+  const [composerPreset, setComposerPreset] = useState(null)
+  const composerRef = useRef(null)
   const [editData, setEditData]     = useState({
     categoria:    denuncia.categoria,
     competencia:  denuncia.competencia,
@@ -521,6 +550,12 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
       .single()
     setSaving(false)
     if (!error && data) { setDenuncia(data); onUpdated(data) }
+  }
+
+  function handleReplyToSector({ paraEmail, setor }) {
+    setTab('mensagens')
+    setComposerPreset({ tipo: 'diligencia', paraEmail, setor, _ts: Date.now() })
+    setTimeout(() => composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
   }
 
   const tabStyle = (active) => ({
@@ -642,11 +677,11 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
             <div>
               {loadingMsgs
                 ? <div style={{ padding: '24px 0', textAlign: 'center', color: C.muted, fontSize: 13 }}>Carregando mensagens…</div>
-                : <MessageThread mensagens={mensagens} profile={profile} denuncia={denuncia} onRefresh={fetchMensagens} />
+                : <MessageThread mensagens={mensagens} profile={profile} denuncia={denuncia} onRefresh={fetchMensagens} onReplyToSector={handleReplyToSector} />
               }
 
-              <div style={{ marginTop: 20 }}>
-                <MessageComposer denuncia={denuncia} profile={profile} onSent={fetchMensagens} />
+              <div ref={composerRef} style={{ marginTop: 20 }}>
+                <MessageComposer denuncia={denuncia} profile={profile} onSent={fetchMensagens} preset={composerPreset} />
               </div>
             </div>
           )}
@@ -659,18 +694,19 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
 
 // ── Card de denúncia na lista ─────────────────────────────────────────────────
 
-function DenunciaCard({ denuncia, onClick }) {
+function DenunciaCard({ denuncia, onClick, onArchive, onRestore }) {
   const s = STATUS_LABELS[denuncia.status] || { label: denuncia.status, color: C.gray, bg: C.grayBg }
   const cat = CATEGORIA_LABELS[denuncia.categoria] || denuncia.categoria
+  const isArchived = denuncia.status === 'arquivado'
   return (
     <div onClick={onClick}
       style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 10,
         padding: '14px 16px', cursor: 'pointer', transition: 'box-shadow 0.15s',
-        ':hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.08)' } }}
+        opacity: isArchived ? 0.75 : 1 }}
       onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
       onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <span style={{ fontWeight: 900, fontSize: 14, color: C.navy }}>{denuncia.numero}</span>
             <StatusBadge status={denuncia.status} small />
@@ -685,7 +721,29 @@ function DenunciaCard({ denuncia, onClick }) {
             <span><Calendar size={10} style={{ verticalAlign: 'middle', marginRight: 2 }} />{fmt(denuncia.data_protocolo)}</span>
           </div>
         </div>
-        <ChevronRight size={16} color={C.muted} style={{ flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {!isArchived && onArchive && (
+            <button
+              onClick={e => { e.stopPropagation(); onArchive(denuncia) }}
+              title="Mover para o arquivo"
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px',
+                borderRadius: 7, border: '1px solid ' + C.border, background: C.bg,
+                color: C.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <Archive size={12} />Arquivar
+            </button>
+          )}
+          {isArchived && onRestore && (
+            <button
+              onClick={e => { e.stopPropagation(); onRestore(denuncia) }}
+              title="Restaurar para a caixa de entrada"
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px',
+                borderRadius: 7, border: '1px solid ' + C.blue, background: C.blueBg,
+                color: C.blue, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <RotateCcw size={12} />Reativar
+            </button>
+          )}
+          <ChevronRight size={16} color={C.muted} />
+        </div>
       </div>
       {denuncia.corpo_resumo && (
         <div style={{ marginTop: 8, fontSize: 12, color: C.muted, lineHeight: 1.5,
@@ -1313,6 +1371,7 @@ function DenunciasList({ profile }) {
   const [catFiltro, setCatFiltro]       = useState('todos')
   const [q, setQ]                       = useState('')
   const [refreshing, setRefreshing]     = useState(false)
+  const [archiveView, setArchiveView]   = useState(false)  // false = caixa ativa; true = arquivo
 
   const fetchDenuncias = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -1329,10 +1388,16 @@ function DenunciasList({ profile }) {
 
   useEffect(() => { fetchDenuncias() }, [fetchDenuncias])
 
+  // Ativas = tudo exceto arquivado; Arquivo = apenas arquivado
+  const ativas   = useMemo(() => denuncias.filter(d => d.status !== 'arquivado'), [denuncias])
+  const arquivo  = useMemo(() => denuncias.filter(d => d.status === 'arquivado'),  [denuncias])
+
   const filtered = useMemo(() => {
-    let rows = denuncias
-    if (statusFiltro !== 'todos') rows = rows.filter(d => d.status === statusFiltro)
-    if (catFiltro !== 'todos')    rows = rows.filter(d => d.categoria === catFiltro)
+    let rows = archiveView ? arquivo : ativas
+    if (!archiveView) {
+      if (statusFiltro !== 'todos') rows = rows.filter(d => d.status === statusFiltro)
+    }
+    if (catFiltro !== 'todos') rows = rows.filter(d => d.categoria === catFiltro)
     if (q.trim()) {
       const ql = q.trim().toLowerCase()
       rows = rows.filter(d =>
@@ -1342,11 +1407,29 @@ function DenunciasList({ profile }) {
       )
     }
     return rows
-  }, [denuncias, statusFiltro, catFiltro, q])
+  }, [denuncias, archiveView, ativas, arquivo, statusFiltro, catFiltro, q])
 
   function handleUpdated(updated) {
     setDenuncias(prev => prev.map(d => d.id === updated.id ? { ...d, ...updated } : d))
     if (selected?.id === updated.id) setSelected(s => ({ ...s, ...updated }))
+  }
+
+  async function handleArchive(denuncia) {
+    const { data } = await supabase
+      .from('compliance_denuncias')
+      .update({ status: 'arquivado' })
+      .eq('id', denuncia.id)
+      .select('*').single()
+    if (data) handleUpdated(data)
+  }
+
+  async function handleRestore(denuncia) {
+    const { data } = await supabase
+      .from('compliance_denuncias')
+      .update({ status: 'recebido' })
+      .eq('id', denuncia.id)
+      .select('*').single()
+    if (data) handleUpdated(data)
   }
 
   if (loading) {
@@ -1360,20 +1443,52 @@ function DenunciasList({ profile }) {
     )
   }
 
+  const viewTabStyle = (active) => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    background: active ? C.navy : C.white,
+    color: active ? 'white' : C.muted,
+    boxShadow: active ? 'none' : '0 0 0 1px ' + C.border,
+  })
+
   return (
     <>
-      <DashboardCards denuncias={denuncias} />
+      <DashboardCards denuncias={ativas} />
 
-      {/* Filtros */}
+      {/* Seletor de vista: Ativas / Arquivo */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button style={viewTabStyle(!archiveView)} onClick={() => setArchiveView(false)}>
+          <Inbox size={13} />Caixa de entrada
+          {ativas.length > 0 && (
+            <span style={{ background: C.blueBg, color: C.blue, borderRadius: 99, fontSize: 11, padding: '1px 7px', fontWeight: 700 }}>
+              {ativas.length}
+            </span>
+          )}
+        </button>
+        <button style={viewTabStyle(archiveView)} onClick={() => setArchiveView(true)}>
+          <Archive size={13} />Arquivo
+          {arquivo.length > 0 && (
+            <span style={{ background: archiveView ? 'rgba(255,255,255,0.25)' : C.grayBg, color: archiveView ? 'white' : C.muted, borderRadius: 99, fontSize: 11, padding: '1px 7px', fontWeight: 700 }}>
+              {arquivo.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Filtros (apenas na vista ativa) */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 200px' }}>
           <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: C.muted }} />
-          <input style={{ ...INP, paddingLeft: 28 }} value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por número, assunto ou conteúdo…" />
+          <input style={{ ...INP, paddingLeft: 28 }} value={q} onChange={e => setQ(e.target.value)}
+            placeholder={archiveView ? 'Buscar no arquivo…' : 'Buscar por número, assunto ou conteúdo…'} />
         </div>
-        <select style={{ ...SEL, flex: '0 0 160px' }} value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)}>
-          <option value="todos">Todos os status</option>
-          {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABELS[s]?.label}</option>)}
-        </select>
+        {!archiveView && (
+          <select style={{ ...SEL, flex: '0 0 160px' }} value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)}>
+            <option value="todos">Todos os status</option>
+            {STATUS_ORDER.filter(s => s !== 'arquivado').map(s => <option key={s} value={s}>{STATUS_LABELS[s]?.label}</option>)}
+          </select>
+        )}
         <select style={{ ...SEL, flex: '0 0 180px' }} value={catFiltro} onChange={e => setCatFiltro(e.target.value)}>
           <option value="todos">Todas as categorias</option>
           {Object.entries(CATEGORIA_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -1385,12 +1500,24 @@ function DenunciasList({ profile }) {
         </button>
       </div>
 
+      {/* Banner informativo no arquivo */}
+      {archiveView && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px',
+          background: C.soft, border: '1px solid ' + C.border, borderRadius: 8, marginBottom: 14,
+          fontSize: 12, color: C.muted }}>
+          <Archive size={13} />
+          Denúncias arquivadas ficam aqui e não aparecem na caixa de entrada. Use "Reativar" para movê-las de volta.
+        </div>
+      )}
+
       {/* Lista */}
       {filtered.length === 0 ? (
         <div style={{ padding: '48px 24px', textAlign: 'center', background: C.white, border: '1px solid ' + C.border, borderRadius: 12 }}>
-          <ShieldAlert size={36} color={C.border} style={{ display: 'block', margin: '0 auto 12px' }} />
+          <Archive size={36} color={C.border} style={{ display: 'block', margin: '0 auto 12px' }} />
           <p style={{ color: C.muted, fontSize: 14, margin: 0 }}>
-            {denuncias.length === 0 ? 'Nenhuma denúncia recebida ainda.' : 'Nenhuma denúncia corresponde aos filtros aplicados.'}
+            {archiveView
+              ? 'Nenhuma denúncia arquivada.'
+              : denuncias.length === 0 ? 'Nenhuma denúncia recebida ainda.' : 'Nenhuma denúncia corresponde aos filtros aplicados.'}
           </p>
         </div>
       ) : (
@@ -1399,7 +1526,13 @@ function DenunciasList({ profile }) {
             {filtered.length} denúncia{filtered.length !== 1 ? 's' : ''}
           </div>
           {filtered.map(d => (
-            <DenunciaCard key={d.id} denuncia={d} onClick={() => setSelected(d)} />
+            <DenunciaCard
+              key={d.id}
+              denuncia={d}
+              onClick={() => setSelected(d)}
+              onArchive={!archiveView ? handleArchive : undefined}
+              onRestore={archiveView  ? handleRestore  : undefined}
+            />
           ))}
         </div>
       )}
