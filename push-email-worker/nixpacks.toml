@@ -2,10 +2,7 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["npx --yes pnpm@9 install --no-frozen-lockfile"]
-
-[phases.build]
-cmds = []
+cmds = ["corepack enable && corepack prepare pnpm@9 --activate && pnpm install --no-frozen-lockfile"]
 
 [start]
-cmd = "npx pnpm@9 start"
+cmd = "pnpm start"
