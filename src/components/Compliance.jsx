@@ -1877,7 +1877,7 @@ function ComplianceRelatorios({ profile, onClose }) {
             </div>
 
             {/* Cards de resumo */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10, marginBottom: 20 }}>
+            <div className="rel-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10, marginBottom: 20 }}>
               {[
                 { label: 'Total filtrado',     value: stats.total,          color: C.navy },
                 { label: 'Reencaminhadas',     value: stats.reencaminhadas, color: C.amber },
@@ -1919,8 +1919,11 @@ function ComplianceRelatorios({ profile, onClose }) {
                 <p style={{ color: C.muted, fontSize: 14, margin: 0 }}>Nenhuma denúncia corresponde aos filtros aplicados.</p>
               </div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <div className="rel-table-wrap" style={{ overflowX: 'auto' }}>
+                <table className="rel-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <colgroup>
+                    <col /><col /><col /><col /><col /><col /><col />
+                  </colgroup>
                   <thead>
                     <tr style={{ background: C.navy, color: 'white' }}>
                       {['Nº', 'Data', 'Categoria', 'Status', 'Competência', 'Sanção aplicada', 'Prazo'].map(h => (
@@ -1948,7 +1951,7 @@ function ComplianceRelatorios({ profile, onClose }) {
                           <td style={{ padding: '8px 12px' }}>
                             {sancao
                               ? <span style={{ color: sancao.color, fontWeight: 700 }}>
-                                  {sancao.value === 'desligamento_justa_causa' ? '⚠ Desligamento JC'
+                                  {sancao.value === 'desligamento_justa_causa' ? 'Desligamento JC'
                                     : sancao.value === 'suspensao' ? 'Suspensão'
                                     : sancao.value === 'advertencia' ? 'Advertência'
                                     : 'Feedback'}
@@ -1972,12 +1975,78 @@ function ComplianceRelatorios({ profile, onClose }) {
 
       {/* Estilos de impressão */}
       <style>{`
+        @page { size: A4 landscape; margin: 1.2cm 1.5cm; }
+
         @media print {
-          .no-print { background: white !important; padding: 0 !important; }
-          .no-print > div { box-shadow: none !important; max-width: 100% !important; border-radius: 0 !important; }
-          .no-print > div > div:first-child > div:last-child,
+          /* ── Overlay do modal: vira página estática ── */
+          .no-print {
+            position: static !important;
+            background: white !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            display: block !important;
+            z-index: auto !important;
+          }
+          .no-print > div {
+            box-shadow: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            border-radius: 0 !important;
+          }
+
+          /* ── Esconde: header do modal (logo/botões) e painel de filtros ── */
+          .no-print > div > div:first-child,
           .no-print > div > div:nth-child(2) { display: none !important; }
+
+          /* ── Exibe cabeçalho exclusivo de impressão ── */
           .print-only { display: block !important; }
+
+          /* ── Cards: 5 colunas compactas em linha ── */
+          .rel-cards {
+            display: grid !important;
+            grid-template-columns: repeat(5, 1fr) !important;
+            gap: 6px !important;
+            margin-bottom: 12px !important;
+          }
+          .rel-cards > div {
+            padding: 8px 10px !important;
+            border-radius: 6px !important;
+          }
+          .rel-cards > div > div:first-child {
+            font-size: 20px !important;
+          }
+          .rel-cards > div > div:last-child {
+            font-size: 10px !important;
+          }
+
+          /* ── Tabela: sem scroll, ajustada à página ── */
+          .rel-table-wrap {
+            overflow: visible !important;
+            width: 100% !important;
+          }
+          .rel-table {
+            width: 100% !important;
+            table-layout: fixed !important;
+            font-size: 9.5pt !important;
+            border-collapse: collapse !important;
+          }
+          /* Larguras proporcionais das 7 colunas */
+          .rel-table colgroup col:nth-child(1) { width: 14%; }
+          .rel-table colgroup col:nth-child(2) { width: 9%;  }
+          .rel-table colgroup col:nth-child(3) { width: 20%; }
+          .rel-table colgroup col:nth-child(4) { width: 11%; }
+          .rel-table colgroup col:nth-child(5) { width: 18%; }
+          .rel-table colgroup col:nth-child(6) { width: 19%; }
+          .rel-table colgroup col:nth-child(7) { width: 9%;  }
+          .rel-table th, .rel-table td {
+            padding: 5px 7px !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+          }
+          /* Listras zebra visíveis na impressão */
+          .rel-table tbody tr:nth-child(even) { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .rel-table thead tr { background: #1e3a5f !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
           @keyframes spin {}
         }
       `}</style>
