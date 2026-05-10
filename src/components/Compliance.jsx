@@ -1745,6 +1745,16 @@ function ComplianceRelatorios({ profile, onClose }) {
 
   const setF = (k, v) => setFiltros(p => ({ ...p, [k]: v }))
 
+  function handlePrint() {
+    document.body.classList.add('printing-compliance-report')
+    const cleanup = () => {
+      document.body.classList.remove('printing-compliance-report')
+      window.removeEventListener('afterprint', cleanup)
+    }
+    window.addEventListener('afterprint', cleanup)
+    window.print()
+  }
+
   async function gerarRelatorio() {
     setLoading(true)
     let q = supabase
@@ -1805,7 +1815,7 @@ function ComplianceRelatorios({ profile, onClose }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {rodou && resultado.length > 0 && (
-              <button onClick={() => window.print()}
+              <button onClick={handlePrint}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px',
                   border: '1px solid ' + C.border, borderRadius: 8, background: C.white,
                   color: C.navy, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
@@ -1867,7 +1877,7 @@ function ComplianceRelatorios({ profile, onClose }) {
 
         {/* Resultado */}
         {rodou && (
-          <div style={{ padding: '20px 24px' }} id="compliance-relatorio-print">
+          <div className="compliance-print-area" style={{ padding: '20px 24px' }} id="compliance-relatorio-print">
 
             {/* Cabeçalho de impressão */}
             <div className="print-only" style={{ display: 'none', marginBottom: 20 }}>
@@ -1978,74 +1988,66 @@ function ComplianceRelatorios({ profile, onClose }) {
         @page { size: A4 landscape; margin: 1.2cm 1.5cm; }
 
         @media print {
-          /* ── Overlay do modal: vira página estática ── */
-          .no-print {
-            position: static !important;
+          /*
+           * Estratégia: ocultar TUDO via visibility:hidden e revelar
+           * apenas .compliance-print-area e seus filhos.
+           * Isso evita imprimir a sidebar, o cabeçalho do app e o
+           * restante da página de compliance junto com o relatório.
+           */
+          body.printing-compliance-report * {
+            visibility: hidden !important;
+          }
+          body.printing-compliance-report .compliance-print-area,
+          body.printing-compliance-report .compliance-print-area * {
+            visibility: visible !important;
+          }
+          body.printing-compliance-report .compliance-print-area {
+            position: fixed !important;
+            inset: 0 !important;
+            padding: 1.2cm 1.5cm !important;
             background: white !important;
-            padding: 0 !important;
             overflow: visible !important;
-            display: block !important;
-            z-index: auto !important;
-          }
-          .no-print > div {
-            box-shadow: none !important;
-            max-width: 100% !important;
-            width: 100% !important;
-            border-radius: 0 !important;
+            z-index: 99999 !important;
           }
 
-          /* ── Esconde: header do modal (logo/botões) e painel de filtros ── */
-          .no-print > div > div:first-child,
-          .no-print > div > div:nth-child(2) { display: none !important; }
-
-          /* ── Exibe cabeçalho exclusivo de impressão ── */
+          /* ── Cabeçalho exclusivo de impressão ── */
           .print-only { display: block !important; }
 
-          /* ── Cards: 5 colunas compactas em linha ── */
+          /* ── Cards: 5 colunas em linha ── */
           .rel-cards {
             display: grid !important;
             grid-template-columns: repeat(5, 1fr) !important;
             gap: 6px !important;
-            margin-bottom: 12px !important;
+            margin-bottom: 14px !important;
           }
-          .rel-cards > div {
-            padding: 8px 10px !important;
-            border-radius: 6px !important;
-          }
-          .rel-cards > div > div:first-child {
-            font-size: 20px !important;
-          }
-          .rel-cards > div > div:last-child {
-            font-size: 10px !important;
-          }
+          .rel-cards > div { padding: 8px 10px !important; border-radius: 6px !important; }
+          .rel-cards > div > div:first-child { font-size: 20px !important; }
+          .rel-cards > div > div:last-child  { font-size: 10px !important; }
 
-          /* ── Tabela: sem scroll, ajustada à página ── */
-          .rel-table-wrap {
-            overflow: visible !important;
-            width: 100% !important;
-          }
+          /* ── Tabela: sem scroll, ajustada à largura da página ── */
+          .rel-table-wrap { overflow: visible !important; width: 100% !important; }
           .rel-table {
             width: 100% !important;
             table-layout: fixed !important;
             font-size: 9.5pt !important;
             border-collapse: collapse !important;
           }
-          /* Larguras proporcionais das 7 colunas */
-          .rel-table colgroup col:nth-child(1) { width: 14%; }
-          .rel-table colgroup col:nth-child(2) { width: 9%;  }
-          .rel-table colgroup col:nth-child(3) { width: 20%; }
-          .rel-table colgroup col:nth-child(4) { width: 11%; }
-          .rel-table colgroup col:nth-child(5) { width: 18%; }
-          .rel-table colgroup col:nth-child(6) { width: 19%; }
-          .rel-table colgroup col:nth-child(7) { width: 9%;  }
           .rel-table th, .rel-table td {
             padding: 5px 7px !important;
             white-space: normal !important;
             word-break: break-word !important;
           }
-          /* Listras zebra visíveis na impressão */
-          .rel-table tbody tr:nth-child(even) { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .rel-table thead tr { background: #1e3a5f !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .rel-table thead tr {
+            background: #1e3a5f !important;
+            color: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .rel-table tbody tr:nth-child(even) {
+            background: #f1f5f9 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
 
           @keyframes spin {}
         }
