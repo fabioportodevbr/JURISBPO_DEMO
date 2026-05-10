@@ -18,7 +18,7 @@ import {
   X, Lock, Inbox, Activity, Tag,
   Calendar, ArrowRight, Loader, Settings,
   Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
-  AlertCircle, CheckCircle2, Wifi,
+  AlertCircle, CheckCircle2, Wifi, HelpCircle,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { C } from '../lib/theme.js'
@@ -102,6 +102,48 @@ function Avatar({ nome, size = 32 }) {
 const INP = { width: '100%', padding: '8px 10px', border: '1px solid ' + C.border, borderRadius: 7, fontSize: 13, background: C.white, color: C.text, boxSizing: 'border-box' }
 const SEL = { ...INP, cursor: 'pointer' }
 const LBL = { display: 'block', fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 4 }
+
+// ── Help pop-up genérico ──────────────────────────────────────────────────────
+
+function HelpPopup({ children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle', marginLeft: 5 }}>
+      <button
+        type="button"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={() => setOpen(v => !v)}
+        style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+          color: '#6b7280', lineHeight: 1, display: 'flex', alignItems: 'center' }}>
+        <HelpCircle size={13} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#1e293b', color: '#f1f5f9',
+          borderRadius: 10, padding: '12px 14px',
+          fontSize: 12, lineHeight: 1.65,
+          width: 300, zIndex: 999,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
+          pointerEvents: 'none',
+        }}>
+          {/* seta */}
+          <div style={{
+            position: 'absolute', top: '100%', left: '50%',
+            transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '6px solid #1e293b',
+          }} />
+          {children}
+        </div>
+      )}
+    </span>
+  )
+}
 
 // ── Dashboard cards ───────────────────────────────────────────────────────────
 
@@ -860,11 +902,69 @@ function ComplianceSettings({ profile }) {
             <input style={INP} value={form.imap_host} onChange={e => set('imap_host', e.target.value)}
               placeholder="mail.empresa.com ou imap.gmail.com" />
           </FieldRow>
-          <FieldRow label="Porta">
+
+          {/* Porta + help */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ ...LBL, display: 'flex', alignItems: 'center' }}>
+              Porta
+              <HelpPopup>
+                <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Porta e criptografia IMAP</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #334155' }}>
+                      <th style={{ textAlign: 'left', paddingBottom: 4, color: '#94a3b8', fontWeight: 600 }}>Porta</th>
+                      <th style={{ textAlign: 'left', paddingBottom: 4, color: '#94a3b8', fontWeight: 600 }}>SSL/TLS</th>
+                      <th style={{ textAlign: 'left', paddingBottom: 4, color: '#94a3b8', fontWeight: 600 }}>Quando usar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #1e3a5f' }}>
+                      <td style={{ padding: '5px 0', fontWeight: 700, color: '#7dd3fc' }}>993</td>
+                      <td style={{ padding: '5px 8px', color: '#86efac' }}>✔ Marcado</td>
+                      <td style={{ padding: '5px 0', color: '#e2e8f0' }}>Padrão para IMAP sobre TLS — Gmail, Outlook.com, Zoho, Exchange moderno.</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #1e3a5f' }}>
+                      <td style={{ padding: '5px 0', fontWeight: 700, color: '#7dd3fc' }}>143</td>
+                      <td style={{ padding: '5px 8px', color: '#fca5a5' }}>✘ Desmarcado</td>
+                      <td style={{ padding: '5px 0', color: '#e2e8f0' }}>IMAP sem TLS ou com STARTTLS — servidores legados ou redes internas.</td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '5px 0', fontWeight: 700, color: '#7dd3fc' }}>443</td>
+                      <td style={{ padding: '5px 8px', color: '#86efac' }}>✔ Marcado</td>
+                      <td style={{ padding: '5px 0', color: '#e2e8f0' }}>Exchange / Microsoft 365 em redes que bloqueiam a porta 993 — usa HTTPS como túnel.</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 8, padding: '6px 8px', background: '#0f172a', borderRadius: 6, color: '#94a3b8', fontSize: 11 }}>
+                  💡 Em caso de dúvida, consulte o administrador de TI ou o provedor de e-mail.
+                </div>
+              </HelpPopup>
+            </label>
             <input style={{ ...INP, width: 80 }} type="number" value={form.imap_port}
               onChange={e => set('imap_port', e.target.value)} />
-          </FieldRow>
-          <FieldRow label="SSL/TLS">
+          </div>
+
+          {/* SSL/TLS + help */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ ...LBL, display: 'flex', alignItems: 'center' }}>
+              SSL/TLS
+              <HelpPopup>
+                <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Criptografia da conexão</div>
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ color: '#86efac', fontWeight: 700 }}>✔ SSL/TLS marcado</span><br />
+                  A conexão usa TLS desde o início. Use com as portas <strong>993</strong> ou <strong>443</strong>.
+                  É o modo mais seguro e recomendado.
+                </div>
+                <div>
+                  <span style={{ color: '#fca5a5', fontWeight: 700 }}>✘ Desmarcado (STARTTLS)</span><br />
+                  Conecta sem criptografia e depois negocia TLS. Use com a porta <strong>143</strong>.
+                  Adequado apenas em redes internas ou servidores legados.
+                </div>
+                <div style={{ marginTop: 8, padding: '6px 8px', background: '#0f172a', borderRadius: 6, color: '#94a3b8', fontSize: 11 }}>
+                  💡 Se estiver usando porta 993 ou 443, mantenha este campo marcado.
+                </div>
+              </HelpPopup>
+            </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36 }}>
               <input type="checkbox" id="imap_secure" checked={form.imap_secure}
                 onChange={e => set('imap_secure', e.target.checked)} style={{ cursor: 'pointer' }} />
@@ -872,7 +972,7 @@ function ComplianceSettings({ profile }) {
                 {form.imap_secure ? 'SSL/TLS' : 'STARTTLS'}
               </label>
             </div>
-          </FieldRow>
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <FieldRow label="Usuário (e-mail da caixa)">
