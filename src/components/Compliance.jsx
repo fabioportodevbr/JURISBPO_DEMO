@@ -20,6 +20,7 @@ import {
   Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
   AlertCircle, CheckCircle2, Wifi, HelpCircle, Reply,
   Archive, RotateCcw, Paperclip, Download,
+  BarChart2, Printer, Filter, AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { C } from '../lib/theme.js'
@@ -59,6 +60,15 @@ const TIPO_MSG_LABELS = {
   interna:             { label: 'Nota interna',            icon: Lock,       color: C.gray   },
   resposta_diligencia: { label: 'Resposta do setor',       icon: Reply,      color: C.green  },
 }
+
+const SANCAO_OPCOES = [
+  { value: 'feedback',                 label: 'Encaminhar ao Setor competente para aplicar feedback',                            color: C.blue   },
+  { value: 'advertencia',              label: 'Encaminhar ao Setor competente para aplicar advertência',                         color: C.amber  },
+  { value: 'suspensao',                label: 'Encaminhar ao Setor competente para aplicar suspensão',                           color: C.purple },
+  { value: 'desligamento_justa_causa', label: 'Encaminhar ao Departamento de Pessoal para desligamento por justa causa',         color: '#dc2626' },
+]
+
+const SANCAO_LABELS = Object.fromEntries(SANCAO_OPCOES.map(o => [o.value, o]))
 
 const STATUS_FLOW = [
   { key: 'recebido',        label: 'Recebido'        },
@@ -730,12 +740,14 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
   const [composerPreset, setComposerPreset] = useState(null)
   const composerRef = useRef(null)
   const [editData, setEditData]     = useState({
-    categoria:    denuncia.categoria,
-    competencia:  denuncia.competencia,
-    setor_destino: denuncia.setor_destino || '',
+    categoria:      denuncia.categoria,
+    competencia:    denuncia.competencia,
+    setor_destino:  denuncia.setor_destino  || '',
     prazo_resposta: denuncia.prazo_resposta || '',
-    parecer:      denuncia.parecer || '',
+    parecer:        denuncia.parecer        || '',
     responsavel_id: denuncia.responsavel_id || '',
+    sancao_tipo:    denuncia.sancao_tipo    || null,
+    sancao_mensagem: denuncia.sancao_mensagem || '',
   })
 
   const fetchMensagens = useCallback(async () => {
@@ -766,11 +778,13 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
   async function handleSaveData() {
     setSaving(true)
     const updates = {
-      categoria:     editData.categoria,
-      competencia:   editData.competencia,
-      setor_destino: editData.setor_destino || null,
-      prazo_resposta: editData.prazo_resposta || null,
-      parecer:       editData.parecer || null,
+      categoria:       editData.categoria,
+      competencia:     editData.competencia,
+      setor_destino:   editData.setor_destino   || null,
+      prazo_resposta:  editData.prazo_resposta  || null,
+      parecer:         editData.parecer         || null,
+      sancao_tipo:     editData.sancao_tipo     || null,
+      sancao_mensagem: editData.sancao_mensagem || null,
     }
     const { data, error } = await supabase
       .from('compliance_denuncias')
@@ -896,6 +910,59 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
                 <textarea style={{ ...INP, height: 90, resize: 'vertical', fontFamily: 'inherit' }}
                   value={editData.parecer} onChange={e => setEditData(p => ({ ...p, parecer: e.target.value }))}
                   placeholder="Registre o parecer ou conclusão da apuração…" />
+              </div>
+
+              {/* ── Aplicação de sanção ── */}
+              <div style={{ marginBottom: 16, border: '1px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 14px', background: C.soft, borderBottom: '1px solid ' + C.border,
+                  display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <AlertTriangle size={14} color={C.amber} />
+                  <span style={{ fontWeight: 800, fontSize: 13, color: C.text }}>Aplicação de Sanção</span>
+                  <span style={{ fontSize: 11, color: C.muted, marginLeft: 4 }}>(opcional — preencher apenas se houver encaminhamento)</span>
+                </div>
+                <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {SANCAO_OPCOES.map(op => (
+                    <label key={op.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                      padding: '8px 12px', borderRadius: 8, border: '1px solid',
+                      borderColor: editData.sancao_tipo === op.value ? op.color : C.border,
+                      background: editData.sancao_tipo === op.value ? (op.color + '12') : C.white,
+                      transition: 'all 0.12s' }}>
+                      <input
+                        type="checkbox"
+                        checked={editData.sancao_tipo === op.value}
+                        onChange={() => setEditData(p => ({
+                          ...p,
+                          sancao_tipo: p.sancao_tipo === op.value ? null : op.value,
+                          sancao_mensagem: p.sancao_tipo === op.value ? '' : p.sancao_mensagem,
+                        }))}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: op.color, flexShrink: 0 }}
+                      />
+                      <span style={{ fontSize: 13, fontWeight: editData.sancao_tipo === op.value ? 700 : 500,
+                        color: editData.sancao_tipo === op.value ? op.color : C.text }}>
+                        {op.label}
+                      </span>
+                    </label>
+                  ))}
+
+                  {/* Campo de mensagem — aparece ao selecionar qualquer sanção */}
+                  {editData.sancao_tipo && (
+                    <div style={{ marginTop: 4, padding: '10px 12px', background: C.soft, borderRadius: 8,
+                      border: '1px solid ' + C.border }}>
+                      <label style={{ ...LBL, marginBottom: 6 }}>
+                        Mensagem ao setor / departamento competente
+                        <span style={{ color: C.muted, fontWeight: 400, marginLeft: 4 }}>(preenchimento livre)</span>
+                      </label>
+                      <textarea
+                        style={{ ...INP, height: 90, resize: 'vertical', fontFamily: 'inherit' }}
+                        value={editData.sancao_mensagem}
+                        onChange={e => setEditData(p => ({ ...p, sancao_mensagem: e.target.value }))}
+                        placeholder={`Descreva as orientações para o ${
+                          editData.sancao_tipo === 'desligamento_justa_causa' ? 'Departamento de Pessoal' : 'setor competente'
+                        } quanto à aplicação da sanção…`}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button onClick={handleSaveData} disabled={saving}
@@ -1599,6 +1666,263 @@ function ComplianceSettings({ profile }) {
   )
 }
 
+// ── Relatórios de compliance ──────────────────────────────────────────────────
+
+function ComplianceRelatorios({ profile, onClose }) {
+  const [filtros, setFiltros] = useState({
+    periodo_inicio: '',
+    periodo_fim:    '',
+    categoria:      '',
+    reencaminhadas: false,
+    concluidas:     false,
+    desligamentos:  false,
+  })
+  const [resultado, setResultado] = useState([])
+  const [loading, setLoading]     = useState(false)
+  const [rodou, setRodou]         = useState(false)
+
+  const setF = (k, v) => setFiltros(p => ({ ...p, [k]: v }))
+
+  async function gerarRelatorio() {
+    setLoading(true)
+    let q = supabase
+      .from('compliance_denuncias')
+      .select('numero,status,categoria,competencia,setor_destino,data_protocolo,prazo_resposta,sancao_tipo,parecer,corpo_resumo')
+      .eq('escritorio_id', profile.escritorio_id)
+
+    if (filtros.periodo_inicio) q = q.gte('data_protocolo', filtros.periodo_inicio)
+    if (filtros.periodo_fim)    q = q.lte('data_protocolo', filtros.periodo_fim + 'T23:59:59.999Z')
+    if (filtros.categoria)      q = q.eq('categoria', filtros.categoria)
+    if (filtros.reencaminhadas) q = q.eq('competencia', 'reencaminhar')
+    if (filtros.concluidas)     q = q.eq('status', 'concluido')
+    if (filtros.desligamentos)  q = q.eq('sancao_tipo', 'desligamento_justa_causa')
+
+    const { data } = await q.order('data_protocolo', { ascending: false })
+    setResultado(data || [])
+    setRodou(true)
+    setLoading(false)
+  }
+
+  const stats = useMemo(() => {
+    const porCat = {}
+    resultado.forEach(d => { porCat[d.categoria] = (porCat[d.categoria] || 0) + 1 })
+    return {
+      total:         resultado.length,
+      reencaminhadas: resultado.filter(d => d.competencia === 'reencaminhar').length,
+      concluidas:    resultado.filter(d => d.status === 'concluido').length,
+      desligamentos: resultado.filter(d => d.sancao_tipo === 'desligamento_justa_causa').length,
+      comSancao:     resultado.filter(d => d.sancao_tipo).length,
+      porCategoria:  Object.entries(porCat).sort((a, b) => b[1] - a[1]),
+    }
+  }, [resultado])
+
+  const periodoTexto = [
+    filtros.periodo_inicio ? `de ${fmtDate(filtros.periodo_inicio + 'T12:00:00')}` : '',
+    filtros.periodo_fim    ? `até ${fmtDate(filtros.periodo_fim + 'T12:00:00')}` : '',
+  ].filter(Boolean).join(' ') || 'Todo o período'
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300,
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '24px 16px', overflowY: 'auto' }} className="no-print">
+      <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 1020,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '18px 24px', borderBottom: '1px solid ' + C.border,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: C.navy,
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <BarChart2 size={16} color="white" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 16, color: C.text }}>Relatório de Compliance</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Filtre e exporte denúncias registradas</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {rodou && resultado.length > 0 && (
+              <button onClick={() => window.print()}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px',
+                  border: '1px solid ' + C.border, borderRadius: 8, background: C.white,
+                  color: C.navy, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                <Printer size={14} />Imprimir / PDF
+              </button>
+            )}
+            <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, padding: 4 }}>
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Filtros */}
+        <div style={{ padding: '16px 24px', background: C.soft, borderBottom: '1px solid ' + C.border }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: C.muted, textTransform: 'uppercase',
+            letterSpacing: '0.05em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Filter size={12} />Filtros
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, marginBottom: 12 }}>
+            <div>
+              <label style={LBL}>Período — de</label>
+              <input type="date" style={INP} value={filtros.periodo_inicio}
+                onChange={e => setF('periodo_inicio', e.target.value)} />
+            </div>
+            <div>
+              <label style={LBL}>Período — até</label>
+              <input type="date" style={INP} value={filtros.periodo_fim}
+                onChange={e => setF('periodo_fim', e.target.value)} />
+            </div>
+            <div>
+              <label style={LBL}>Categoria</label>
+              <select style={SEL} value={filtros.categoria} onChange={e => setF('categoria', e.target.value)}>
+                <option value="">Todas as categorias</option>
+                {Object.entries(CATEGORIA_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 14 }}>
+            {[
+              { key: 'reencaminhadas', label: 'Apenas reencaminhadas' },
+              { key: 'concluidas',     label: 'Apenas concluídas' },
+              { key: 'desligamentos',  label: 'Apenas desligamentos por justa causa' },
+            ].map(({ key, label }) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: C.text }}>
+                <input type="checkbox" checked={filtros[key]} onChange={e => setF(key, e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: 'pointer', accentColor: C.navy }} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <button onClick={gerarRelatorio} disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px',
+              background: C.navy, color: 'white', border: 'none', borderRadius: 8,
+              fontWeight: 700, fontSize: 13, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+            {loading ? <Loader size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : <BarChart2 size={14} />}
+            {loading ? 'Gerando…' : 'Gerar relatório'}
+          </button>
+        </div>
+
+        {/* Resultado */}
+        {rodou && (
+          <div style={{ padding: '20px 24px' }} id="compliance-relatorio-print">
+
+            {/* Cabeçalho de impressão */}
+            <div className="print-only" style={{ display: 'none', marginBottom: 20 }}>
+              <div style={{ fontWeight: 900, fontSize: 18, color: C.navy }}>Canal de Compliance — Relatório</div>
+              <div style={{ fontSize: 13, color: C.muted }}>{periodoTexto}</div>
+              {filtros.categoria && <div style={{ fontSize: 13 }}>Categoria: {CATEGORIA_LABELS[filtros.categoria]}</div>}
+            </div>
+
+            {/* Cards de resumo */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10, marginBottom: 20 }}>
+              {[
+                { label: 'Total filtrado',     value: stats.total,          color: C.navy },
+                { label: 'Reencaminhadas',     value: stats.reencaminhadas, color: C.amber },
+                { label: 'Concluídas',         value: stats.concluidas,     color: C.green },
+                { label: 'Com sanção',         value: stats.comSancao,      color: C.purple },
+                { label: 'Desligamentos JC',   value: stats.desligamentos,  color: '#dc2626' },
+              ].map(c => (
+                <div key={c.label} style={{ background: C.soft, border: '1px solid ' + C.border,
+                  borderRadius: 9, padding: '12px 14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: c.color }}>{c.value}</div>
+                  <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 2 }}>{c.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Distribuição por categoria */}
+            {stats.porCategoria.length > 0 && (
+              <div style={{ background: C.soft, border: '1px solid ' + C.border, borderRadius: 9,
+                padding: '12px 16px', marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: C.muted, textTransform: 'uppercase', marginBottom: 10 }}>
+                  Distribuição por categoria
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {stats.porCategoria.map(([cat, count]) => (
+                    <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 6,
+                      background: C.white, border: '1px solid ' + C.border, borderRadius: 7, padding: '4px 10px', fontSize: 12 }}>
+                      <span style={{ fontWeight: 700, color: C.navy }}>{count}</span>
+                      <span style={{ color: C.muted }}>{CATEGORIA_LABELS[cat] || cat}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tabela */}
+            {resultado.length === 0 ? (
+              <div style={{ padding: '40px 24px', textAlign: 'center', background: C.soft, borderRadius: 10 }}>
+                <Filter size={32} color={C.border} style={{ display: 'block', margin: '0 auto 10px' }} />
+                <p style={{ color: C.muted, fontSize: 14, margin: 0 }}>Nenhuma denúncia corresponde aos filtros aplicados.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: C.navy, color: 'white' }}>
+                      {['Nº', 'Data', 'Categoria', 'Status', 'Competência', 'Sanção aplicada', 'Prazo'].map(h => (
+                        <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultado.map((d, i) => {
+                      const sancao = d.sancao_tipo ? SANCAO_LABELS[d.sancao_tipo] : null
+                      const statusS = STATUS_LABELS[d.status] || { label: d.status, color: C.muted }
+                      return (
+                        <tr key={d.numero} style={{ background: i % 2 === 0 ? C.white : C.soft, borderBottom: '1px solid ' + C.border }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 800, color: C.navy, whiteSpace: 'nowrap' }}>{d.numero}</td>
+                          <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{fmtDate(d.data_protocolo)}</td>
+                          <td style={{ padding: '8px 12px' }}>{CATEGORIA_LABELS[d.categoria] || d.categoria}</td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <span style={{ color: statusS.color, fontWeight: 700 }}>{statusS.label}</span>
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            {d.competencia === 'reencaminhar'
+                              ? <span style={{ color: C.amber, fontWeight: 700 }}>Reencaminhada{d.setor_destino ? ` → ${d.setor_destino}` : ''}</span>
+                              : <span style={{ color: C.muted }}>Compliance</span>}
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            {sancao
+                              ? <span style={{ color: sancao.color, fontWeight: 700 }}>
+                                  {sancao.value === 'desligamento_justa_causa' ? '⚠ Desligamento JC'
+                                    : sancao.value === 'suspensao' ? 'Suspensão'
+                                    : sancao.value === 'advertencia' ? 'Advertência'
+                                    : 'Feedback'}
+                                </span>
+                              : <span style={{ color: C.muted }}>—</span>}
+                          </td>
+                          <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{d.prazo_resposta ? fmtDate(d.prazo_resposta) : '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 10, fontSize: 11, color: C.muted, textAlign: 'right' }}>
+                  {resultado.length} registro{resultado.length !== 1 ? 's' : ''} · Gerado em {fmt(new Date().toISOString())}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Estilos de impressão */}
+      <style>{`
+        @media print {
+          .no-print { background: white !important; padding: 0 !important; }
+          .no-print > div { box-shadow: none !important; max-width: 100% !important; border-radius: 0 !important; }
+          .no-print > div > div:first-child > div:last-child,
+          .no-print > div > div:nth-child(2) { display: none !important; }
+          .print-only { display: block !important; }
+          @keyframes spin {}
+        }
+      `}</style>
+    </div>
+  )
+}
+
 // ── Painel de denúncias ───────────────────────────────────────────────────────
 
 function DenunciasList({ profile }) {
@@ -1616,7 +1940,7 @@ function DenunciasList({ profile }) {
     else setRefreshing(true)
     const { data, error } = await supabase
       .from('compliance_denuncias')
-      .select('id,numero,status,categoria,competencia,setor_destino,assunto,corpo_resumo,data_protocolo,prazo_resposta,parecer,responsavel_id,escritorio_id,corpo_original')
+      .select('id,numero,status,categoria,competencia,setor_destino,assunto,corpo_resumo,data_protocolo,prazo_resposta,parecer,responsavel_id,escritorio_id,corpo_original,sancao_tipo,sancao_mensagem')
       .eq('escritorio_id', profile.escritorio_id)
       .order('data_protocolo', { ascending: false })
     if (!error) setDenuncias(data || [])
@@ -1790,7 +2114,8 @@ function DenunciasList({ profile }) {
 // ── Módulo principal ──────────────────────────────────────────────────────────
 
 export default function Compliance({ profile }) {
-  const [mainTab, setMainTab] = useState('denuncias')
+  const [mainTab, setMainTab]           = useState('denuncias')
+  const [showRelatorios, setShowRelatorios] = useState(false)
 
   const tabStyle = (active) => ({
     display: 'flex', alignItems: 'center', gap: 6,
@@ -1802,15 +2127,25 @@ export default function Compliance({ profile }) {
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
-      {/* Título */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 0 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ShieldAlert size={17} color="white" />
+      {/* Título + botão Relatórios */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShieldAlert size={17} color="white" />
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: C.text }}>Canal de Compliance</h1>
+            <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Acesso restrito a gerentes</p>
+          </div>
         </div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: C.text }}>Canal de Compliance</h1>
-          <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Acesso restrito a gerentes</p>
-        </div>
+        <button
+          onClick={() => setShowRelatorios(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+            border: '1px solid ' + C.border, borderRadius: 8, background: C.white,
+            color: C.navy, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <BarChart2 size={14} />Relatórios
+        </button>
       </div>
 
       {/* Tabs principais */}
@@ -1825,6 +2160,10 @@ export default function Compliance({ profile }) {
 
       {mainTab === 'denuncias'     && <DenunciasList profile={profile} />}
       {mainTab === 'configuracoes' && <ComplianceSettings profile={profile} />}
+
+      {showRelatorios && (
+        <ComplianceRelatorios profile={profile} onClose={() => setShowRelatorios(false)} />
+      )}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
