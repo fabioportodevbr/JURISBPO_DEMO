@@ -51,4 +51,7 @@ export type ComplianceDbConfig = {
   smtpPassword: string
   smtpFromName: string
   smtpFromEmail: string
+  // Filtros
+  filtroRemetentes: string   // padrões separados por vírgula; ex: "compliance,naorespondabrbpo"
+  aceitarTodos: boolean      // true = aceita tudo (sem filtro)
 }

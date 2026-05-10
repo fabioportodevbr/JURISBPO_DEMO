@@ -631,12 +631,14 @@ function DenunciaCard({ denuncia, onClick }) {
 // ── Configurações de e-mail ───────────────────────────────────────────────────
 
 const EMPTY_CFG = {
-  enabled:        false,
-  imap_host:      '', imap_port: 993, imap_secure: true,
-  imap_user:      '', imap_password: '',
-  smtp_host:      '', smtp_port: 587, smtp_secure: false,
-  smtp_user:      '', smtp_password: '',
-  smtp_from_name: 'Canal de Compliance', smtp_from_email: '',
+  enabled:           false,
+  imap_host:         '', imap_port: 993, imap_secure: true,
+  imap_user:         '', imap_password: '',
+  smtp_host:         '', smtp_port: 587, smtp_secure: false,
+  smtp_user:         '', smtp_password: '',
+  smtp_from_name:    'Canal de Compliance', smtp_from_email: '',
+  filtro_remetentes: '',
+  aceitar_todos:     false,
 }
 
 function FieldRow({ label, hint, children }) {
@@ -706,19 +708,21 @@ function ComplianceSettings({ profile }) {
         setHasPwImap(!!data.imap_password)
         setHasPwSmtp(!!data.smtp_password)
         setForm({
-          enabled:        data.enabled,
-          imap_host:      data.imap_host      || '',
-          imap_port:      data.imap_port      || 993,
-          imap_secure:    data.imap_secure    ?? true,
-          imap_user:      data.imap_user      || '',
-          imap_password:  '',   // nunca carrega senha na UI
-          smtp_host:      data.smtp_host      || '',
-          smtp_port:      data.smtp_port      || 587,
-          smtp_secure:    data.smtp_secure    ?? false,
-          smtp_user:      data.smtp_user      || '',
-          smtp_password:  '',   // nunca carrega senha na UI
-          smtp_from_name: data.smtp_from_name || 'Canal de Compliance',
-          smtp_from_email:data.smtp_from_email|| '',
+          enabled:           data.enabled,
+          imap_host:         data.imap_host         || '',
+          imap_port:         data.imap_port         || 993,
+          imap_secure:       data.imap_secure       ?? true,
+          imap_user:         data.imap_user         || '',
+          imap_password:     '',   // nunca carrega senha na UI
+          smtp_host:         data.smtp_host         || '',
+          smtp_port:         data.smtp_port         || 587,
+          smtp_secure:       data.smtp_secure       ?? false,
+          smtp_user:         data.smtp_user         || '',
+          smtp_password:     '',   // nunca carrega senha na UI
+          smtp_from_name:    data.smtp_from_name    || 'Canal de Compliance',
+          smtp_from_email:   data.smtp_from_email   || '',
+          filtro_remetentes: data.filtro_remetentes || '',
+          aceitar_todos:     data.aceitar_todos     ?? false,
         })
       }
       setLoading(false)
@@ -732,18 +736,20 @@ function ComplianceSettings({ profile }) {
     setSaving(true); setErr(null); setSaved(false)
     try {
       const payload = {
-        escritorio_id:   profile.escritorio_id,
-        enabled:         form.enabled,
-        imap_host:       form.imap_host.trim(),
-        imap_port:       Number(form.imap_port) || 993,
-        imap_secure:     form.imap_secure,
-        imap_user:       form.imap_user.trim(),
-        smtp_host:       form.smtp_host.trim(),
-        smtp_port:       Number(form.smtp_port) || 587,
-        smtp_secure:     form.smtp_secure,
-        smtp_user:       form.smtp_user.trim(),
-        smtp_from_name:  form.smtp_from_name.trim() || 'Canal de Compliance',
-        smtp_from_email: form.smtp_from_email.trim(),
+        escritorio_id:     profile.escritorio_id,
+        enabled:           form.enabled,
+        imap_host:         form.imap_host.trim(),
+        imap_port:         Number(form.imap_port) || 993,
+        imap_secure:       form.imap_secure,
+        imap_user:         form.imap_user.trim(),
+        smtp_host:         form.smtp_host.trim(),
+        smtp_port:         Number(form.smtp_port) || 587,
+        smtp_secure:       form.smtp_secure,
+        smtp_user:         form.smtp_user.trim(),
+        smtp_from_name:    form.smtp_from_name.trim() || 'Canal de Compliance',
+        smtp_from_email:   form.smtp_from_email.trim(),
+        filtro_remetentes: form.filtro_remetentes.trim(),
+        aceitar_todos:     form.aceitar_todos,
       }
       // Só inclui senhas se o usuário digitou algo novo
       if (pwChanged.imap && form.imap_password) {
@@ -905,6 +911,62 @@ function ComplianceSettings({ profile }) {
         </div>
       </div>
 
+      {/* ── FILTRO DE MENSAGENS ───────────────────────────────── */}
+      <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
+        <SectionTitle icon={Search} label="Filtro de mensagens" />
+        <p style={{ fontSize: 12, color: C.muted, margin: '0 0 14px' }}>
+          Define quais e-mails recebidos na caixa serão registrados como denúncias.
+          O sistema usa três regras em sequência — a primeira que for satisfeita aceita a mensagem.
+        </p>
+
+        {/* Toggle aceitar todos */}
+        <div style={{ background: C.soft, border: '1px solid ' + C.border, borderRadius: 8,
+          padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Aceitar todos os e-mails</div>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+              {form.aceitar_todos
+                ? 'Qualquer mensagem recebida nesta caixa será registrada como denúncia, sem filtro.'
+                : 'Apenas e-mails que passarem pelo filtro de remetentes ou terminologia serão registrados.'}
+            </div>
+          </div>
+          <button onClick={() => set('aceitar_todos', !form.aceitar_todos)}
+            style={{ border: 'none', background: 'none', cursor: 'pointer',
+              color: form.aceitar_todos ? C.amber : C.muted, flexShrink: 0 }}>
+            {form.aceitar_todos ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+          </button>
+        </div>
+
+        {!form.aceitar_todos && (
+          <>
+            {/* Remetentes autorizados */}
+            <FieldRow
+              label="Remetentes autorizados (endereços ou padrões)"
+              hint='Separe por vírgula. Exemplo: naorespondabrbpo@gmail.com, compliance@empresa.com — o sistema aceita o e-mail se o campo "De:" contiver qualquer um desses padrões (busca parcial, sem distinção de maiúsculas).'>
+              <input style={INP}
+                value={form.filtro_remetentes}
+                onChange={e => set('filtro_remetentes', e.target.value)}
+                placeholder="naorespondabrbpo@gmail.com, compliance@empresa.com, brbpo compliance"
+              />
+            </FieldRow>
+
+            {/* Terminologia automática */}
+            <div style={{ background: C.greenBg, border: '1px solid ' + C.green, borderRadius: 8,
+              padding: '10px 14px', fontSize: 12, color: '#065f46' }}>
+              <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <CheckCircle2 size={13} />Terminologia de compliance (automática, sempre ativa)
+              </div>
+              <div style={{ lineHeight: 1.6 }}>
+                Se nenhum remetente autorizado for encontrado, o sistema ainda aceita o e-mail se o assunto
+                ou remetente contiver termos como:{' '}
+                <em>compliance, denúncia, assédio, discriminação, corrupção, fraude, desvio de conduta,
+                irregularidade, ética, integridade, retaliação, suborno, conflito de interesses, LGPD, violação…</em>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Ações */}
       {err && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: C.red, fontSize: 13, marginBottom: 10 }}>
@@ -929,11 +991,13 @@ function ComplianceSettings({ profile }) {
 
       <div style={{ marginTop: 20, padding: '12px 14px', background: C.soft, border: '1px solid ' + C.border,
         borderRadius: 8, fontSize: 12, color: C.muted }}>
-        <strong style={{ color: C.text }}>Como funciona:</strong> após salvar, o worker de e-mail
-        (push-email-worker) lerá estas configurações automaticamente no próximo ciclo de execução.
-        Ele conectará à caixa IMAP e registrará todos os e-mails recebidos como denúncias.
-        Em seguida, o módulo SMTP enviará a auto-resposta de protocolo ao remetente.
-        Nenhuma palavra-chave é necessária — <em>qualquer</em> mensagem recebida nesta caixa é tratada como denúncia.
+        <strong style={{ color: C.text }}>Ordem de prioridade do filtro:</strong>
+        <ol style={{ margin: '6px 0 0', paddingLeft: 18, lineHeight: 1.8 }}>
+          <li><strong>Aceitar todos</strong> ativado → registra tudo sem análise.</li>
+          <li><strong>Remetente autorizado</strong> → aceita se o campo "De:" contiver qualquer padrão da lista.</li>
+          <li><strong>Terminologia</strong> → aceita se assunto ou remetente contiver vocabulário de compliance.</li>
+          <li>Nenhuma regra satisfeita → e-mail é ignorado (marcado como lido, não registrado).</li>
+        </ol>
       </div>
     </div>
   )
