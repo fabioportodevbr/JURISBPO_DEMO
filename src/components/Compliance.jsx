@@ -9,13 +9,16 @@
  * - Workflow visual de status (stepper)
  * - Composer de mensagens (officer_reply, diligência, nota interna)
  * - Anonimização do remetente (UI nunca exibe remetente_email)
+ * - Aba Configurações: gerente configura IMAP + SMTP diretamente na UI
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  ShieldAlert, Search, Filter, RefreshCw, ChevronDown, ChevronRight,
-  MessageSquare, Send, FileText, AlertTriangle, CheckCircle, Clock,
-  Eye, Plus, X, User, Lock, Inbox, Activity, Tag, Info,
-  Building, Calendar, UserCheck, ArrowRight, Loader,
+  ShieldAlert, Search, RefreshCw, ChevronRight,
+  MessageSquare, Send, FileText, CheckCircle,
+  X, Lock, Inbox, Activity, Tag,
+  Calendar, ArrowRight, Loader, Settings,
+  Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
+  AlertCircle, CheckCircle2, Wifi,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { C } from '../lib/theme.js'
@@ -625,9 +628,320 @@ function DenunciaCard({ denuncia, onClick }) {
   )
 }
 
-// ── Módulo principal ──────────────────────────────────────────────────────────
+// ── Configurações de e-mail ───────────────────────────────────────────────────
 
-export default function Compliance({ profile }) {
+const EMPTY_CFG = {
+  enabled:        false,
+  imap_host:      '', imap_port: 993, imap_secure: true,
+  imap_user:      '', imap_password: '',
+  smtp_host:      '', smtp_port: 587, smtp_secure: false,
+  smtp_user:      '', smtp_password: '',
+  smtp_from_name: 'Canal de Compliance', smtp_from_email: '',
+}
+
+function FieldRow({ label, hint, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={LBL}>{label}</label>
+      {children}
+      {hint && <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{hint}</div>}
+    </div>
+  )
+}
+
+function PasswordInput({ value, onChange, placeholder }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        type={show ? 'text' : 'password'}
+        style={{ ...INP, paddingRight: 34 }}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete="new-password"
+      />
+      <button type="button" onClick={() => setShow(s => !s)}
+        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+          border: 'none', background: 'none', cursor: 'pointer', color: C.muted, padding: 2 }}>
+        {show ? <EyeOff size={14} /> : <Eye size={14} />}
+      </button>
+    </div>
+  )
+}
+
+function SectionTitle({ icon: Icon, label }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '22px 0 14px',
+      paddingBottom: 8, borderBottom: '1px solid ' + C.border }}>
+      <Icon size={14} color={C.navy} />
+      <span style={{ fontSize: 13, fontWeight: 800, color: C.navy }}>{label}</span>
+    </div>
+  )
+}
+
+function ComplianceSettings({ profile }) {
+  const [form, setForm]           = useState(EMPTY_CFG)
+  const [pwChanged, setPwChanged] = useState({ imap: false, smtp: false })
+  const [loading, setLoading]     = useState(true)
+  const [saving, setSaving]       = useState(false)
+  const [saved, setSaved]         = useState(false)
+  const [err, setErr]             = useState(null)
+  const [exists, setExists]       = useState(false)  // já tem linha no banco?
+
+  // Carrega config atual (sem expor senhas: usa placeholder se já configuradas)
+  const [hasPwImap, setHasPwImap] = useState(false)
+  const [hasPwSmtp, setHasPwSmtp] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const { data } = await supabase
+        .from('compliance_config')
+        .select('*')
+        .eq('escritorio_id', profile.escritorio_id)
+        .maybeSingle()
+      if (data) {
+        setExists(true)
+        setHasPwImap(!!data.imap_password)
+        setHasPwSmtp(!!data.smtp_password)
+        setForm({
+          enabled:        data.enabled,
+          imap_host:      data.imap_host      || '',
+          imap_port:      data.imap_port      || 993,
+          imap_secure:    data.imap_secure    ?? true,
+          imap_user:      data.imap_user      || '',
+          imap_password:  '',   // nunca carrega senha na UI
+          smtp_host:      data.smtp_host      || '',
+          smtp_port:      data.smtp_port      || 587,
+          smtp_secure:    data.smtp_secure    ?? false,
+          smtp_user:      data.smtp_user      || '',
+          smtp_password:  '',   // nunca carrega senha na UI
+          smtp_from_name: data.smtp_from_name || 'Canal de Compliance',
+          smtp_from_email:data.smtp_from_email|| '',
+        })
+      }
+      setLoading(false)
+    }
+    load()
+  }, [profile.escritorio_id])
+
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  async function handleSave() {
+    setSaving(true); setErr(null); setSaved(false)
+    try {
+      const payload = {
+        escritorio_id:   profile.escritorio_id,
+        enabled:         form.enabled,
+        imap_host:       form.imap_host.trim(),
+        imap_port:       Number(form.imap_port) || 993,
+        imap_secure:     form.imap_secure,
+        imap_user:       form.imap_user.trim(),
+        smtp_host:       form.smtp_host.trim(),
+        smtp_port:       Number(form.smtp_port) || 587,
+        smtp_secure:     form.smtp_secure,
+        smtp_user:       form.smtp_user.trim(),
+        smtp_from_name:  form.smtp_from_name.trim() || 'Canal de Compliance',
+        smtp_from_email: form.smtp_from_email.trim(),
+      }
+      // Só inclui senhas se o usuário digitou algo novo
+      if (pwChanged.imap && form.imap_password) {
+        payload.imap_password = form.imap_password
+      }
+      if (pwChanged.smtp && form.smtp_password) {
+        payload.smtp_password = form.smtp_password
+      }
+
+      const { error } = exists
+        ? await supabase.from('compliance_config').update(payload).eq('escritorio_id', profile.escritorio_id)
+        : await supabase.from('compliance_config').insert({ ...payload,
+            imap_password: form.imap_password || '',
+            smtp_password: form.smtp_password || '',
+          })
+
+      if (error) throw error
+
+      setExists(true)
+      if (pwChanged.imap && form.imap_password) setHasPwImap(true)
+      if (pwChanged.smtp && form.smtp_password) setHasPwSmtp(true)
+      setPwChanged({ imap: false, smtp: false })
+      setForm(f => ({ ...f, imap_password: '', smtp_password: '' }))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px 0', textAlign: 'center', color: C.muted, fontSize: 13 }}>
+        <Loader size={20} style={{ animation: 'spin 0.8s linear infinite', margin: '0 auto 8px', display: 'block' }} />
+        Carregando configurações…
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Aviso de segurança */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: C.amberBg,
+        border: '1px solid ' + C.amber, borderRadius: 8, padding: '10px 14px', marginBottom: 20 }}>
+        <Lock size={14} color={C.amber} style={{ flexShrink: 0, marginTop: 1 }} />
+        <div style={{ fontSize: 12, color: '#92400e' }}>
+          <strong>Credenciais protegidas por RLS.</strong> As senhas são acessíveis apenas pelo worker
+          (service role) e pelo gerente logado. Nunca são enviadas ao frontend após o salvamento —
+          somente substituídas quando um novo valor for fornecido.
+        </div>
+      </div>
+
+      {/* Toggle de ativação */}
+      <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 10,
+        padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>Canal de Compliance</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+            {form.enabled ? 'Ativo — o worker monitora a caixa de e-mail configurada abaixo.' : 'Inativo — o worker ignora esta caixa.'}
+          </div>
+        </div>
+        <button onClick={() => set('enabled', !form.enabled)}
+          style={{ border: 'none', background: 'none', cursor: 'pointer', color: form.enabled ? C.green : C.muted }}>
+          {form.enabled ? <ToggleRight size={36} /> : <ToggleLeft size={36} />}
+        </button>
+      </div>
+
+      {/* ── IMAP ──────────────────────────────────────────────── */}
+      <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
+        <SectionTitle icon={Inbox} label="Caixa de recebimento (IMAP)" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'end' }}>
+          <FieldRow label="Servidor IMAP (host)">
+            <input style={INP} value={form.imap_host} onChange={e => set('imap_host', e.target.value)}
+              placeholder="mail.empresa.com ou imap.gmail.com" />
+          </FieldRow>
+          <FieldRow label="Porta">
+            <input style={{ ...INP, width: 80 }} type="number" value={form.imap_port}
+              onChange={e => set('imap_port', e.target.value)} />
+          </FieldRow>
+          <FieldRow label="SSL/TLS">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36 }}>
+              <input type="checkbox" id="imap_secure" checked={form.imap_secure}
+                onChange={e => set('imap_secure', e.target.checked)} style={{ cursor: 'pointer' }} />
+              <label htmlFor="imap_secure" style={{ fontSize: 13, color: C.text, cursor: 'pointer' }}>
+                {form.imap_secure ? 'SSL/TLS' : 'STARTTLS'}
+              </label>
+            </div>
+          </FieldRow>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FieldRow label="Usuário (e-mail da caixa)">
+            <input style={INP} type="email" value={form.imap_user}
+              onChange={e => set('imap_user', e.target.value)} placeholder="compliance@empresa.com" />
+          </FieldRow>
+          <FieldRow
+            label="Senha"
+            hint={hasPwImap && !pwChanged.imap ? 'Senha já configurada — preencha somente para alterar.' : undefined}>
+            <PasswordInput
+              value={form.imap_password}
+              onChange={e => { set('imap_password', e.target.value); setPwChanged(p => ({ ...p, imap: true })) }}
+              placeholder={hasPwImap && !pwChanged.imap ? '••••••••  (configurada)' : 'Senha da caixa de e-mail'}
+            />
+          </FieldRow>
+        </div>
+      </div>
+
+      {/* ── SMTP ──────────────────────────────────────────────── */}
+      <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
+        <SectionTitle icon={Mail} label="Envio de e-mails (SMTP)" />
+        <p style={{ fontSize: 12, color: C.muted, margin: '0 0 12px' }}>
+          Usado para enviar a auto-resposta ao denunciante e as mensagens do Compliance Officer.
+          Em geral é o mesmo servidor Exchange da caixa acima.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'end' }}>
+          <FieldRow label="Servidor SMTP (host)">
+            <input style={INP} value={form.smtp_host} onChange={e => set('smtp_host', e.target.value)}
+              placeholder="mail.empresa.com ou smtp.gmail.com" />
+          </FieldRow>
+          <FieldRow label="Porta">
+            <input style={{ ...INP, width: 80 }} type="number" value={form.smtp_port}
+              onChange={e => set('smtp_port', e.target.value)} />
+          </FieldRow>
+          <FieldRow label="SSL/TLS" hint="Porta 465 = SSL; 587 = STARTTLS">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36 }}>
+              <input type="checkbox" id="smtp_secure" checked={form.smtp_secure}
+                onChange={e => set('smtp_secure', e.target.checked)} style={{ cursor: 'pointer' }} />
+              <label htmlFor="smtp_secure" style={{ fontSize: 13, color: C.text, cursor: 'pointer' }}>
+                {form.smtp_secure ? 'SSL/TLS (465)' : 'STARTTLS (587)'}
+              </label>
+            </div>
+          </FieldRow>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FieldRow label="Usuário SMTP">
+            <input style={INP} type="email" value={form.smtp_user}
+              onChange={e => set('smtp_user', e.target.value)} placeholder="compliance@empresa.com" />
+          </FieldRow>
+          <FieldRow
+            label="Senha SMTP"
+            hint={hasPwSmtp && !pwChanged.smtp ? 'Senha já configurada — preencha somente para alterar.' : undefined}>
+            <PasswordInput
+              value={form.smtp_password}
+              onChange={e => { set('smtp_password', e.target.value); setPwChanged(p => ({ ...p, smtp: true })) }}
+              placeholder={hasPwSmtp && !pwChanged.smtp ? '••••••••  (configurada)' : 'Senha do servidor SMTP'}
+            />
+          </FieldRow>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FieldRow label="Nome do remetente (exibido no e-mail)">
+            <input style={INP} value={form.smtp_from_name}
+              onChange={e => set('smtp_from_name', e.target.value)} placeholder="Canal de Compliance" />
+          </FieldRow>
+          <FieldRow label="E-mail de envio (endereço 'De:')">
+            <input style={INP} type="email" value={form.smtp_from_email}
+              onChange={e => set('smtp_from_email', e.target.value)} placeholder="compliance@empresa.com" />
+          </FieldRow>
+        </div>
+      </div>
+
+      {/* Ações */}
+      {err && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: C.red, fontSize: 13, marginBottom: 10 }}>
+          <AlertCircle size={14} />{err}
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={handleSave} disabled={saving}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 20px',
+            background: C.navy, color: 'white', border: 'none', borderRadius: 8,
+            fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+          {saving
+            ? <><Loader size={14} style={{ animation: 'spin 0.8s linear infinite' }} />Salvando…</>
+            : <><Server size={14} />Salvar configurações</>}
+        </button>
+        {saved && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: C.green, fontSize: 13, fontWeight: 600 }}>
+            <CheckCircle2 size={15} />Configurações salvas com sucesso!
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 20, padding: '12px 14px', background: C.soft, border: '1px solid ' + C.border,
+        borderRadius: 8, fontSize: 12, color: C.muted }}>
+        <strong style={{ color: C.text }}>Como funciona:</strong> após salvar, o worker de e-mail
+        (push-email-worker) lerá estas configurações automaticamente no próximo ciclo de execução.
+        Ele conectará à caixa IMAP e registrará todos os e-mails recebidos como denúncias.
+        Em seguida, o módulo SMTP enviará a auto-resposta de protocolo ao remetente.
+        Nenhuma palavra-chave é necessária — <em>qualquer</em> mensagem recebida nesta caixa é tratada como denúncia.
+      </div>
+    </div>
+  )
+}
+
+// ── Painel de denúncias ───────────────────────────────────────────────────────
+
+function DenunciasList({ profile }) {
   const [denuncias, setDenuncias]       = useState([])
   const [loading, setLoading]           = useState(true)
   const [selected, setSelected]         = useState(null)
@@ -673,38 +987,17 @@ export default function Compliance({ profile }) {
 
   if (loading) {
     return (
-      <div style={{ height: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ height: '40vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ width: 32, height: 32, border: '3px solid rgba(0,0,0,0.1)', borderTopColor: C.navy, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
           <p style={{ color: C.muted, fontSize: 13 }}>Carregando denúncias…</p>
         </div>
-        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       </div>
     )
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
-      {/* Título */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ShieldAlert size={17} color="white" />
-          </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: C.text }}>Canal de Compliance</h1>
-            <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Gestão de denúncias — acesso restrito a gerentes</p>
-          </div>
-        </div>
-        <button onClick={() => fetchDenuncias(true)} disabled={refreshing}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', border: '1px solid ' + C.border,
-            borderRadius: 8, background: C.white, color: C.muted, fontSize: 12, cursor: 'pointer' }}>
-          <RefreshCw size={13} style={refreshing ? { animation: 'spin 0.8s linear infinite' } : {}} />
-          Atualizar
-        </button>
-      </div>
-
-      {/* Cards de dashboard */}
+    <>
       <DashboardCards denuncias={denuncias} />
 
       {/* Filtros */}
@@ -721,6 +1014,11 @@ export default function Compliance({ profile }) {
           <option value="todos">Todas as categorias</option>
           {Object.entries(CATEGORIA_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
+        <button onClick={() => fetchDenuncias(true)} disabled={refreshing}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px', border: '1px solid ' + C.border,
+            borderRadius: 8, background: C.white, color: C.muted, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+          <RefreshCw size={13} style={refreshing ? { animation: 'spin 0.8s linear infinite' } : {}} />
+        </button>
       </div>
 
       {/* Lista */}
@@ -742,7 +1040,6 @@ export default function Compliance({ profile }) {
         </div>
       )}
 
-      {/* Modal */}
       {selected && (
         <DenunciaModal
           denuncia={selected}
@@ -751,6 +1048,48 @@ export default function Compliance({ profile }) {
           onUpdated={handleUpdated}
         />
       )}
+    </>
+  )
+}
+
+// ── Módulo principal ──────────────────────────────────────────────────────────
+
+export default function Compliance({ profile }) {
+  const [mainTab, setMainTab] = useState('denuncias')
+
+  const tabStyle = (active) => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '9px 18px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+    background: 'transparent',
+    borderBottom: active ? `3px solid ${C.navy}` : '3px solid transparent',
+    color: active ? C.navy : C.muted,
+  })
+
+  return (
+    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
+      {/* Título */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ShieldAlert size={17} color="white" />
+        </div>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: C.text }}>Canal de Compliance</h1>
+          <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Acesso restrito a gerentes</p>
+        </div>
+      </div>
+
+      {/* Tabs principais */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid ' + C.border, marginBottom: 22, marginTop: 18 }}>
+        <button style={tabStyle(mainTab === 'denuncias')} onClick={() => setMainTab('denuncias')}>
+          <ShieldAlert size={14} />Denúncias
+        </button>
+        <button style={tabStyle(mainTab === 'configuracoes')} onClick={() => setMainTab('configuracoes')}>
+          <Settings size={14} />Configurações de e-mail
+        </button>
+      </div>
+
+      {mainTab === 'denuncias'     && <DenunciasList profile={profile} />}
+      {mainTab === 'configuracoes' && <ComplianceSettings profile={profile} />}
 
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>

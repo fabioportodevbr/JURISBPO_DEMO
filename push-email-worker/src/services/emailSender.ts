@@ -1,44 +1,43 @@
 import nodemailer from 'nodemailer'
-import { config } from '../config.js'
+import { ComplianceDbConfig } from '../types.js'
 
-let _transporter: nodemailer.Transporter | null = null
+// ---------------------------------------------------------------------------
+// Criação de transporter por configuração
+// O worker cria um transporter por ciclo (não singleton) para suportar
+// múltiplos escritórios com configs distintas.
+// ---------------------------------------------------------------------------
 
-function getTransporter(): nodemailer.Transporter {
-  if (!_transporter) {
-    if (!config.SMTP_HOST || !config.SMTP_USER || !config.SMTP_PASSWORD) {
-      throw new Error(
-        '[compliance-smtp] SMTP não configurado. Defina SMTP_HOST, SMTP_USER e SMTP_PASSWORD no .env.'
-      )
-    }
-    _transporter = nodemailer.createTransport({
-      host: config.SMTP_HOST,
-      port: config.SMTP_PORT,
-      secure: config.SMTP_SECURE,
-      auth: {
-        user: config.SMTP_USER,
-        pass: config.SMTP_PASSWORD,
-      },
-      tls: {
-        rejectUnauthorized: false, // compatibilidade com certificados self-signed em Exchange
-      },
-    })
+function createTransporter(cfg: ComplianceDbConfig): nodemailer.Transporter {
+  if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPassword) {
+    throw new Error(
+      '[compliance-smtp] SMTP não configurado para o escritório ' + cfg.escritorioId
+    )
   }
-  return _transporter
+  return nodemailer.createTransport({
+    host: cfg.smtpHost,
+    port: cfg.smtpPort,
+    secure: cfg.smtpSecure,
+    auth: {
+      user: cfg.smtpUser,
+      pass: cfg.smtpPassword,
+    },
+    tls: {
+      rejectUnauthorized: false, // compatibilidade com certificados self-signed em Exchange
+    },
+  })
 }
 
-export async function sendEmail(opts: {
-  to: string
-  subject: string
-  html: string
-  replyTo?: string
-}): Promise<void> {
-  const t = getTransporter()
+export async function sendEmail(
+  opts: { to: string; subject: string; html: string; replyTo?: string },
+  cfg: ComplianceDbConfig
+): Promise<void> {
+  const t = createTransporter(cfg)
   await t.sendMail({
-    from: `"${config.SMTP_FROM_NAME}" <${config.SMTP_FROM_EMAIL}>`,
-    to: opts.to,
+    from:    `"${cfg.smtpFromName}" <${cfg.smtpFromEmail}>`,
+    to:      opts.to,
     subject: opts.subject,
-    html: opts.html,
-    replyTo: opts.replyTo ?? config.SMTP_FROM_EMAIL,
+    html:    opts.html,
+    replyTo: opts.replyTo ?? cfg.smtpFromEmail,
   })
 }
 

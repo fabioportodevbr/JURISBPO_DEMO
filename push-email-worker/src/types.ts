@@ -32,3 +32,23 @@ export type ParsedDenuncia = {
   rawTextHash: string         // SHA-256 para deduplicação
   escritorioId: string        // UUID do escritório compliance
 }
+
+// Configuração IMAP+SMTP lida do banco (compliance_config) pelo worker
+export type ComplianceDbConfig = {
+  id: string
+  escritorioId: string
+  // IMAP
+  imapHost: string
+  imapPort: number
+  imapSecure: boolean
+  imapUser: string
+  imapPassword: string
+  // SMTP
+  smtpHost: string
+  smtpPort: number
+  smtpSecure: boolean
+  smtpUser: string
+  smtpPassword: string
+  smtpFromName: string
+  smtpFromEmail: string
+}

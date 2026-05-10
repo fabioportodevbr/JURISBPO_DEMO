@@ -2,11 +2,12 @@
  * complianceOutbox.ts
  * Processa mensagens com status_envio='pendente' (auto_resposta, officer_reply, diligencia).
  * Lê o remetente_email da denúncia (SERVICE_ROLE, nunca exposto ao frontend)
- * e envia via SMTP (nodemailer).
+ * e envia via SMTP usando a configuração lida do banco (compliance_config).
  *
- * Roda via cron a cada minuto.
+ * Roda via cron a cada minuto para cada escritório com compliance ativo.
  */
 import { supabase } from '../db/supabase.js'
+import { ComplianceDbConfig } from '../types.js'
 import { sendEmail, buildAutoReplyHtml, buildOfficerMessageHtml } from './emailSender.js'
 
 const BATCH_SIZE = 10   // mensagens por ciclo para não sobrecarregar o SMTP
@@ -20,7 +21,6 @@ type PendingMsg = {
   corpo: string
   setor_acionado: string | null
   enviado_por_nome: string | null
-  // campos da denúncia pai (join)
   compliance_denuncias: {
     numero: string
     remetente_email: string
@@ -28,8 +28,8 @@ type PendingMsg = {
   } | null
 }
 
-export async function processComplianceOutbox(): Promise<void> {
-  // Busca mensagens pendentes com join na denúncia para obter remetente_email
+export async function processComplianceOutbox(cfg: ComplianceDbConfig): Promise<void> {
+  // Busca mensagens pendentes do escritório com join na denúncia
   const { data: rows, error } = await supabase
     .from('compliance_mensagens')
     .select(`
@@ -37,17 +37,18 @@ export async function processComplianceOutbox(): Promise<void> {
       compliance_denuncias ( numero, remetente_email, data_protocolo )
     `)
     .eq('status_envio', 'pendente')
+    .eq('escritorio_id', cfg.escritorioId)
     .order('criado_em', { ascending: true })
     .limit(BATCH_SIZE)
 
   if (error) {
-    console.error('[compliance-outbox] Erro ao buscar pendentes:', error)
+    console.error(`[compliance-outbox][${cfg.escritorioId}] Erro ao buscar pendentes:`, error)
     return
   }
 
   if (!rows || rows.length === 0) return
 
-  console.log(`[compliance-outbox] Processando ${rows.length} mensagem(ns) pendente(s)...`)
+  console.log(`[compliance-outbox][${cfg.escritorioId}] Processando ${rows.length} mensagem(ns) pendente(s)...`)
 
   for (const row of rows as unknown as PendingMsg[]) {
     try {
@@ -58,19 +59,25 @@ export async function processComplianceOutbox(): Promise<void> {
       }
 
       // Resolve o destinatário real:
-      // - auto_resposta → vai para o denunciante (remetente_email da denúncia)
-      // - officer_reply → também vai para o denunciante
-      // - diligencia    → vai para para_email (e-mail do setor acionado), fornecido pelo officer
+      // - auto_resposta → remetente_email da denúncia (o denunciante)
+      // - officer_reply → idem
+      // - diligencia    → para_email (e-mail do setor, preenchido pelo officer)
       let toEmail: string | null = null
 
       if (row.tipo === 'auto_resposta' || row.tipo === 'officer_reply') {
         toEmail = denuncia.remetente_email
       } else if (row.tipo === 'diligencia') {
-        toEmail = row.para_email   // preenchido pelo officer no frontend
+        toEmail = row.para_email
       }
 
       if (!toEmail) {
         await markFailed(row.id, `Destinatário não resolvido para tipo=${row.tipo}`)
+        continue
+      }
+
+      // Valida configuração SMTP mínima
+      if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPassword) {
+        await markFailed(row.id, 'SMTP não configurado para este escritório')
         continue
       }
 
@@ -88,7 +95,6 @@ export async function processComplianceOutbox(): Promise<void> {
         html    = buildAutoReplyHtml(denuncia.numero, dataFmt)
         subject = row.assunto ?? `Protocolo recebido — ${denuncia.numero}`
       } else {
-        // officer_reply ou diligencia
         html = buildOfficerMessageHtml({
           corpo:          row.corpo,
           officerNome:    row.enviado_por_nome ?? 'Compliance Officer',
@@ -103,9 +109,8 @@ export async function processComplianceOutbox(): Promise<void> {
         )
       }
 
-      await sendEmail({ to: toEmail, subject, html })
+      await sendEmail({ to: toEmail, subject, html }, cfg)
 
-      // Marca como enviado
       await supabase
         .from('compliance_mensagens')
         .update({ status_envio: 'enviado', enviado_em: new Date().toISOString(), erro_envio: null })
