@@ -63,6 +63,8 @@ export const can = (profile, acao) => {
     'ia.usar': nivel >= 2,
     'perfil.editar': !readOnly,
     'mensagens.enviar': !readOnly && nivel >= 1,
+    'compliance.ver': nivel >= 4,
+    'compliance.gerenciar': nivel >= 4,
   }
   return perms[acao] ?? false
 }

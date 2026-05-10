@@ -16,11 +16,13 @@
     "imapflow": "latest",
     "mailparser": "latest",
     "node-cron": "latest",
+    "nodemailer": "latest",
     "typescript": "^6.0.3",
     "zod": "latest"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "@types/nodemailer": "latest",
     "tsx": "^4.21.0"
   }
 }

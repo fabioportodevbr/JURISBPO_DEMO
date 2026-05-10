@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, FileText, CheckSquare, Calendar,
   Brain, Users, Bell, LogOut, Menu, ChevronRight, Settings,
-  AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet, MessageSquare,
+  AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet, MessageSquare, ShieldAlert,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import { supabase, signOut, can, ROLES } from './lib/supabase.js'
@@ -29,6 +29,7 @@ import PartesCRM   from './components/PartesCRM.jsx'
 import Acervo      from './components/Acervo.jsx'
 import Financeiro  from './pages/Financeiro.tsx'
 import ConfiguracaoCalendario from './pages/ConfiguracaoCalendario.jsx'
+import Compliance from './components/Compliance.jsx'
 
 // ── Tema ─────────────────────────────────────────────────────────────────
 import { C } from './lib/theme'
@@ -49,6 +50,7 @@ function buildNav(profile) {
     { path: '/forum',         label: 'Fórum',         Icon: MessageSquare },
     { path: '/relatorios', label: 'Relatórios', Icon: BarChart3, perm: 'processos.ver' },
     { path: '/equipe',     label: 'Equipe',         Icon: Users,     perm: 'equipe.ver' },
+    { path: '/compliance', label: 'Compliance',     Icon: ShieldAlert, perm: 'compliance.ver' },
   ]
   return all.filter(item => !item.perm || can(profile, item.perm))
 }
@@ -224,6 +226,7 @@ function AppLayout() {
             <Route path="/relatorios" element={<Relatorios profile={profile} />} />
             <Route path="/equipe"     element={can(profile,'equipe.ver')     ? <Equipe     profile={profile} /> : <Bloqueado />} />
             <Route path="/perfil"     element={<MeuPerfil  profile={profile} />} />
+            <Route path="/compliance"  element={can(profile,'compliance.ver') ? <Compliance profile={profile} /> : <Bloqueado />} />
             <Route path="/configuracao-calendario" element={profile?.role === 'gerente' ? <ConfiguracaoCalendario profile={profile} /> : <Bloqueado />} />
             <Route path="*"           element={<Navigate to="/dashboard" replace />} />
           </Routes>
