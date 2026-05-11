@@ -29,14 +29,23 @@ function fmt(d) {
   return d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 }
 
-function EventPill({ e, onClick }) {
-  const bg = e.origem === 'google' ? colorsGoogle : (colorsSystem[e.type] || C.blue)
+function eventColor(e) {
+  return e.origem === 'google' ? colorsGoogle : (colorsSystem[e.type] || C.blue)
+}
+
+function DayMarker({ events, onClick }) {
+  const visible = events.slice(0, 4)
   return (
     <button
       onClick={onClick}
-      style={{ width: '100%', textAlign: 'left', border: 0, borderRadius: 5, padding: '3px 5px', background: bg, color: 'white', fontSize: 11, fontWeight: 700, marginTop: 3, cursor: 'pointer', whiteSpace: 'normal', lineHeight: 1.2, overflowWrap: 'anywhere' }}
+      title={`${events.length} evento(s) neste dia`}
+      style={{ width: '100%', minHeight: 28, border: '1px solid ' + C.border, borderRadius: 8, padding: '5px 6px', background: C.bg, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer' }}
     >
-      {e.origem === 'google' ? '📅 ' : ''}{e.label}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+        {visible.map((e, idx) => <span key={e.type + e.id + idx} style={{ width: 7, height: 7, borderRadius: 999, background: eventColor(e), flexShrink: 0 }} />)}
+        {events.length > visible.length && <span style={{ fontSize: 10, color: C.muted, fontWeight: 900, lineHeight: 1 }}>+{events.length - visible.length}</span>}
+      </span>
+      <span style={{ fontSize: 11, color: C.text, fontWeight: 900, lineHeight: 1 }}>{events.length}</span>
     </button>
   )
 }
@@ -89,6 +98,40 @@ function Modal({ event, onClose }) {
   )
 }
 
+function DayEventsModal({ day, onClose, onOpenEvent }) {
+  if (!day) return null
+  return (
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 590, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+    >
+      <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 560, maxHeight: '88vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid ' + C.border, padding: 16, alignItems: 'center' }}>
+          <div>
+            <b style={{ color: C.text }}>{fmt(day.date)}</b>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{day.events.length} evento(s)</div>
+          </div>
+          <button onClick={onClose} style={{ border: 0, background: 'none', cursor: 'pointer', color: C.text, display: 'flex', padding: 4 }}><X /></button>
+        </div>
+        <div style={{ padding: 14, overflow: 'auto', display: 'grid', gap: 8 }}>
+          {day.events.map(e => (
+            <button
+              key={e.type + e.id}
+              onClick={() => onOpenEvent(e)}
+              style={{ textAlign: 'left', border: '1px solid ' + C.border, borderLeft: `5px solid ${eventColor(e)}`, borderRadius: 10, padding: 12, background: C.white, color: C.text, cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 800, marginBottom: 4 }}>
+                {e.data?.horario ? `${e.data.horario}${e.data?.horario_fim ? ` - ${e.data.horario_fim}` : ''}` : (e.origem === 'google' ? 'Google Calendar' : labels[e.type])}
+              </div>
+              <b style={{ fontSize: 14 }}>{e.label}</b>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Calendario({ profile }) {
   const [searchParams] = useSearchParams()
   const [events, setEvents] = useState([])
@@ -98,6 +141,7 @@ export default function Calendario({ profile }) {
   const [mode, setMode] = useState('mes')
   const [mobile, setMobile] = useState(false)
   const [sel, setSel] = useState(null)
+  const [dayModal, setDayModal] = useState(null)
   const [loadingGoogle, setLoadingGoogle] = useState(false)
   const [googleError, setGoogleError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
@@ -281,14 +325,15 @@ export default function Calendario({ profile }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
               {cells.map((day, i) => {
                 const date = day ? `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : ''
+                const dayEvents = day ? (byDate[date] || []) : []
                 return (
-                  <div key={i} style={{ minHeight: 96, padding: 8, borderRight: '1px solid ' + C.border, borderBottom: '1px solid ' + C.border, background: day ? C.white : C.bg }}>
+                  <div key={i} style={{ height: 96, padding: 8, borderRight: '1px solid ' + C.border, borderBottom: '1px solid ' + C.border, background: day ? C.white : C.bg, boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {day && (
                       <>
-                        <div style={{ fontSize: 12, fontWeight: 800 }}>{day}</div>
-                        {(byDate[date] || []).map(e => (
-                          <EventPill key={e.type + e.id} e={e} onClick={() => setSel(e)} />
-                        ))}
+                        <div style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{day}</div>
+                        {dayEvents.length > 0 && (
+                          <DayMarker events={dayEvents} onClick={() => setDayModal({ date, events: dayEvents })} />
+                        )}
                       </>
                     )}
                   </div>
@@ -302,7 +347,7 @@ export default function Calendario({ profile }) {
               <button
                 key={e.type + e.id}
                 onClick={() => setSel(e)}
-                style={{ textAlign: 'left', background: C.white, border: '1px solid ' + C.border, borderLeft: `5px solid ${e.origem === 'google' ? colorsGoogle : (colorsSystem[e.type] || C.blue)}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}
+                style={{ textAlign: 'left', background: C.white, border: '1px solid ' + C.border, borderLeft: `5px solid ${eventColor(e)}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}
               >
                 <div style={{ fontSize: 12, color: C.muted, fontWeight: 800 }}>
                   {fmt(e.date)} · {e.origem === 'google' ? '📅 Google Calendar' : labels[e.type]}
@@ -326,6 +371,7 @@ export default function Calendario({ profile }) {
         ))}
       </div>
 
+      <DayEventsModal day={dayModal} onClose={() => setDayModal(null)} onOpenEvent={(event) => { setDayModal(null); setSel(event) }} />
       <Modal event={sel} onClose={() => setSel(null)} />
     </div>
   )

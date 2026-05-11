@@ -1354,7 +1354,7 @@ export default function Acervo({ profile }) {
                   type="button"
                   onClick={() => setShowEncerrarModal(true)}
                   title={`Clique aqui para encerrar o controle de ofícios de ${anoVigente} e iniciar o do próximo ano`}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', border: '1px solid ' + C.border, borderRadius: 6, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', opacity: 0.7 }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', border: '1px solid ' + C.danger, borderRadius: 6, background: C.dangerLight, color: C.danger, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', opacity: 1 }}>
                   <Archive size={12} />
                   Encerrar {anoVigente}
                 </button>
@@ -1430,7 +1430,7 @@ export default function Acervo({ profile }) {
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <button type="button" onClick={() => setShowEncerrarModal(false)} style={{ padding: '8px 18px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}>Cancelar</button>
-            <button type="button" onClick={confirmEncerrarControleAnual} style={{ padding: '8px 18px', border: 'none', borderRadius: 8, background: C.navy, color: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>Confirmar arquivamento</button>
+            <button type="button" onClick={confirmEncerrarControleAnual} style={{ padding: '8px 18px', border: '1px solid ' + C.danger, borderRadius: 8, background: C.dangerLight, color: C.danger, cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit' }}>Confirmar arquivamento</button>
           </div>
         </Modal>
       )}

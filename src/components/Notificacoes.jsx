@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { Bell, CheckCircle, RefreshCw, Inbox, X, Archive, ArchiveRestore } from 'lucide-react'
+import { Bell, RefreshCw, Inbox, X, Archive, ArchiveRestore } from 'lucide-react'
 
 import { C } from '../lib/theme'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
@@ -21,7 +21,7 @@ function Chip({tipo}){const [label,bg,color]=tipoInfo[tipo]||[tipo||'Aviso',C.gr
 
 function Empty({text}){return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:28,textAlign:'center',color:C.muted}}><Inbox size={28} style={{display:'block',margin:'0 auto 8px'}}/>{text}</div>}
 
-export default function Notificacoes({profile}){
+export default function Notificacoes({profile, embedded=false}){
   const [modo,setModo]=useState('entrada')
   const [notificacoes,setNotificacoes]=useState([])
   const [loading,setLoading]=useState(false)
@@ -94,18 +94,19 @@ export default function Notificacoes({profile}){
 
   const naoLidas=(notificacoes||[]).filter(n=>!n.lida&&!n.arquivada).length
 
-  return <div style={{padding:24}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+  return <div style={{padding:embedded?0:24}}>
+    {!embedded&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
       <div>
         <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Notificações</h1>
         <p style={{color:C.muted,marginTop:4,marginBottom:0}}>Avisos de atividades, redistribuições e vencimentos de prazo.</p>
       </div>
       <button onClick={carregar} style={{border:'1px solid '+C.border,background:C.white,borderRadius:8,padding:'9px 16px',cursor:'pointer',display:'flex',gap:7,alignItems:'center',fontWeight:700,fontSize:13}}><RefreshCw size={14}/>Atualizar</button>
-    </div>
+    </div>}
 
-    <div style={{display:'flex',gap:8,margin:'18px 0',flexWrap:'wrap',alignItems:'center'}}>
+    <div style={{display:'flex',gap:8,margin:embedded?'0 0 18px':'18px 0',flexWrap:'wrap',alignItems:'center',justifyContent:embedded?'space-between':'flex-start'}}>
       <button onClick={()=>setModo('entrada')} style={{border:'1px solid '+C.border,background:modo==='entrada'?C.greenBg:C.white,color:modo==='entrada'?C.green:C.text,borderRadius:20,padding:'7px 11px',fontWeight:800,cursor:'pointer',display:'flex',gap:6,alignItems:'center',fontSize:13}}><Inbox size={14}/>Caixa de entrada{naoLidas>0&&<span style={{background:C.red,color:'white',borderRadius:999,padding:'1px 7px',fontSize:11,fontWeight:900}}>{naoLidas}</span>}</button>
       <button onClick={()=>setModo('arquivo')} style={{border:'1px solid '+C.border,background:modo==='arquivo'?C.greenBg:C.white,color:modo==='arquivo'?C.green:C.text,borderRadius:20,padding:'7px 11px',fontWeight:800,cursor:'pointer',display:'flex',gap:6,alignItems:'center',fontSize:13}}><Archive size={14}/>Arquivo</button>
+      {embedded&&<button onClick={carregar} style={{marginLeft:'auto',border:'1px solid '+C.border,background:C.white,borderRadius:8,padding:'8px 11px',cursor:'pointer',display:'flex',gap:7,alignItems:'center',fontWeight:700,fontSize:13,color:C.text}}><RefreshCw size={14}/>Atualizar</button>}
     </div>
 
     {loading?<div style={{color:C.muted}}>Carregando...</div>:<div style={{display:'grid',gap:10}}>{notificacoesVisiveis.length===0?<Empty text={modo==='arquivo'?'Nenhuma notificação arquivada.':'Nenhuma notificação na caixa de entrada.'}/>:notificacoesVisiveis.map(n=><NotificationCard key={n.id} n={n}/>)}</div>}
@@ -120,5 +121,19 @@ export default function Notificacoes({profile}){
         </div>
       </div>
     </Modal>}
+  </div>
+}
+
+export function NotificacoesModal({profile,onClose}){
+  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:680,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:760,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:18,borderBottom:'1px solid '+C.border}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,color:C.text,fontWeight:900}}><Bell size={17}/>NotificaÃ§Ãµes</div>
+        <button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',display:'flex',padding:4,color:C.text}}><X/></button>
+      </div>
+      <div style={{padding:18,overflow:'auto'}}>
+        <Notificacoes profile={profile} embedded />
+      </div>
+    </div>
   </div>
 }

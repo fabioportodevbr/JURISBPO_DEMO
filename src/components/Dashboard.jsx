@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
-import { Bell, AlertTriangle, Mail, CheckCircle, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff, Sun, Moon } from 'lucide-react'
+import { Bell, AlertTriangle, Mail, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff, Sun, Moon } from 'lucide-react'
 import ClippingJuridico from './ClippingJuridico.jsx'
 import MuralRecados from './MuralRecados.jsx'
+import { NotificacoesModal } from './Notificacoes.jsx'
 import { FinanceiroResumoDashboard } from './FinanceiroResumoDashboard.tsx'
 
 import { C } from '../lib/theme'
@@ -214,16 +215,17 @@ function saudacaoHorario(){
   return 'Boa noite'
 }
 
-export default function Dashboard({profile}){
+export default function Dashboard({profile, unreadCount=0}){
   const navigate=useNavigate()
   const[pushModal,setPushModal]=useState(false)
+  const[notificacoesModal,setNotificacoesModal]=useState(false)
   const[audienciaModal,setAudienciaModal]=useState(null)
   const[atividadeModal,setAtividadeModal]=useState(null)
   const[contratoModal,setContratoModal]=useState(null)
   const[createPush,setCreatePush]=useState(null)
   const[createForm,setCreateForm]=useState({numero:'',titulo:'',tribunal:'',categoria:'trabalhista',parte_contraria:'',resumo_processo:''})
   const[savingProcess,setSavingProcess]=useState(false)
-  const[st,setSt]=useState({p:0,c:0,pendentes:[],futuras:[],audienciasSemana:[],reunioesSemana:[],ren:[],notificacoes:[],mensagens:[],pushNovos:0,pushImportantes:0,pushUltimo:null,pushItems:[]})
+  const[st,setSt]=useState({p:0,c:0,pendentes:[],futuras:[],audienciasSemana:[],reunioesSemana:[],ren:[],pushNovos:0,pushImportantes:0,pushUltimo:null,pushItems:[]})
 
   useEffect(()=>{(async()=>{
     const eid=profile.escritorio_id
@@ -232,12 +234,10 @@ export default function Dashboard({profile}){
     const fimSemana=addDaysISO(7)
     const desde24h=new Date(Date.now()-24*60*60*1000).toISOString()
     const atividadesQueryFactory=()=>{let query=supabase.from('atividades').select('*').eq('escritorio_id',eid).neq('status','concluida');if(profile.role!=='gerente'){query=query.or(`tipo.in.(audiencia,reuniao),and(tipo.in.(tarefa,prazo_processual),responsavel_id.eq.${profile.id})`)}return query}
-    const[p,c,a,{data:n},{data:m},{data:push}]=await Promise.all([
+    const[p,c,a,{data:push}]=await Promise.all([
       fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
       fetchAllRows(()=>supabase.from('contratos').select('*').eq('escritorio_id',eid)),
       fetchAllRows(atividadesQueryFactory),
-      supabase.from('notificacoes').select('*').eq('usuario_id',profile.id).eq('lida',false).eq('arquivada',false).order('created_at',{ascending:false}).limit(5),
-      supabase.from('mensagens').select('*').eq('destinatario_id',profile.id).eq('lida',false).not('arquivada_por','cs',`{${profile.id}}`).order('created_at',{ascending:false}).limit(5),
       supabase.from('andamentos_processuais_push').select('id,processo_id,cliente_id,numero_processo,tribunal,movimento,assunto_email,corpo_email_resumo,corpo_resumo,corpo_email_limpo,remetente,data_movimento,criado_em,status_associacao').eq('escritorio_id',eid).neq('status_associacao','ignorado').gte('criado_em',desde24h).order('criado_em',{ascending:false}).limit(100),
     ])
     const atividades=(a||[]).filter(isOpen)
@@ -247,10 +247,8 @@ export default function Dashboard({profile}){
     const reunioesSemana=atividades.filter(x=>isMeeting(x)&&x.prazo&&x.prazo>=hoje&&x.prazo<=fimSemana).sort(compareByDate)
     const ren=(c||[]).map(x=>({...x,renovacao:renewalState(x)})).filter(x=>x.renovacao).sort((x,y)=>x.renovacao.days-y.renovacao.days).slice(0,5)
     const pushItems=push||[]
-    setSt({p:(p||[]).filter(x=>x.status==='ativo').length,c:(c||[]).filter(x=>x.status==='ativo'||x.status==='a_vencer').length,pendentes,futuras,audienciasSemana,reunioesSemana,ren,notificacoes:n||[],mensagens:m||[],pushNovos:pushItems.length,pushImportantes:pushItems.filter(isImportantPush).length,pushUltimo:pushItems[0]||null,pushItems})
+    setSt({p:(p||[]).filter(x=>x.status==='ativo').length,c:(c||[]).filter(x=>x.status==='ativo'||x.status==='a_vencer').length,pendentes,futuras,audienciasSemana,reunioesSemana,ren,pushNovos:pushItems.length,pushImportantes:pushItems.filter(isImportantPush).length,pushUltimo:pushItems[0]||null,pushItems})
   })()},[profile.escritorio_id,profile.id,profile.role])
-
-  const totalAvisos=useMemo(()=>st.notificacoes.length+st.mensagens.length,[st.notificacoes,st.mensagens])
 
   const abrirProcesso=(processoId)=>{if(!processoId)return;setPushModal(false);navigate(`/processos?processo_id=${processoId}`)}
   const abrirContrato=(contratoId)=>{if(!contratoId)return;navigate(`/contratos?contrato_id=${contratoId}`)}
@@ -288,9 +286,15 @@ export default function Dashboard({profile}){
         <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
         <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
       </div>
-      <button onClick={toggleTheme} title="Alternar modo Claro / Escuro" style={{border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
+      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <button onClick={()=>setNotificacoesModal(true)} title="Notificações" style={{position:'relative',border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
+          <Bell size={18} />
+          {unreadCount>0&&<span title={`${unreadCount} notificação(ões) não lida(s)`} style={{position:'absolute',top:-7,right:-7,minWidth:18,height:18,borderRadius:999,background:'#dc2626',color:'white',fontSize:10,fontWeight:900,display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 0 0 2px '+C.bg}}>{unreadCount>9?'9+':unreadCount}</span>}
+        </button>
+        <button onClick={toggleTheme} title="Alternar modo Claro / Escuro" style={{border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+      </div>
     </div>
 
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14,marginTop:22}}>
@@ -300,7 +304,7 @@ export default function Dashboard({profile}){
       <Card title="Atividades futuras" value={st.futuras.length} sub="tarefas e prazos a partir de amanhã" color={C.amber}/>
       <Card title="Audiências na semana" value={st.audienciasSemana.length} sub="próximos 7 dias" color={C.blue}/>
       <Card title="Reuniões na semana" value={st.reunioesSemana.length} sub="próximos 7 dias" color={C.green}/>
-      <Card title="Alertas e mensagens" value={totalAvisos} sub="itens não lidos" color={totalAvisos?C.red:C.green}/>
+      <Card title="Notificações" value={unreadCount} sub="itens não lidos" color={unreadCount?C.red:C.green}/>
     </div>
 
     <div style={{marginTop:22}}>
@@ -311,14 +315,6 @@ export default function Dashboard({profile}){
     </div>
 
     <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info" onItemClick={setAudienciaModal}/>
-
-    <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
-      <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Notificações e mensagens não lidas</h2>
-      {totalAvisos?<div>
-        {st.notificacoes.map(n=><div key={'n-'+n.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:C.amberBg}}><b>{n.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{n.descricao||'Notificação interna'} · {new Date(n.created_at).toLocaleString('pt-BR')}</div></div>)}
-        {st.mensagens.map(m=><div key={'m-'+m.id} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:C.blueBg}}><b style={{display:'flex',alignItems:'center',gap:6}}><Mail size={14}/> {m.assunto}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{m.corpo?.slice(0,160)}{m.corpo?.length>160?'...':''} · {new Date(m.created_at).toLocaleString('pt-BR')}</div></div>)}
-      </div>:<div style={{padding:24,textAlign:'center',color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><CheckCircle size={16}/>Nenhuma notificação ou mensagem nova.</div>}
-    </div>
 
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
       <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas de renovação contratual</h2>
@@ -337,6 +333,7 @@ export default function Dashboard({profile}){
     <ClippingJuridico/>
 
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso} onDismiss={desconsiderarPush}/>}
+    {notificacoesModal&&<NotificacoesModal profile={profile} onClose={()=>setNotificacoesModal(false)}/>}
     {audienciaModal&&<AudienciaModal audiencia={audienciaModal} onClose={()=>setAudienciaModal(null)} onOpenProcess={abrirProcesso}/>}
     {atividadeModal&&<AtividadeModal atividade={atividadeModal} onClose={()=>setAtividadeModal(null)} onOpenProcess={abrirProcesso}/>}
     {contratoModal&&<ContratoAlertaModal contrato={contratoModal} onClose={()=>setContratoModal(null)} onOpenContract={abrirContrato}/>}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, FileText, CheckSquare, Calendar,
-  Brain, Users, Bell, LogOut, Menu, ChevronRight, Settings,
+  Brain, Users, LogOut, Menu, ChevronRight, Settings,
   AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet, MessageSquare, ShieldAlert,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
@@ -21,7 +21,6 @@ import Atividades  from './components/Atividades.jsx'
 import Calendario  from './components/Calendario.jsx'
 import IaJuridica  from './components/IaJuridica.jsx'
 import Equipe      from './components/Equipe.jsx'
-import Notificacoes from './components/Notificacoes.jsx'
 import Forum from './components/Forum.jsx'
 import MeuPerfil   from './components/MeuPerfil.jsx'
 import Relatorios   from './components/Relatorios.jsx'
@@ -46,7 +45,6 @@ function buildNav(profile) {
     { path: '/calendario', label: 'Calendário',     Icon: Calendar   },
     { path: '/financeiro', label: 'Financeiro',    Icon: Wallet,    perm: 'financeiro.ver' },
     { path: '/ia',         label: 'IA Jurídica',    Icon: Brain,     perm: 'ia.usar', accent: true },
-    { path: '/notificacoes', label: 'Notificações', Icon: Bell },
     { path: '/forum',         label: 'Fórum',         Icon: MessageSquare },
     { path: '/relatorios', label: 'Relatórios', Icon: BarChart3, perm: 'processos.ver' },
     { path: '/equipe',     label: 'Equipe',         Icon: Users,     perm: 'equipe.ver' },
@@ -82,9 +80,8 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
               <button key={path} onClick={() => { onNav(path); onClose() }}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 1, textAlign: 'left', background: active ? C.navyL : (accent && !active ? 'rgba(6,78,59,0.16)' : 'transparent'), color: active ? C.gold : (accent ? '#86efac' : 'rgba(255,255,255,0.6)'), fontSize: 14, fontWeight: active ? 700 : 400, transition: 'all 0.12s' }}>
                 <Icon size={16} />{label}
-                {(path === '/notificacoes') && unreadCount > 0 && <span title={`${unreadCount} item(ns) não lido(s)`} style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999, background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
-                {active && path !== '/notificacoes' && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
-                {active && path === '/notificacoes' && unreadCount === 0 && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
+                {(path === '/dashboard') && unreadCount > 0 && <span title={`${unreadCount} item(ns) não lido(s)`} style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999, background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
+                {active && (path !== '/dashboard' || unreadCount === 0) && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
                 {accent && !active && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, background: 'rgba(6,78,59,0.55)', color: '#bbf7d0', padding: '2px 6px', borderRadius: 10 }}>IA</span>}
               </button>
             )
@@ -135,11 +132,8 @@ function AppLayout() {
     if (!profile?.id) return
     let alive = true
     async function carregarNaoLidas() {
-      const [{ count: notificacoesCount }, { count: mensagensCount }] = await Promise.all([
-        supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('usuario_id', profile.id).eq('lida', false).eq('arquivada', false),
-        supabase.from('mensagens').select('id', { count: 'exact', head: true }).eq('destinatario_id', profile.id).eq('lida', false).not('arquivada_por','cs',`{${profile.id}}`),
-      ])
-      if (alive) setUnreadCount((notificacoesCount || 0) + (mensagensCount || 0))
+      const { count: notificacoesCount } = await supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('usuario_id', profile.id).eq('lida', false).eq('arquivada', false)
+      if (alive) setUnreadCount(notificacoesCount || 0)
     }
     carregarNaoLidas()
     const timer = window.setInterval(carregarNaoLidas, 30000)
@@ -211,7 +205,7 @@ function AppLayout() {
         )}
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', paddingBottom: mobile ? 'calc(78px + env(safe-area-inset-bottom))' : 0 }}>
           <Routes>
-            <Route path="/dashboard"  element={<Dashboard  profile={profile} />} />
+            <Route path="/dashboard"  element={<Dashboard  profile={profile} unreadCount={unreadCount} />} />
             <Route path="/processos"  element={can(profile,'processos.ver') ? <Processos  profile={profile} /> : <Bloqueado />} />
             <Route path="/contratos"  element={can(profile,'contratos.ver') ? <Contratos  profile={profile} /> : <Bloqueado />} />
             <Route path="/partes"     element={can(profile,'processos.ver') ? <PartesCRM profile={profile} /> : <Bloqueado />} />
@@ -221,7 +215,7 @@ function AppLayout() {
             <Route path="/calendario" element={<Calendario profile={profile} />} />
             <Route path="/financeiro" element={can(profile,'financeiro.ver') ? <Financeiro profile={profile} /> : <Bloqueado />} />
             <Route path="/ia"         element={can(profile,'ia.usar')        ? <IaJuridica profile={profile} /> : <Bloqueado />} />
-            <Route path="/notificacoes" element={<Notificacoes profile={profile} />} />
+            <Route path="/notificacoes" element={<Navigate to="/dashboard" replace />} />
             <Route path="/forum" element={<Forum profile={profile} />} />
             <Route path="/relatorios" element={<Relatorios profile={profile} />} />
             <Route path="/equipe"     element={can(profile,'equipe.ver')     ? <Equipe     profile={profile} /> : <Bloqueado />} />
@@ -238,7 +232,7 @@ function AppLayout() {
 }
 
 function MobileNav({ nav, currentPath, onNav, unreadCount }) {
-  const primary = nav.filter(item => ['/dashboard','/processos','/atividades','/calendario','/notificacoes'].includes(item.path)).slice(0, 5)
+  const primary = nav.filter(item => ['/dashboard','/processos','/atividades','/calendario'].includes(item.path)).slice(0, 5)
   return (
     <nav className="mobile-bottom-nav" aria-label="Navegação principal">
       {primary.map(({ path, label, Icon }) => {
@@ -247,9 +241,9 @@ function MobileNav({ nav, currentPath, onNav, unreadCount }) {
           <button key={path} onClick={() => onNav(path)} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
               <Icon size={20} />
-              {path === '/notificacoes' && unreadCount > 0 && <span style={{ position: 'absolute', top: -6, right: -8, width: 10, height: 10, borderRadius: 999, background: '#dc2626', border: '2px solid white' }} />}
+              {path === '/dashboard' && unreadCount > 0 && <span style={{ position: 'absolute', top: -6, right: -8, width: 10, height: 10, borderRadius: 999, background: '#dc2626', border: '2px solid white' }} />}
             </span>
-            <span>{label === 'Atividades' ? 'Ativ.' : label === 'Notificações' ? 'Notif.' : label}</span>
+            <span>{label === 'Atividades' ? 'Ativ.' : label}</span>
           </button>
         )
       })}
