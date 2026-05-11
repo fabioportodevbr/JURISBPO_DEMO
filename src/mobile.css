@@ -6,6 +6,10 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root.dark {
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 html, body, #root, #__next { min-height: 100%; }
 body {

@@ -103,6 +103,62 @@ button, input, select, textarea {
   font-family: inherit;
 }
 
+:root.dark button,
+:root.dark input,
+:root.dark select,
+:root.dark textarea {
+  color: var(--c-text);
+}
+
+:root.dark input,
+:root.dark select,
+:root.dark textarea {
+  color-scheme: dark;
+}
+
+:root.dark input::placeholder,
+:root.dark textarea::placeholder {
+  color: var(--c-muted);
+  opacity: 1;
+}
+
+:root.dark input:disabled,
+:root.dark select:disabled,
+:root.dark textarea:disabled {
+  color: var(--c-muted);
+  -webkit-text-fill-color: var(--c-muted);
+  opacity: 1;
+}
+
+:root.dark input[type="date"]::-webkit-calendar-picker-indicator,
+:root.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+:root.dark input[type="month"]::-webkit-calendar-picker-indicator,
+:root.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.35);
+  opacity: 0.86;
+  cursor: pointer;
+}
+
+:root.dark input[type="file"] {
+  color: var(--c-text);
+}
+
+:root.dark input[type="file"]::file-selector-button {
+  background: var(--c-grayBg);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+:root.dark input[type="checkbox"],
+:root.dark input[type="radio"] {
+  accent-color: var(--c-green);
+  color-scheme: dark;
+}
+
 ::selection {
   background: rgba(6, 78, 59, 0.18);
 }
