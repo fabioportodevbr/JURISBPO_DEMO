@@ -1,16 +1,38 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Brain, Zap, Printer, AlertTriangle, Loader, Send, UploadCloud, Copy, Check } from 'lucide-react'
-import * as pdfjsLib from 'pdfjs-dist'
 import mammoth from 'mammoth'
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
 
 import { C as GlobalC } from '../lib/theme'
 const C = {
   ...GlobalC
 }
 const INP = { width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid '+C.border, fontSize:14, color:C.text, background:C.white, boxSizing:'border-box', outline:'none', fontFamily:'inherit', lineHeight:1.6, resize:'vertical' }
+
+const ensurePromiseWithResolvers = () => {
+  if (typeof Promise.withResolvers === 'function') return
+
+  Promise.withResolvers = () => {
+    let resolve
+    let reject
+    const promise = new Promise((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+}
+
+let pdfjsLibPromise
+const getPdfjsLib = async () => {
+  ensurePromiseWithResolvers()
+  if (!pdfjsLibPromise) {
+    pdfjsLibPromise = import('pdfjs-dist/legacy/build/pdf.mjs')
+  }
+  const pdfjsLib = await pdfjsLibPromise
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs'
+  return pdfjsLib
+}
 
 const callAI = async ({ prompt, mode='chat', maxTokens=2500, format='text', context=null }) => {
   const { data, error } = await supabase.functions.invoke('ia-juridica', {
@@ -30,21 +52,30 @@ const callAI = async ({ prompt, mode='chat', maxTokens=2500, format='text', cont
 }
 
 const extrairTextoDoArquivo = async (file) => {
-  if (file.name.endsWith('.docx')) {
+  const fileName = file.name.toLowerCase()
+
+  if (fileName.endsWith('.docx')) {
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer });
     return result.value;
-  } else if (file.name.endsWith('.pdf')) {
+  } else if (fileName.endsWith('.pdf')) {
+    const pdfjsLib = await getPdfjsLib()
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n\n';
+    const pdf = await pdfjsLib.getDocument({
+      data: new Uint8Array(arrayBuffer),
+    }).promise;
+    try {
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str || '').join(' ');
+        fullText += pageText + '\n\n';
+      }
+      return fullText;
+    } finally {
+      pdf.destroy?.();
     }
-    return fullText;
   }
   throw new Error('Formato não suportado. Use .pdf ou .docx');
 }
