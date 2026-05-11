@@ -322,6 +322,8 @@ export default function Processos({profile}){
   useEffect(()=>{load()},[profile.escritorio_id])
   const active=items.filter(p=>p.status!=='encerrado'), closed=items.filter(p=>p.status==='encerrado')
   const latestAccessed=useMemo(()=>{let ids=[];try{ids=JSON.parse(localStorage.getItem(accessKey)||'[]')}catch{};return ids.map(id=>items.find(p=>p.id===id)).filter(Boolean).slice(0,5)},[items])
+  const latestAccessedKey=latestAccessed.map(p=>p.id).join('|')
+  useEffect(()=>{setRecentOpen(false)},[profile.escritorio_id,latestAccessedKey])
   const partesReclamadas=useMemo(()=>[...new Set(items.map(p=>p.parte_contraria).filter(Boolean))].sort(),[items])
   const list=useMemo(()=>{const term=q.trim().toLowerCase();const base=statusFilter==='arquivados'?closed:statusFilter==='todos'?items:active;const filtrados=base.filter(p=>{
     if(catFilter!=='todas'&&(p.categoria||'trabalhista')!==catFilter)return false
