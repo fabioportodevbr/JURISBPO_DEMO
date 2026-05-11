@@ -998,10 +998,13 @@ export default function Acervo({ profile }) {
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px dashed ' + C.border, borderRadius: 8, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
                 <Plus size={13} />Nova empresa
               </button>
-              <button type="button" aria-label="Ajuda sobre cadastro de empresas" title="Ajuda"
-                onClick={() => setShowHelpNovaEmpresa(h => !h)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.primary, cursor: 'pointer' }}>
-                <HelpCircle size={18} />
+              <button type="button" aria-label="Ajuda sobre cadastro de empresas"
+                onMouseEnter={() => setShowHelpNovaEmpresa(true)}
+                onMouseLeave={() => setShowHelpNovaEmpresa(false)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.border, borderRadius: '50%', background: C.bg, color: C.muted, cursor: 'default', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', transition: 'border-color 0.15s, color 0.15s' }}
+                onFocus={() => setShowHelpNovaEmpresa(true)}
+                onBlur={() => setShowHelpNovaEmpresa(false)}>
+                ?
               </button>
               {showHelpNovaEmpresa && (
                 <div style={{ position: 'absolute', left: 0, top: '100%', marginTop: 8, zIndex: 50, maxWidth: 360, padding: '12px 14px', background: C.white, border: '1px solid ' + C.border, borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.12)', fontSize: 13, color: C.text, lineHeight: 1.55 }}>
@@ -1122,10 +1125,14 @@ export default function Acervo({ profile }) {
                   </tbody>
                 </table>
               </div>
-              <div style={{ padding: '14px 16px', borderTop: '1px solid ' + C.border, background: C.bg, display: 'flex', justifyContent: 'center' }}>
-                <button type="button" onClick={() => setShowEncerrarModal(true)}
-                  style={{ padding: '10px 18px', border: '1px solid ' + C.amber, borderRadius: 8, background: C.white, color: C.warning, cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
-                  Encerrar o controle de ofícios de {anoVigente}
+              <div style={{ padding: '8px 14px', borderTop: '1px solid ' + C.border, background: C.bg, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEncerrarModal(true)}
+                  title={`Clique aqui para encerrar o controle de ofícios de ${anoVigente} e iniciar o do próximo ano`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', border: '1px solid ' + C.border, borderRadius: 6, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', opacity: 0.7 }}>
+                  <Archive size={12} />
+                  Encerrar {anoVigente}
                 </button>
               </div>
             </div>

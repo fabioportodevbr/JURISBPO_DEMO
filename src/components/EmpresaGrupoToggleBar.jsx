@@ -15,7 +15,7 @@ function toggleLabel(empresa) {
 export default function EmpresaGrupoToggleBar({ empresas, value, onChange }) {
   if (!empresas?.length) return null
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 20, marginBottom: 18 }}>
       <div style={{ display: 'flex', gap: 4, background: C.bg, border: '1px solid ' + C.border, borderRadius: 10, padding: 4 }}>
         {empresas.map((emp) => {
           const sel = value === emp.id
