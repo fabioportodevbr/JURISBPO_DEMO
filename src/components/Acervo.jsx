@@ -121,6 +121,23 @@ async function carregarOficiosConsultaMesclados(supabase, { crmEmpresa, escritor
   return Object.values(byId).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
 }
 
+// ── Audit: log de controle anual ─────────────────────────────────────────
+async function logControleAcao({ escritorioId, parteGrupoId, ano, acao, profile, detalhes }) {
+  try {
+    await supabase.from('oficios_controle_log').insert({
+      escritorio_id: escritorioId,
+      parte_grupo_id: parteGrupoId,
+      ano,
+      acao,
+      usuario_id: profile?.id,
+      usuario_nome: profile?.nome || profile?.email,
+      detalhes: detalhes ?? null,
+    })
+  } catch (e) {
+    console.error('[controle-log]', e)
+  }
+}
+
 // ── Modal base ────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children, wide }) {
   useEffect(() => {
@@ -526,35 +543,145 @@ function ConsultarModal({ empresa, escritorioId, legacyEmpresaId, onClose, profi
   )
 }
 
-// ── Modal: Lista anos arquivados (escolhe ano para ver só leitura) ─────────
-function AnosArquivadosModal({ empresa, escritorioId, legacyEmpresaId, onClose, onPickAno }) {
-  const [anos, setAnos] = useState([])
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    ;(async () => {
-      const s = new Set()
-      const { data: d1 } = await supabase.from('oficios').select('ano').eq('parte_grupo_id', empresa.id).eq('escritorio_id', escritorioId).eq('controle_arquivado', true)
-      ;(d1 || []).forEach((r) => { if (r.ano != null) s.add(r.ano) })
+// ── Modal: Controles arquivados com histórico e reabertura ───────────────
+const CONTROLE_ACAO_LABEL = {
+  controle_arquivado:    'Arquivado',
+  controle_desarquivado: 'Reaberto para edição',
+}
+const CONTROLE_ACAO_COLOR = {
+  controle_arquivado:    '#92400e',
+  controle_desarquivado: '#1e40af',
+}
+const CONTROLE_ACAO_BG = {
+  controle_arquivado:    '#fef3c7',
+  controle_desarquivado: '#dbeafe',
+}
+
+function AnosArquivadosModal({ empresa, escritorioId, legacyEmpresaId, profile, canEdit, onClose, onPickAno, onDesarquivar, onReArquivar }) {
+  const [anosData, setAnosData] = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [expanded, setExpanded] = useState(null) // ano cujo log está aberto
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [{ data: logData }, { data: d1 }] = await Promise.all([
+        supabase.from('oficios_controle_log')
+          .select('ano, acao, usuario_nome, criado_em')
+          .eq('escritorio_id', escritorioId)
+          .eq('parte_grupo_id', empresa.id)
+          .order('criado_em', { ascending: false }),
+        supabase.from('oficios')
+          .select('ano')
+          .eq('parte_grupo_id', empresa.id)
+          .eq('escritorio_id', escritorioId)
+          .eq('controle_arquivado', true),
+      ])
+      let d2 = []
       if (legacyEmpresaId) {
-        const { data: d2 } = await supabase.from('oficios').select('ano').eq('empresa_id', legacyEmpresaId).eq('controle_arquivado', true)
-        ;(d2 || []).forEach((r) => { if (r.ano != null) s.add(r.ano) })
+        const { data } = await supabase.from('oficios').select('ano').eq('empresa_id', legacyEmpresaId).eq('controle_arquivado', true)
+        d2 = data || []
       }
-      setAnos([...s].sort((a, b) => b - a))
-      setLoading(false)
-    })()
+      const arquivSet = new Set([...(d1 || []), ...d2].map(r => r.ano).filter(v => v != null))
+      const logByAno = {}
+      for (const e of (logData || [])) {
+        if (e.ano == null) continue
+        if (!logByAno[e.ano]) logByAno[e.ano] = []
+        logByAno[e.ano].push(e)
+      }
+      const allAnos = new Set([...arquivSet, ...Object.keys(logByAno).map(Number)])
+      const result = [...allAnos].map(ano => {
+        const entries = logByAno[ano] || []
+        const latest  = entries[0]?.acao ?? null
+        let status
+        if (arquivSet.has(ano)) status = 'arquivado'
+        else if (latest === 'controle_desarquivado') status = 'reaberto'
+        else return null
+        return { ano, status, entries }
+      }).filter(Boolean).sort((a, b) => b.ano - a.ano)
+      setAnosData(result)
+    } finally { setLoading(false) }
   }, [empresa.id, escritorioId, legacyEmpresaId])
+
+  useEffect(() => { loadData() }, [loadData])
+
   return (
-    <Modal title={`Controles arquivados — ${nomeEmpresaAcervo(empresa)}`} onClose={onClose}>
-      <p style={{ fontSize: 13, color: C.muted, margin: '0 0 14px' }}>Selecione o ano para consultar os ofícios arquivados (somente leitura).</p>
+    <Modal title={`Controles de anos anteriores — ${nomeEmpresaAcervo(empresa)}`} onClose={onClose} wide>
+      <p style={{ fontSize: 13, color: C.muted, margin: '0 0 16px' }}>
+        Histórico de controles arquivados. Você pode reabrir um ano para retificações e re-arquivá-lo quando concluir.
+      </p>
       {loading ? <p style={{ color: C.muted }}>Carregando...</p>
-        : anos.length === 0 ? <p style={{ color: C.muted }}>Nenhum controle arquivado para esta empresa.</p>
-        : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {anos.map(ano => (
-            <button key={ano} type="button" onClick={() => onPickAno(ano)}
-              style={{ textAlign: 'left', padding: '12px 16px', borderRadius: 10, border: '1px solid ' + C.border, background: C.white, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: C.primary, fontFamily: 'inherit' }}>
-              Ano {ano}
-            </button>
-          ))}
+       : anosData.length === 0 ? <p style={{ color: C.muted }}>Nenhum controle arquivado para esta empresa.</p>
+       : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {anosData.map(({ ano, status, entries }) => {
+            const isExp = expanded === ano
+            const latestEntry = entries[0]
+            return (
+              <div key={ano} style={{ border: '1px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
+                {/* ── cabeçalho do ano ── */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: C.bg, gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Ano {ano}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                      background: status === 'arquivado' ? '#fef3c7' : '#dbeafe',
+                      color:      status === 'arquivado' ? '#92400e' : '#1e40af' }}>
+                      {status === 'arquivado' ? 'Arquivado' : 'Reaberto'}
+                    </span>
+                    {latestEntry && (
+                      <span style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {CONTROLE_ACAO_LABEL[latestEntry.acao] ?? latestEntry.acao}
+                        {' — '}{fmtTs(latestEntry.criado_em)}
+                        {' — '}{latestEntry.usuario_nome || '—'}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    <button type="button" onClick={() => onPickAno(ano, status)}
+                      style={{ padding: '5px 12px', border: '1px solid ' + C.border, borderRadius: 7, background: C.white, color: C.text, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                      {status === 'reaberto' ? 'Editar ofícios' : 'Ver ofícios'}
+                    </button>
+                    {canEdit && status === 'arquivado' && (
+                      <button type="button" onClick={() => onDesarquivar(ano, loadData)}
+                        style={{ padding: '5px 12px', border: '1px solid #bfdbfe', borderRadius: 7, background: '#eff6ff', color: '#1e40af', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        Reabrir
+                      </button>
+                    )}
+                    {canEdit && status === 'reaberto' && (
+                      <button type="button" onClick={() => onReArquivar(ano, loadData)}
+                        style={{ padding: '5px 12px', border: '1px solid #a7f3d0', borderRadius: 7, background: '#ecfdf5', color: '#065f46', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        Re-arquivar
+                      </button>
+                    )}
+                    {entries.length > 0 && (
+                      <button type="button" onClick={() => setExpanded(isExp ? null : ano)}
+                        title={isExp ? 'Fechar histórico' : 'Ver histórico completo'}
+                        style={{ padding: '5px 8px', border: '1px solid ' + C.border, borderRadius: 7, background: C.white, color: C.muted, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        {isExp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {/* ── log expandido ── */}
+                {isExp && (
+                  <div style={{ padding: '10px 16px', borderTop: '1px solid ' + C.border, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Histórico do controle</div>
+                    {entries.map((e, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '6px 10px', background: C.bg, borderRadius: 6 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                          background: CONTROLE_ACAO_COLOR[e.acao] ?? C.muted }} />
+                        <span style={{ fontWeight: 700, color: CONTROLE_ACAO_COLOR[e.acao] ?? C.muted }}>
+                          {CONTROLE_ACAO_LABEL[e.acao] ?? e.acao}
+                        </span>
+                        <span style={{ color: C.muted }}>por</span>
+                        <span style={{ color: C.text, fontWeight: 600 }}>{e.usuario_nome || '—'}</span>
+                        <span style={{ marginLeft: 'auto', color: C.muted, whiteSpace: 'nowrap' }}>{fmtTs(e.criado_em)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>}
     </Modal>
   )
@@ -685,6 +812,7 @@ export default function Acervo({ profile }) {
   const [showEncerrarModal, setShowEncerrarModal] = useState(false)
   const [showAnosArquivados, setShowAnosArquivados] = useState(false)
   const [consultarArquivadoAno, setConsultarArquivadoAno] = useState(null)
+  const [consultarReabertoAno, setConsultarReabertoAno] = useState(null)
   const [editingOficio, setEditingOficio] = useState(null)
   const [anexosOficio, setAnexosOficio] = useState(null)
   const [sortCol, setSortCol] = useState('numero')
@@ -799,6 +927,19 @@ export default function Acervo({ profile }) {
       return
     }
     if (!selectedEmpresa || !profile?.escritorio_id || !anoVigente) return
+
+    // Regra de segurança: só é possível arquivar após 1º de janeiro do ano seguinte
+    const hoje = new Date()
+    const limiteArquivamento = new Date(anoVigente + 1, 0, 1) // Jan 1 do próximo ano
+    if (hoje < limiteArquivamento) {
+      alert(
+        `O controle de ${anoVigente} só pode ser arquivado a partir de 1º de janeiro de ${anoVigente + 1}.\n\n` +
+        `Aguarde o encerramento do ano corrente para realizar esta operação.`
+      )
+      setShowEncerrarModal(false)
+      return
+    }
+
     const y = anoVigente
     const { error: upErr } = await supabase.from('oficios').update({ controle_arquivado: true })
       .eq('parte_grupo_id', selectedEmpresa.id)
@@ -827,6 +968,16 @@ export default function Acervo({ profile }) {
     if (cfgErr) {
       alert('Ofícios arquivados, mas falhou ao registrar o novo ano vigente: ' + cfgErr.message)
     }
+    // Registra no histórico de controle
+    await logControleAcao({
+      escritorioId: profile.escritorio_id,
+      parteGrupoId: selectedEmpresa.id,
+      ano: y,
+      acao: 'controle_arquivado',
+      profile,
+      detalhes: { proximo_ano: prox, total_oficios: oficiosList.length },
+    })
+
     setAnoVigente(prox)
     setShowEncerrarModal(false)
     const rows = await carregarOficiosAnoMesclados(supabase, selectedEmpresa, prox, profile.escritorio_id, legacyOficiosEmpresaId)
@@ -837,6 +988,79 @@ export default function Acervo({ profile }) {
       remetentes: uniq(rows.map(x => x.remetente)),
       formasEnvio: uniq(rows.map(x => x.forma_envio)),
     })
+  }
+
+  // ── Reabrir controle de ano arquivado ───────────────────────────────────
+  async function confirmarDesarquivar(ano, onRefresh) {
+    if (!canEdit) { alert('Sem permissão para esta operação.'); return }
+    if (!confirm(
+      `Reabrir o controle de ofícios de ${ano} para edição?\n\n` +
+      `Os ofícios de ${ano} poderão ser consultados e editados na seção "Controles de anos anteriores".\n` +
+      `O ano vigente (${anoVigente}) não será alterado.`
+    )) return
+
+    const { error } = await supabase.from('oficios').update({ controle_arquivado: false })
+      .eq('parte_grupo_id', selectedEmpresa.id)
+      .eq('escritorio_id', profile.escritorio_id)
+      .eq('ano', ano)
+      .eq('controle_arquivado', true)
+    if (error) { alert('Erro ao reabrir controle: ' + error.message); return }
+
+    if (legacyOficiosEmpresaId) {
+      await supabase.from('oficios').update({ controle_arquivado: false })
+        .eq('empresa_id', legacyOficiosEmpresaId)
+        .eq('ano', ano)
+        .eq('controle_arquivado', true)
+    }
+
+    await logControleAcao({
+      escritorioId: profile.escritorio_id,
+      parteGrupoId: selectedEmpresa.id,
+      ano,
+      acao: 'controle_desarquivado',
+      profile,
+      detalhes: { ano_ativo: anoVigente },
+    })
+    onRefresh?.()
+  }
+
+  // ── Re-arquivar controle reaberto ────────────────────────────────────────
+  async function confirmarReArquivar(ano, onRefresh) {
+    if (!canEdit) { alert('Sem permissão para esta operação.'); return }
+
+    const hoje = new Date()
+    if (hoje < new Date(ano + 1, 0, 1)) {
+      alert(`O controle de ${ano} só pode ser arquivado a partir de 1º de janeiro de ${ano + 1}.`)
+      return
+    }
+    if (!confirm(
+      `Re-arquivar o controle de ofícios de ${ano}?\n\n` +
+      `Os ofícios de ${ano} voltarão para somente leitura no histórico.`
+    )) return
+
+    const { error } = await supabase.from('oficios').update({ controle_arquivado: true })
+      .eq('parte_grupo_id', selectedEmpresa.id)
+      .eq('escritorio_id', profile.escritorio_id)
+      .eq('ano', ano)
+      .eq('controle_arquivado', false)
+    if (error) { alert('Erro ao re-arquivar: ' + error.message); return }
+
+    if (legacyOficiosEmpresaId) {
+      await supabase.from('oficios').update({ controle_arquivado: true })
+        .eq('empresa_id', legacyOficiosEmpresaId)
+        .eq('ano', ano)
+        .eq('controle_arquivado', false)
+    }
+
+    await logControleAcao({
+      escritorioId: profile.escritorio_id,
+      parteGrupoId: selectedEmpresa.id,
+      ano,
+      acao: 'controle_arquivado',
+      profile,
+      detalhes: { re_arquivamento: true },
+    })
+    onRefresh?.()
   }
 
   async function excluirModelo(id) {
@@ -1162,9 +1386,36 @@ export default function Acervo({ profile }) {
           onClose={() => setConsultarArquivadoAno(null)}
           onEdit={() => {}} />
       )}
+      {consultarReabertoAno != null && selectedEmpresa && profile?.escritorio_id && (
+        <ConsultarModal
+          empresa={selectedEmpresa}
+          escritorioId={profile.escritorio_id}
+          legacyEmpresaId={legacyOficiosEmpresaId}
+          profile={profile}
+          canEdit={canEdit}
+          readOnly={false}
+          apenasArquivados={false}
+          anoFiltro={consultarReabertoAno}
+          onClose={() => setConsultarReabertoAno(null)}
+          onEdit={of => { setEditingOficio(of); setShowNovoOficio(true) }}
+        />
+      )}
       {showAnosArquivados && selectedEmpresa && profile?.escritorio_id && (
-        <AnosArquivadosModal empresa={selectedEmpresa} escritorioId={profile.escritorio_id} legacyEmpresaId={legacyOficiosEmpresaId} onClose={() => setShowAnosArquivados(false)}
-          onPickAno={(ano) => { setShowAnosArquivados(false); setConsultarArquivadoAno(ano) }} />
+        <AnosArquivadosModal
+          empresa={selectedEmpresa}
+          escritorioId={profile.escritorio_id}
+          legacyEmpresaId={legacyOficiosEmpresaId}
+          profile={profile}
+          canEdit={canEdit}
+          onClose={() => setShowAnosArquivados(false)}
+          onPickAno={(ano, status) => {
+            setShowAnosArquivados(false)
+            if (status === 'reaberto') setConsultarReabertoAno(ano)
+            else setConsultarArquivadoAno(ano)
+          }}
+          onDesarquivar={confirmarDesarquivar}
+          onReArquivar={confirmarReArquivar}
+        />
       )}
       {showEncerrarModal && selectedEmpresa && (
         <Modal title={`Encerrar controle de ofícios de ${anoVigente}`} onClose={() => setShowEncerrarModal(false)}>
