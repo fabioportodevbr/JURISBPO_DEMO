@@ -832,8 +832,8 @@ function DenunciaModal({ denuncia: initialDenuncia, profile, onClose, onUpdated 
 
   const tabStyle = (active) => ({
     padding: '8px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
-    background: 'transparent', borderBottom: active ? `3px solid ${C.navy}` : '3px solid transparent',
-    color: active ? C.navy : C.muted,
+    background: 'transparent', borderBottom: active ? `3px solid ${C.green}` : '3px solid transparent',
+    color: active ? C.green : C.muted,
   })
 
   return (
@@ -1171,8 +1171,8 @@ function SectionTitle({ icon: Icon, label }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '22px 0 14px',
       paddingBottom: 8, borderBottom: '1px solid ' + C.border }}>
-      <Icon size={14} color={C.navy} />
-      <span style={{ fontSize: 13, fontWeight: 800, color: C.navy }}>{label}</span>
+      <Icon size={14} color={C.green} />
+      <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{label}</span>
     </div>
   )
 }
@@ -1677,7 +1677,7 @@ function ComplianceSettings({ profile }) {
 
             {/* Terminologia automática */}
             <div style={{ background: C.greenBg, border: '1px solid ' + C.green, borderRadius: 8,
-              padding: '10px 14px', fontSize: 12, color: '#065f46' }}>
+              padding: '10px 14px', fontSize: 12, color: C.green }}>
               <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <CheckCircle2 size={13} />Terminologia de compliance (automática, sempre ativa)
               </div>
@@ -2254,8 +2254,8 @@ export default function Compliance({ profile }) {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '9px 18px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
     background: 'transparent',
-    borderBottom: active ? `3px solid ${C.navy}` : '3px solid transparent',
-    color: active ? C.navy : C.muted,
+    borderBottom: active ? `3px solid ${C.green}` : '3px solid transparent',
+    color: active ? C.green : C.muted,
   })
 
   return (

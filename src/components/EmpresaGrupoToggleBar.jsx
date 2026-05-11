@@ -14,6 +14,7 @@ function toggleLabel(empresa) {
  */
 export default function EmpresaGrupoToggleBar({ empresas, value, onChange }) {
   if (!empresas?.length) return null
+  const activeColor = C.green
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 20, marginBottom: 18 }}>
       <div style={{ display: 'flex', gap: 4, background: C.bg, border: '1px solid ' + C.border, borderRadius: 10, padding: 4 }}>
@@ -35,7 +36,7 @@ export default function EmpresaGrupoToggleBar({ empresas, value, onChange }) {
                 fontSize: 13,
                 fontWeight: sel ? 700 : 400,
                 background: sel ? C.white : 'transparent',
-                color: sel ? C.primary : C.muted,
+                color: sel ? activeColor : C.muted,
                 boxShadow: sel ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
                 fontFamily: 'inherit',
               }}
@@ -59,7 +60,7 @@ export default function EmpresaGrupoToggleBar({ empresas, value, onChange }) {
             fontSize: 13,
             fontWeight: value === CONSOLIDADO_KEY ? 700 : 400,
             background: value === CONSOLIDADO_KEY ? C.white : 'transparent',
-            color: value === CONSOLIDADO_KEY ? C.primary : C.muted,
+            color: value === CONSOLIDADO_KEY ? activeColor : C.muted,
             boxShadow: value === CONSOLIDADO_KEY ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
             fontFamily: 'inherit',
           }}
