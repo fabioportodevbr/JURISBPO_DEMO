@@ -204,9 +204,9 @@ async function extrairImagemPrincipalPdf(pdf, pdfjsLib) {
 }
 
 async function extrairConflitoPdf(file) {
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const pdfjsLib = await import('pdfjs-dist/legacy/webpack.mjs')
   const buffer = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer.slice(0)), disableWorker: true, isEvalSupported: false }).promise
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer.slice(0)), isEvalSupported: false }).promise
   let texto = ''
   for (let p = 1; p <= pdf.numPages; p += 1) {
     const page = await pdf.getPage(p)
