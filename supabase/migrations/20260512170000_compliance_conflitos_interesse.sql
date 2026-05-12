@@ -32,9 +32,10 @@ create index if not exists idx_compliance_conflitos_escritorio
 create index if not exists idx_compliance_conflitos_risco
   on public.compliance_conflito_interesse_analises (escritorio_id, nivel_risco, status);
 
-insert into storage.buckets (id, name, public)
-values ('compliance-anexos', 'compliance-anexos', false)
-on conflict (id) do nothing;
+insert into storage.buckets as b (id, name, public, file_size_limit)
+values ('compliance-anexos', 'compliance-anexos', false, 52428800)
+on conflict (id) do update
+set file_size_limit = greatest(coalesce(b.file_size_limit, 0), excluded.file_size_limit);
 
 alter table public.compliance_conflito_interesse_analises enable row level security;
 

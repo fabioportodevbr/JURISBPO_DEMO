@@ -94,6 +94,9 @@ const formatBytes = (bytes) => {
   return `${(bytes / 1_048_576).toFixed(1)} MB`
 }
 
+const COMPLIANCE_ANEXOS_BUCKET = 'compliance-anexos'
+const CONFLITO_PDF_MAX_BYTES = 50 * 1024 * 1024
+
 const sanitizeFileName = (name) =>
   name.replace(/[^\w.\-() ]/g, '_').replace(/_{2,}/g, '_').slice(0, 200)
 
@@ -2238,7 +2241,14 @@ function ConflitosInteresseTab({ profile }) {
   useEffect(() => { load() }, [load])
 
   function addFiles(fileList) {
-    const novos = Array.from(fileList || []).filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
+    const pdfs = Array.from(fileList || []).filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
+    const grandes = pdfs.filter(f => f.size > CONFLITO_PDF_MAX_BYTES)
+    const novos = pdfs.filter(f => f.size <= CONFLITO_PDF_MAX_BYTES)
+    if (grandes.length) {
+      setError(`O limite por PDF e ${formatBytes(CONFLITO_PDF_MAX_BYTES)}. Arquivo recusado: ${grandes.map(f => `${f.name} (${formatBytes(f.size)})`).join(', ')}`)
+    } else if (pdfs.length) {
+      setError('')
+    }
     if (!novos.length) return
     setFiles(prev => {
       const vistos = new Set(prev.map(f => `${f.name}:${f.size}:${f.lastModified}`))
@@ -2275,15 +2285,21 @@ function ConflitosInteresseTab({ profile }) {
         const analise = await extrairConflitoPdf(file)
         const path = `${profile.escritorio_id}/conflitos_interesse/${Date.now()}_${Math.random().toString(16).slice(2)}_${sanitizeFileName(file.name)}`
         const { error: upErr } = await supabase.storage
-          .from('compliance-anexos')
+          .from(COMPLIANCE_ANEXOS_BUCKET)
           .upload(path, file, { contentType: file.type || 'application/pdf', upsert: false })
-        if (upErr) throw new Error(`Erro ao enviar ${file.name}: ${upErr.message}`)
+        if (upErr) {
+          const msg = upErr.message || String(upErr)
+          if (/maximum allowed size|exceeded.*size|object.*size/i.test(msg)) {
+            throw new Error(`Erro ao enviar ${file.name}: o PDF tem ${formatBytes(file.size)} e ultrapassou o limite configurado no Storage. O bucket ${COMPLIANCE_ANEXOS_BUCKET} deve aceitar ate ${formatBytes(CONFLITO_PDF_MAX_BYTES)}.`)
+          }
+          throw new Error(`Erro ao enviar ${file.name}: ${msg}`)
+        }
         const payload = {
           escritorio_id: profile.escritorio_id,
           arquivo_nome: file.name,
           arquivo_tipo: file.type || 'application/pdf',
           arquivo_tamanho_bytes: file.size,
-          storage_bucket: 'compliance-anexos',
+          storage_bucket: COMPLIANCE_ANEXOS_BUCKET,
           storage_path: path,
           respostas: analise.respostas,
           nivel_risco: analise.nivel_risco,
@@ -2302,7 +2318,7 @@ function ConflitosInteresseTab({ profile }) {
           .select('*')
           .single()
         if (dbErr) {
-          await supabase.storage.from('compliance-anexos').remove([path])
+          await supabase.storage.from(COMPLIANCE_ANEXOS_BUCKET).remove([path])
           throw new Error(`Erro ao salvar ${file.name}: ${dbErr.message}`)
         }
         const atividadeId = await criarAtividadeRevisao(data)
@@ -2326,7 +2342,7 @@ function ConflitosInteresseTab({ profile }) {
   async function abrirArquivo(row) {
     if (!row?.storage_path) return
     const { data } = await supabase.storage
-      .from(row.storage_bucket || 'compliance-anexos')
+      .from(row.storage_bucket || COMPLIANCE_ANEXOS_BUCKET)
       .createSignedUrl(row.storage_path, 120)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }

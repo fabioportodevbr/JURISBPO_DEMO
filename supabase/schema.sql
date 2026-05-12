@@ -473,6 +473,11 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('modelos', 'modelos', false)
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO storage.buckets AS b (id, name, public, file_size_limit)
+VALUES ('compliance-anexos', 'compliance-anexos', false, 52428800)
+ON CONFLICT (id) DO UPDATE
+SET file_size_limit = greatest(coalesce(b.file_size_limit, 0), excluded.file_size_limit);
+
 DROP POLICY IF EXISTS documentos_storage_select ON storage.objects;
 DROP POLICY IF EXISTS documentos_storage_insert ON storage.objects;
 DROP POLICY IF EXISTS documentos_storage_update ON storage.objects;
