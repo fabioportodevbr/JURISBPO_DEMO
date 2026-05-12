@@ -195,15 +195,47 @@ async function getObjetoPdf(page, id) {
   })
 }
 
+function criarCanvasLeitura(width, height) {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const canvas = new OffscreenCanvas(width, height)
+    return { canvas, ctx: canvas.getContext('2d', { willReadFrequently: true }) }
+  }
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    return { canvas, ctx: canvas.getContext('2d', { willReadFrequently: true }) }
+  }
+  return { canvas: null, ctx: null }
+}
+
+function normalizarImagemPdf(img) {
+  if (!img) return null
+  if (img.data?.length && img.width && img.height) return img
+
+  const bitmap = img.bitmap || img
+  const width = img.width || bitmap?.width
+  const height = img.height || bitmap?.height
+  if (!bitmap || !width || !height) return null
+
+  try {
+    const { ctx } = criarCanvasLeitura(width, height)
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    const imageData = ctx.getImageData(0, 0, width, height)
+    return { width, height, data: imageData.data }
+  } catch {
+    return null
+  }
+}
+
 async function extrairImagemPrincipalPdf(pdf, pdfjsLib) {
   const page = await pdf.getPage(1)
   const op = await page.getOperatorList()
   const paint = pdfjsLib.OPS?.paintImageXObject
   const imageArg = op.argsArray.find((args, i) => op.fnArray[i] === paint && args?.[0])?.[0]
   if (!imageArg) return null
-  const img = await getObjetoPdf(page, imageArg)
-  if (!img?.data?.length || !img.width || !img.height) return null
-  return img
+  return normalizarImagemPdf(await getObjetoPdf(page, imageArg))
 }
 
 async function extrairConflitoPdf(file) {
