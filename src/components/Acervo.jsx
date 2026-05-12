@@ -29,6 +29,23 @@ function fmtTs(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleString('pt-BR')
 }
+function abrirBlobOficio(blob) {
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!win) alert('Permita pop-ups para visualizar o arquivo.')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+function abrirAnexoOficio(anexo) {
+  if (!anexo?.arquivo_base64) { alert('Arquivo indisponivel para visualizacao.'); return }
+  const bin = atob(anexo.arquivo_base64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
+  abrirBlobOficio(new Blob([bytes], { type: anexo.arquivo_tipo || 'application/octet-stream' }))
+}
+function abrirArquivoLocalOficio(file) {
+  if (!file) return
+  abrirBlobOficio(file)
+}
 function numSeq(numero) {
   const n = parseInt(String(numero || '').split('/')[0], 10)
   return Number.isFinite(n) ? n : 0
@@ -245,11 +262,21 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
     formasEnvio: opcoes?.formasEnvio || [],
   })
   const [files, setFiles] = useState([])
+  const [draggingFiles, setDraggingFiles] = useState(false)
   const [existingAnexos, setExistingAnexos] = useState([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const fileRef = useRef(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  function addFiles(fileList) {
+    const novos = Array.from(fileList || []).filter(f => f && f.size >= 0)
+    if (!novos.length) return
+    setFiles(prev => {
+      const vistos = new Set(prev.map(f => `${f.name}:${f.size}:${f.lastModified}`))
+      const unicos = novos.filter(f => !vistos.has(`${f.name}:${f.size}:${f.lastModified}`))
+      return [...prev, ...unicos]
+    })
+  }
 
   useEffect(() => {
     if (!isEdit || !oficio?.id) return
@@ -371,12 +398,18 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
                 <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, background: C.bg, border: '1px solid ' + C.border, borderRadius: 6, padding: '7px 10px', marginBottom: 4 }}>
                   <Paperclip size={12} color={C.primary} />
                   {a.arquivo_base64
-                    ? <a href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo}
-                        style={{ flex: 1, color: C.primary, fontWeight: 600, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    ? <button type="button" onClick={() => abrirAnexoOficio(a)}
+                        style={{ flex: 1, color: C.primary, fontWeight: 600, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 13 }}>
                         {a.nome_arquivo}
-                      </a>
+                      </button>
                     : <span style={{ flex: 1, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span>
                   }
+                  {a.arquivo_base64 && (
+                    <button type="button" onClick={() => abrirAnexoOficio(a)} title="Visualizar"
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.primary, display: 'flex', padding: 2 }}>
+                      <Eye size={13} />
+                    </button>
+                  )}
                   {a.arquivo_base64 && (
                     <a href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo}
                       title="Baixar" style={{ color: C.muted, display: 'flex', padding: 2 }}>
@@ -394,16 +427,23 @@ function OficioModal({ oficio, empresa, destinatarios, opcoes, numeroSugerido, o
           {isEdit && existingAnexos.length === 0 && (
             <p style={{ fontSize: 12, color: C.muted, margin: '0 0 8px' }}>Nenhum arquivo anexado ainda.</p>
           )}
-          <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed ' + C.border, borderRadius: 10, padding: 14, textAlign: 'center', cursor: 'pointer' }}>
-            <Upload size={18} color={C.muted} style={{ display: 'block', margin: '0 auto 4px' }} />
-            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{isEdit ? 'Clique para adicionar novos arquivos' : 'Clique para selecionar arquivos'}</p>
-            <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => setFiles(Array.from(e.target.files))} />
+          <div
+            onClick={() => fileRef.current?.click()}
+            onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setDraggingFiles(true) }}
+            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDraggingFiles(true) }}
+            onDragLeave={e => { e.preventDefault(); e.stopPropagation(); if (e.currentTarget === e.target) setDraggingFiles(false) }}
+            onDrop={e => { e.preventDefault(); e.stopPropagation(); setDraggingFiles(false); addFiles(e.dataTransfer.files) }}
+            style={{ border: '2px dashed ' + (draggingFiles ? C.primary : C.border), borderRadius: 10, padding: 14, textAlign: 'center', cursor: 'pointer', background: draggingFiles ? C.primaryLight : C.white, transition: 'border-color .15s ease, background .15s ease' }}>
+            <Upload size={18} color={draggingFiles ? C.primary : C.muted} style={{ display: 'block', margin: '0 auto 4px' }} />
+            <p style={{ fontSize: 13, color: draggingFiles ? C.primary : C.muted, margin: 0 }}>{isEdit ? 'Arraste arquivos aqui ou clique para adicionar' : 'Arraste arquivos aqui ou clique para selecionar'}</p>
+            <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
           </div>
           {files.map((f, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, background: C.greenBg, border: '1px solid ' + C.primaryLight, borderRadius: 6, padding: '6px 10px', marginTop: 4 }}>
               <Paperclip size={12} color={C.primary} />
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
               <span style={{ fontSize: 11, color: C.muted, flexShrink: 0 }}>novo</span>
+              <button type="button" onClick={() => abrirArquivoLocalOficio(f)} title="Visualizar" style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.primary, display: 'flex', padding: 0 }}><Eye size={13} /></button>
               <button type="button" onClick={() => setFiles(ff => ff.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 0 }}><X size={13} /></button>
             </div>
           ))}
@@ -441,6 +481,12 @@ function AnexosOficioModal({ oficio, onClose }) {
                   <Download size={12} />Baixar
                 </a>
               : <span style={{ fontSize: 12, color: C.muted, fontStyle: 'italic' }}>indisponível</span>}
+            {a.arquivo_base64 && (
+              <button type="button" onClick={() => abrirAnexoOficio(a)} title="Visualizar"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid ' + C.primary, borderRadius: 6, background: C.white, color: C.primary, cursor: 'pointer' }}>
+                <Eye size={13} />
+              </button>
+            )}
             {a.created_by_nome && <span style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>{a.created_by_nome}</span>}
           </div>
         ))}
@@ -526,10 +572,12 @@ function ConsultarModal({ empresa, escritorioId, legacyEmpresaId, onClose, profi
               <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Anexos ({anexos.length})</div>
               {anexos.map(a => (
                 a.arquivo_base64
-                  ? <a key={a.id} href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.primary, background: C.primaryLight, borderRadius: 6, padding: '6px 10px', textDecoration: 'none', fontWeight: 600, marginBottom: 4 }}>
-                      <Paperclip size={12} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span><Download size={12} />
-                    </a>
+                  ? <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.primary, background: C.primaryLight, borderRadius: 6, padding: '6px 10px', fontWeight: 600, marginBottom: 4 }}>
+                      <Paperclip size={12} />
+                      <button type="button" onClick={() => abrirAnexoOficio(a)} style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', border: 'none', background: 'transparent', color: C.primary, fontWeight: 600, textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 13 }}>{a.nome_arquivo}</button>
+                      <button type="button" onClick={() => abrirAnexoOficio(a)} title="Visualizar" style={{ border: 'none', background: 'transparent', color: C.primary, cursor: 'pointer', display: 'flex', padding: 0 }}><Eye size={13} /></button>
+                      <a href={`data:${a.arquivo_tipo || 'application/octet-stream'};base64,${a.arquivo_base64}`} download={a.nome_arquivo} title="Baixar" style={{ color: C.primary, display: 'flex', padding: 0 }}><Download size={12} /></a>
+                    </div>
                   : <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted, background: C.bg, borderRadius: 6, padding: '6px 10px', marginBottom: 4 }}>
                       <Paperclip size={12} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome_arquivo}</span>
                     </div>
