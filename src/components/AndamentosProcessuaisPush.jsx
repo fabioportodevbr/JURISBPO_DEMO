@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 
 import { C } from '../lib/theme'
-import { motivoDesconsideracaoPush, registrarPushDesconsiderado } from '../lib/pushArquivo.js'
+import { motivoDesconsideracaoPush, pushIgnoradoDentroDoPrazo, pushIgnoradoParaArquivo, registrarPushDesconsiderado } from '../lib/pushArquivo.js'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:10,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const DEFAULT_PUSH_EMAIL='juridicocallbrbpo@gmail.com'
 const DEFAULT_PUSH_CONFIG={imap_host:'imap.gmail.com',imap_port:993,imap_secure:true,imap_user:DEFAULT_PUSH_EMAIL,imap_mailbox:'INBOX',enabled:true}
@@ -102,7 +102,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
     setLoading(true)
     let query=supabase.from('andamentos_processuais_push').select('*').eq('escritorio_id',profile.escritorio_id).order('criado_em',{ascending:false}).limit(processo?.id?200:(compact?limit:80))
     const {data,error}=await query
-    if(error){console.error('Erro ao carregar andamentos push:',error);setItems([])} else setItems(data||[])
+    if(error){console.error('Erro ao carregar andamentos push:',error);setItems([])} else setItems((data||[]).filter(pushIgnoradoDentroDoPrazo))
     setLoading(false)
   }
 
@@ -133,8 +133,22 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
       .order('arquivado_em',{ascending:false})
       .limit(500)
     if(error){
-      setArquivoError('Arquivo ainda não disponível no banco. Aplique a migration para consultar os pushes desconsiderados em arquivo próprio.')
-      setArquivoItems([])
+      console.warn('[push-email] Arquivo proprio indisponivel; usando registros ignorados:', error)
+      const fallback=await supabase
+        .from('andamentos_processuais_push')
+        .select('*')
+        .eq('escritorio_id',profile.escritorio_id)
+        .eq('status_associacao','ignorado')
+        .gte('ignorado_em',limiteArquivo)
+        .order('ignorado_em',{ascending:false})
+        .limit(500)
+      if(fallback.error){
+        setArquivoError('Não foi possível carregar o arquivo de pushes desconsiderados: '+fallback.error.message)
+        setArquivoItems([])
+      }else{
+        setArquivoError('')
+        setArquivoItems((fallback.data||[]).map(pushIgnoradoParaArquivo))
+      }
     }else{
       setArquivoItems(data||[])
     }
@@ -238,7 +252,8 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
     const ok=window.confirm('Desconsiderar este andamento? Ele ficará oculto na lista principal, mas poderá ser visto no filtro Ignorados.')
     if(!ok)return
     const motivo=motivoDesconsideracaoPush(profile)
-    await registrarPushDesconsiderado(supabase,a,profile,motivo)
+    const arquivo=await registrarPushDesconsiderado(supabase,a,profile,motivo)
+    if(!arquivo.ok)console.warn('[push-email] Push sera mantido no arquivo por fallback do filtro Ignorados.')
     await updateItem(a.id,{status_associacao:'ignorado',ignorado_em:new Date().toISOString(),motivo_ignorado:motivo})
   }
   const restaurar=async(a)=>{
