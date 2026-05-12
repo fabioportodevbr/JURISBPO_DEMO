@@ -105,8 +105,18 @@ CREATE TABLE public.processos (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT processos_status_check CHECK (status IN ('ativo','arquivo_temporario','encerrado')),
-  CONSTRAINT processos_fase_check CHECK (fase IN ('conhecimento','recurso','execucao_sentenca','arquivo_definitivo')),
+  CONSTRAINT processos_fase_check CHECK (fase IN ('conhecimento','recurso','execucao_provisoria','execucao_sentenca','arquivo_definitivo')),
   CONSTRAINT processos_encerrado_fase_check CHECK (status <> 'encerrado' OR fase = 'arquivo_definitivo')
+);
+
+CREATE TABLE public.processo_apensamentos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  processo_id UUID NOT NULL REFERENCES public.processos(id) ON DELETE CASCADE,
+  processo_apensado_id UUID NOT NULL REFERENCES public.processos(id) ON DELETE CASCADE,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT processo_apensamentos_processos_diferentes_check CHECK (processo_id <> processo_apensado_id)
 );
 
 CREATE TABLE public.contratos (
@@ -304,6 +314,14 @@ CREATE INDEX idx_clientes_escritorio ON public.clientes(escritorio_id);
 CREATE INDEX idx_processos_escritorio ON public.processos(escritorio_id);
 CREATE INDEX idx_processos_status ON public.processos(status);
 CREATE INDEX idx_processos_busca ON public.processos(numero, titulo, tribunal, orgao);
+CREATE INDEX idx_processo_apensamentos_escritorio ON public.processo_apensamentos(escritorio_id);
+CREATE INDEX idx_processo_apensamentos_processo ON public.processo_apensamentos(processo_id);
+CREATE INDEX idx_processo_apensamentos_apensado ON public.processo_apensamentos(processo_apensado_id);
+CREATE UNIQUE INDEX idx_processo_apensamentos_unico ON public.processo_apensamentos(
+  escritorio_id,
+  least(processo_id, processo_apensado_id),
+  greatest(processo_id, processo_apensado_id)
+);
 CREATE INDEX idx_contratos_escritorio ON public.contratos(escritorio_id);
 CREATE INDEX idx_atividades_escritorio ON public.atividades(escritorio_id);
 CREATE INDEX idx_atividades_tipo ON public.atividades(tipo);
@@ -324,6 +342,7 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usuarios_escritorios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.processo_apensamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contratos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.atividades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.atividade_atribuicoes ENABLE ROW LEVEL SECURITY;
@@ -363,6 +382,11 @@ FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WIT
 CREATE POLICY processos_select_member ON public.processos
 FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
 CREATE POLICY processos_write_non_visitor ON public.processos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY processo_apensamentos_select_member ON public.processo_apensamentos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY processo_apensamentos_write_non_visitor ON public.processo_apensamentos
 FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
 
 CREATE POLICY contratos_select_member ON public.contratos
