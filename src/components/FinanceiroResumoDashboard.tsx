@@ -13,6 +13,7 @@ type RegistroFinanceiro = {
   fgts?: number | string | null;
   honorarios_sucumbenciais?: number | string | null;
   honorarios_periciais?: number | string | null;
+  honorarios_e_custos?: number | string | null;
   inss_reclamante?: number | string | null;
   inss_reclamada?: number | string | null;
   multa_inadimplemento?: number | string | null;
@@ -36,6 +37,7 @@ const CAMPOS_ENCARGOS = [
   "fgts",
   "honorarios_sucumbenciais",
   "honorarios_periciais",
+  "honorarios_e_custos",
   "inss_reclamante",
   "inss_reclamada",
   "multa_inadimplemento",

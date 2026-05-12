@@ -50,6 +50,7 @@ type RegistroFinanceiro = {
   fgts?: number | string | null;
   honorarios_sucumbenciais?: number | string | null;
   honorarios_periciais?: number | string | null;
+  honorarios_e_custos?: number | string | null;
   inss_reclamante?: number | string | null;
   inss_reclamada?: number | string | null;
   multa_inadimplemento?: number | string | null;
@@ -81,6 +82,7 @@ type FormState = {
   fgts: string;
   honorarios_sucumbenciais: string;
   honorarios_periciais: string;
+  honorarios_e_custos: string;
   inss_reclamante: string;
   inss_reclamada: string;
   multa_inadimplemento: string;
@@ -146,6 +148,7 @@ const CAMPOS_VALOR = [
   "fgts",
   "honorarios_sucumbenciais",
   "honorarios_periciais",
+  "honorarios_e_custos",
   "inss_reclamante",
   "inss_reclamada",
   "multa_inadimplemento",
@@ -161,6 +164,7 @@ const CAMPOS_ENCARGOS = [
   "fgts",
   "honorarios_sucumbenciais",
   "honorarios_periciais",
+  "honorarios_e_custos",
   "inss_reclamante",
   "inss_reclamada",
   "multa_inadimplemento",
@@ -180,6 +184,7 @@ const initialForm: FormState = {
   fgts: "",
   honorarios_sucumbenciais: "",
   honorarios_periciais: "",
+  honorarios_e_custos: "",
   inss_reclamante: "",
   inss_reclamada: "",
   multa_inadimplemento: "",
@@ -466,6 +471,7 @@ export default function Financeiro({ profile }: { profile: any }) {
       fgts: normalizeInputValue(registro.fgts),
       honorarios_sucumbenciais: normalizeInputValue(registro.honorarios_sucumbenciais),
       honorarios_periciais: normalizeInputValue(registro.honorarios_periciais),
+      honorarios_e_custos: normalizeInputValue(registro.honorarios_e_custos),
       inss_reclamante: normalizeInputValue(registro.inss_reclamante),
       inss_reclamada: normalizeInputValue(registro.inss_reclamada),
       multa_inadimplemento: normalizeInputValue(registro.multa_inadimplemento),
@@ -772,6 +778,7 @@ export default function Financeiro({ profile }: { profile: any }) {
               <F label="FGTS"><input type="number" step="0.01" min="0" style={INP} value={form.fgts} onChange={(event) => setForm((old) => ({ ...old, fgts: event.target.value }))} /></F>
               <F label="Honorários sucumbenciais"><input type="number" step="0.01" min="0" style={INP} value={form.honorarios_sucumbenciais} onChange={(event) => setForm((old) => ({ ...old, honorarios_sucumbenciais: event.target.value }))} /></F>
               <F label="Honorários periciais"><input type="number" step="0.01" min="0" style={INP} value={form.honorarios_periciais} onChange={(event) => setForm((old) => ({ ...old, honorarios_periciais: event.target.value }))} /></F>
+              <F label="Honorários e custos"><input type="number" step="0.01" min="0" style={INP} value={form.honorarios_e_custos} onChange={(event) => setForm((old) => ({ ...old, honorarios_e_custos: event.target.value }))} /></F>
               <F label="INSS reclamante"><input type="number" step="0.01" min="0" style={INP} value={form.inss_reclamante} onChange={(event) => setForm((old) => ({ ...old, inss_reclamante: event.target.value }))} /></F>
               <F label="INSS reclamada"><input type="number" step="0.01" min="0" style={INP} value={form.inss_reclamada} onChange={(event) => setForm((old) => ({ ...old, inss_reclamada: event.target.value }))} /></F>
               <F label="Multa"><input type="number" step="0.01" min="0" style={INP} value={form.multa_inadimplemento} onChange={(event) => setForm((old) => ({ ...old, multa_inadimplemento: event.target.value }))} /></F>

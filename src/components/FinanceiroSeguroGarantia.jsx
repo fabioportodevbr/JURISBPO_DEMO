@@ -92,6 +92,7 @@ export function calcularResumoFinanceiroProcesso(proc, financeiros = []) {
     parseMoney(f.fgts) +
     parseMoney(f.honorarios_sucumbenciais) +
     parseMoney(f.honorarios_periciais) +
+    parseMoney(f.honorarios_e_custos) +
     parseMoney(f.inss_reclamante) +
     parseMoney(f.inss_reclamada) +
     parseMoney(f.multa_inadimplemento) +
