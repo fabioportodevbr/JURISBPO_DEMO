@@ -12,6 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- Em projeto com dados, FACA BACKUP antes.
 -- ============================================================
 DROP TABLE IF EXISTS public.documentos CASCADE;
+DROP TABLE IF EXISTS public.compliance_conflito_interesse_analises CASCADE;
 DROP TABLE IF EXISTS public.atividade_atribuicoes CASCADE;
 DROP TABLE IF EXISTS public.atividades CASCADE;
 DROP TABLE IF EXISTS public.contratos CASCADE;
@@ -161,6 +162,35 @@ CREATE TABLE public.atividades (
   CONSTRAINT atividades_prazo_audiencia_processo_check CHECK (
     tipo NOT IN ('prazo_processual','audiencia') OR processo_id IS NOT NULL
   )
+);
+
+CREATE TABLE public.compliance_conflito_interesse_analises (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  arquivo_nome TEXT NOT NULL,
+  arquivo_tipo TEXT,
+  arquivo_tamanho_bytes BIGINT,
+  storage_bucket TEXT NOT NULL DEFAULT 'compliance-anexos',
+  storage_path TEXT,
+  colaborador_nome TEXT,
+  colaborador_documento TEXT,
+  colaborador_matricula TEXT,
+  respostas JSONB NOT NULL DEFAULT '{}'::jsonb,
+  nivel_risco TEXT NOT NULL,
+  flag TEXT NOT NULL,
+  status TEXT NOT NULL,
+  recomendacao TEXT,
+  metodo_extracao TEXT,
+  confianca_extracao NUMERIC(5,4),
+  texto_extraido TEXT,
+  atividade_id UUID REFERENCES public.atividades(id) ON DELETE SET NULL,
+  criado_por UUID REFERENCES auth.users(id),
+  criado_por_nome TEXT,
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT compliance_conflitos_nivel_check CHECK (nivel_risco IN ('BAIXO','MEDIO','ALTO')),
+  CONSTRAINT compliance_conflitos_flag_check CHECK (flag IN ('VERDE','AMARELA','VERMELHA')),
+  CONSTRAINT compliance_conflitos_status_check CHECK (status IN ('analisado_sem_conflito','pendente_revisao','alerta_critico'))
 );
 
 CREATE TABLE public.atividade_atribuicoes (
@@ -328,6 +358,8 @@ CREATE INDEX idx_atividades_tipo ON public.atividades(tipo);
 CREATE INDEX idx_atividades_prazo ON public.atividades(prazo);
 CREATE INDEX idx_atividades_processo ON public.atividades(processo_id);
 CREATE INDEX idx_atividades_contrato ON public.atividades(contrato_id);
+CREATE INDEX idx_compliance_conflitos_escritorio ON public.compliance_conflito_interesse_analises(escritorio_id, criado_em DESC);
+CREATE INDEX idx_compliance_conflitos_risco ON public.compliance_conflito_interesse_analises(escritorio_id, nivel_risco, status);
 CREATE INDEX idx_documentos_escritorio ON public.documentos(escritorio_id);
 CREATE INDEX idx_documentos_processo ON public.documentos(processo_id);
 CREATE INDEX idx_documentos_contrato ON public.documentos(contrato_id);
@@ -345,6 +377,7 @@ ALTER TABLE public.processos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processo_apensamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contratos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.atividades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.compliance_conflito_interesse_analises ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.atividade_atribuicoes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.modelos_documentos ENABLE ROW LEVEL SECURITY;
@@ -399,6 +432,9 @@ FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id))
 CREATE POLICY atividades_write_non_visitor ON public.atividades
 FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
 
+CREATE POLICY compliance_conflitos_gerente_rls ON public.compliance_conflito_interesse_analises
+FOR ALL TO authenticated USING (public.usuario_eh_gerente(escritorio_id)) WITH CHECK (public.usuario_eh_gerente(escritorio_id));
+
 CREATE POLICY documentos_select_member ON public.documentos
 FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
 CREATE POLICY documentos_write_non_visitor ON public.documentos
@@ -441,6 +477,10 @@ DROP POLICY IF EXISTS documentos_storage_select ON storage.objects;
 DROP POLICY IF EXISTS documentos_storage_insert ON storage.objects;
 DROP POLICY IF EXISTS documentos_storage_update ON storage.objects;
 DROP POLICY IF EXISTS documentos_storage_delete ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_select ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_insert ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_update ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_delete ON storage.objects;
 
 CREATE POLICY documentos_storage_select ON storage.objects
 FOR SELECT TO authenticated
@@ -458,6 +498,23 @@ WITH CHECK (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrev
 CREATE POLICY documentos_storage_delete ON storage.objects
 FOR DELETE TO authenticated
 USING (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY compliance_anexos_storage_select ON storage.objects
+FOR SELECT TO authenticated
+USING (bucket_id = 'compliance-anexos' AND public.usuario_tem_escritorio_storage(name));
+
+CREATE POLICY compliance_anexos_storage_insert ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY compliance_anexos_storage_update ON storage.objects
+FOR UPDATE TO authenticated
+USING (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name))
+WITH CHECK (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY compliance_anexos_storage_delete ON storage.objects
+FOR DELETE TO authenticated
+USING (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name));
 
 -- ============================================================
 -- BOOTSTRAP: criar escritorio/profile/vinculo para usuario atual

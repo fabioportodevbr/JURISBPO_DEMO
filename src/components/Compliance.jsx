@@ -19,7 +19,7 @@ import {
   Calendar, ArrowRight, Loader, Settings,
   Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
   AlertCircle, CheckCircle2, Wifi, HelpCircle, Reply,
-  Archive, RotateCcw, Paperclip, Download,
+  Archive, RotateCcw, Paperclip, Download, Upload,
   BarChart2, Printer, Filter, AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
@@ -96,6 +96,150 @@ const formatBytes = (bytes) => {
 
 const sanitizeFileName = (name) =>
   name.replace(/[^\w.\-() ]/g, '_').replace(/_{2,}/g, '_').slice(0, 200)
+
+const RISCO_CONFLITO_META = {
+  BAIXO: { flag: 'VERDE', label: 'Risco baixo', status: 'analisado_sem_conflito', statusLabel: 'Analisado - Sem Conflito', color: C.green, bg: C.greenBg },
+  MEDIO: { flag: 'AMARELA', label: 'Risco medio', status: 'pendente_revisao', statusLabel: 'Pendente de Revisao', color: C.amber, bg: C.amberBg },
+  ALTO:  { flag: 'VERMELHA', label: 'Risco alto', status: 'alerta_critico', statusLabel: 'Alerta Critico', color: C.red, bg: C.redBg },
+}
+
+const CHECKBOX_CONFLITO_ROWS = [
+  { key: 'hasInternalRelationship', y: 986, label: 'Parentesco/relacionamento com colaborador interno' },
+  { key: 'hasExternalRelationship', y: 1048, label: 'Parentesco/relacionamento com clientes, fornecedores ou concorrentes' },
+  { key: 'hasParallelActivity', y: 1250, label: 'Atividade profissional paralela' },
+  { key: 'parallelCompetes', y: 1432, label: 'Atividade paralela concorre ou se relaciona com a empresa' },
+  { key: 'parallelUsesResources', y: 1494, label: 'Atividade paralela usa recursos corporativos' },
+  { key: 'parallelConflictHours', y: 1556, label: 'Atividade paralela ocorre no horario de trabalho' },
+  { key: 'societarySuppliersClients', y: 1778, label: 'Participacao societaria em clientes ou fornecedores' },
+  { key: 'societaryCompetitors', y: 1840, label: 'Participacao societaria em concorrentes' },
+  { key: 'makesDecisionsForRelatedParties', y: 2142, label: 'Participa de decisoes envolvendo partes relacionadas' },
+]
+
+function avaliarRiscoConflito(respostas = {}) {
+  const parallelCompetesOrUsesResources = !!(respostas.parallelCompetes || respostas.parallelUsesResources || respostas.parallelConflictHours)
+  const hasSocietaryParticipation = !!(respostas.societarySuppliersClients || respostas.societaryCompetitors)
+  if (respostas.hasExternalRelationship || hasSocietaryParticipation || parallelCompetesOrUsesResources || respostas.makesDecisionsForRelatedParties) return 'ALTO'
+  if (respostas.hasInternalRelationship || respostas.hasParallelActivity) return 'MEDIO'
+  return 'BAIXO'
+}
+
+function resumoRiscoConflito(risco, respostas = {}) {
+  if (risco === 'ALTO') {
+    const motivos = []
+    if (respostas.hasExternalRelationship) motivos.push('relacao externa sensivel')
+    if (respostas.societarySuppliersClients || respostas.societaryCompetitors) motivos.push('participacao societaria/interesse financeiro')
+    if (respostas.parallelCompetes || respostas.parallelUsesResources || respostas.parallelConflictHours) motivos.push('atividade paralela com conflito operacional')
+    if (respostas.makesDecisionsForRelatedParties) motivos.push('influencia em decisoes relacionadas')
+    return `Exige plano de mitigacao imediato${motivos.length ? ': ' + motivos.join(', ') : '.'}`
+  }
+  if (risco === 'MEDIO') return 'Encaminhar para revisao do analista e validacao de hierarquia/departamento ou ciencia da atividade paralela.'
+  return 'Todas as respostas criticas foram negativas. Aprovacao automatica sem conflito identificado.'
+}
+
+function contarBrilhoImagem(img, cx, cy, baseW = 920, baseH = 3034) {
+  const channels = Math.max(1, Math.round((img.data?.length || 0) / (img.width * img.height)))
+  if (!img?.data?.length || channels < 3) return null
+  const x = Math.round(cx * img.width / baseW)
+  const y = Math.round(cy * img.height / baseH)
+  const r = Math.max(4, Math.round(5 * img.width / baseW))
+  let count = 0
+  for (let yy = y - r; yy <= y + r; yy += 1) {
+    if (yy < 0 || yy >= img.height) continue
+    for (let xx = x - r; xx <= x + r; xx += 1) {
+      if (xx < 0 || xx >= img.width) continue
+      const i = (yy * img.width + xx) * channels
+      const alpha = channels >= 4 ? img.data[i + 3] : 255
+      const bright = (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3
+      if (alpha > 160 && bright > 180) count += 1
+    }
+  }
+  return count
+}
+
+function respostaRadioImagem(img, y) {
+  const yes = contarBrilhoImagem(img, 15, y)
+  const no = contarBrilhoImagem(img, 80, y)
+  if (yes == null || no == null) return null
+  const delta = Math.max(6, (yes + no) * 0.06)
+  if (yes + delta < no) return true
+  if (no + delta < yes) return false
+  return null
+}
+
+function respostasPorImagemPrincipal(img) {
+  const respostas = {}
+  let encontradas = 0
+  CHECKBOX_CONFLITO_ROWS.forEach(row => {
+    const value = respostaRadioImagem(img, row.y)
+    respostas[row.key] = value
+    if (value !== null) encontradas += 1
+  })
+  return { respostas, confianca: CHECKBOX_CONFLITO_ROWS.length ? encontradas / CHECKBOX_CONFLITO_ROWS.length : 0 }
+}
+
+function respostasPorTextoConflito(texto = '') {
+  const norm = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const todasNao = norm.includes('situacoes potenciais') && !/\bsim\b/.test(norm)
+  if (!todasNao) return { respostas: {}, confianca: 0 }
+  const respostas = Object.fromEntries(CHECKBOX_CONFLITO_ROWS.map(row => [row.key, false]))
+  return { respostas, confianca: 0.5 }
+}
+
+async function getObjetoPdf(page, id) {
+  try { return page.objs.get(id) } catch {}
+  return await new Promise(resolve => {
+    try { page.objs.get(id, resolve) } catch { resolve(null) }
+  })
+}
+
+async function extrairImagemPrincipalPdf(pdf, pdfjsLib) {
+  const page = await pdf.getPage(1)
+  const op = await page.getOperatorList()
+  const paint = pdfjsLib.OPS?.paintImageXObject
+  const imageArg = op.argsArray.find((args, i) => op.fnArray[i] === paint && args?.[0])?.[0]
+  if (!imageArg) return null
+  const img = await getObjetoPdf(page, imageArg)
+  if (!img?.data?.length || !img.width || !img.height) return null
+  return img
+}
+
+async function extrairConflitoPdf(file) {
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const buffer = await file.arrayBuffer()
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer.slice(0)), disableWorker: true, isEvalSupported: false }).promise
+  let texto = ''
+  for (let p = 1; p <= pdf.numPages; p += 1) {
+    const page = await pdf.getPage(p)
+    const content = await page.getTextContent()
+    texto += '\n' + content.items.map(i => i.str).join('\n')
+  }
+  let metodo = texto.trim() ? 'texto_pdf' : 'imagem_checkbox'
+  let parsed = texto.trim() ? respostasPorTextoConflito(texto) : { respostas: {}, confianca: 0 }
+  if (parsed.confianca < 1) {
+    const img = await extrairImagemPrincipalPdf(pdf, pdfjsLib)
+    if (img) {
+      const byImage = respostasPorImagemPrincipal(img)
+      if (byImage.confianca >= parsed.confianca) {
+        parsed = byImage
+        metodo = 'imagem_checkbox'
+      }
+    }
+  }
+  const respostas = Object.fromEntries(CHECKBOX_CONFLITO_ROWS.map(row => [row.key, parsed.respostas[row.key] === true]))
+  const extracaoIncompleta = parsed.confianca < 0.8
+  const risco = extracaoIncompleta ? 'MEDIO' : avaliarRiscoConflito(respostas)
+  const meta = RISCO_CONFLITO_META[risco]
+  return {
+    texto_extraido: texto.trim(),
+    respostas,
+    nivel_risco: risco,
+    flag: meta.flag,
+    status: meta.status,
+    recomendacao: extracaoIncompleta ? 'Extracao automatica incompleta. Encaminhar para revisao manual do formulario.' : resumoRiscoConflito(risco, respostas),
+    metodo_extracao: metodo,
+    confianca_extracao: parsed.confianca,
+  }
+}
 
 function StatusBadge({ status, small }) {
   const s = STATUS_LABELS[status] || { label: status, color: C.gray, bg: C.grayBg }
@@ -2058,6 +2202,266 @@ function ComplianceRelatorios({ profile, onClose }) {
 
 // ── Painel de denúncias ───────────────────────────────────────────────────────
 
+function RiskBadge({ risco }) {
+  const meta = RISCO_CONFLITO_META[risco] || RISCO_CONFLITO_META.BAIXO
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px',
+      borderRadius: 999, background: meta.bg, color: meta.color, fontSize: 11, fontWeight: 800 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta.color }} />
+      {meta.flag}
+    </span>
+  )
+}
+
+function ConflitosInteresseTab({ profile }) {
+  const [rows, setRows] = useState([])
+  const [files, setFiles] = useState([])
+  const [dragging, setDragging] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [processing, setProcessing] = useState(false)
+  const [selected, setSelected] = useState(null)
+  const [error, setError] = useState('')
+  const fileRef = useRef(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data, error: err } = await supabase
+      .from('compliance_conflito_interesse_analises')
+      .select('*')
+      .eq('escritorio_id', profile.escritorio_id)
+      .order('criado_em', { ascending: false })
+    if (!err) setRows(data || [])
+    else setError(err.message)
+    setLoading(false)
+  }, [profile.escritorio_id])
+
+  useEffect(() => { load() }, [load])
+
+  function addFiles(fileList) {
+    const novos = Array.from(fileList || []).filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
+    if (!novos.length) return
+    setFiles(prev => {
+      const vistos = new Set(prev.map(f => `${f.name}:${f.size}:${f.lastModified}`))
+      return [...prev, ...novos.filter(f => !vistos.has(`${f.name}:${f.size}:${f.lastModified}`))]
+    })
+  }
+
+  async function criarAtividadeRevisao(analise) {
+    if (analise.nivel_risco === 'BAIXO') return null
+    const high = analise.nivel_risco === 'ALTO'
+    const prazo = new Date(Date.now() + (high ? 2 : 5) * 86400000).toISOString().slice(0, 10)
+    const { data, error: err } = await supabase.from('atividades').insert({
+      escritorio_id: profile.escritorio_id,
+      tipo: 'tarefa',
+      titulo: `${high ? 'Alerta critico' : 'Revisar'} conflito de interesse - ${analise.arquivo_nome}`,
+      descricao: `${RISCO_CONFLITO_META[analise.nivel_risco]?.statusLabel || analise.status}\n\n${analise.recomendacao}`,
+      status: 'a_fazer',
+      prioridade: high ? 'urgente' : 'alta',
+      responsavel_id: profile.id,
+      criado_por: profile.id,
+      prazo,
+    }).select('id').single()
+    if (err) return null
+    return data?.id || null
+  }
+
+  async function processarArquivos() {
+    if (!files.length || processing) return
+    setProcessing(true)
+    setError('')
+    const novos = []
+    try {
+      for (const file of files) {
+        const analise = await extrairConflitoPdf(file)
+        const path = `${profile.escritorio_id}/conflitos_interesse/${Date.now()}_${Math.random().toString(16).slice(2)}_${sanitizeFileName(file.name)}`
+        const { error: upErr } = await supabase.storage
+          .from('compliance-anexos')
+          .upload(path, file, { contentType: file.type || 'application/pdf', upsert: false })
+        if (upErr) throw new Error(`Erro ao enviar ${file.name}: ${upErr.message}`)
+        const payload = {
+          escritorio_id: profile.escritorio_id,
+          arquivo_nome: file.name,
+          arquivo_tipo: file.type || 'application/pdf',
+          arquivo_tamanho_bytes: file.size,
+          storage_bucket: 'compliance-anexos',
+          storage_path: path,
+          respostas: analise.respostas,
+          nivel_risco: analise.nivel_risco,
+          flag: analise.flag,
+          status: analise.status,
+          recomendacao: analise.recomendacao,
+          metodo_extracao: analise.metodo_extracao,
+          confianca_extracao: analise.confianca_extracao,
+          texto_extraido: analise.texto_extraido || null,
+          criado_por: profile.id,
+          criado_por_nome: profile.nome || profile.email,
+        }
+        const { data, error: dbErr } = await supabase
+          .from('compliance_conflito_interesse_analises')
+          .insert(payload)
+          .select('*')
+          .single()
+        if (dbErr) {
+          await supabase.storage.from('compliance-anexos').remove([path])
+          throw new Error(`Erro ao salvar ${file.name}: ${dbErr.message}`)
+        }
+        const atividadeId = await criarAtividadeRevisao(data)
+        const finalRow = atividadeId ? { ...data, atividade_id: atividadeId } : data
+        if (atividadeId) {
+          await supabase.from('compliance_conflito_interesse_analises')
+            .update({ atividade_id: atividadeId })
+            .eq('id', data.id)
+        }
+        novos.push(finalRow)
+      }
+      setRows(prev => [...novos, ...prev])
+      setFiles([])
+    } catch (e) {
+      setError(e?.message || String(e))
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  async function abrirArquivo(row) {
+    if (!row?.storage_path) return
+    const { data } = await supabase.storage
+      .from(row.storage_bucket || 'compliance-anexos')
+      .createSignedUrl(row.storage_path, 120)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+
+  const stats = useMemo(() => ({
+    total: rows.length,
+    baixo: rows.filter(r => r.nivel_risco === 'BAIXO').length,
+    medio: rows.filter(r => r.nivel_risco === 'MEDIO').length,
+    alto: rows.filter(r => r.nivel_risco === 'ALTO').length,
+  }), [rows])
+
+  const detalhe = selected || rows[0] || null
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18, alignItems: 'start' }}>
+      <div>
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDragEnter={e => { e.preventDefault(); setDragging(true) }}
+          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={e => { e.preventDefault(); if (e.currentTarget === e.target) setDragging(false) }}
+          onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
+          style={{ border: '2px dashed ' + (dragging ? C.green : C.border), borderRadius: 12, padding: 18,
+            background: dragging ? C.greenBg : C.white, cursor: 'pointer', textAlign: 'center', marginBottom: 12 }}>
+          <Upload size={22} color={dragging ? C.green : C.muted} style={{ display: 'block', margin: '0 auto 7px' }} />
+          <div style={{ fontSize: 13, fontWeight: 800, color: dragging ? C.green : C.text }}>Anexar formulario em PDF</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Arraste arquivos ou clique para selecionar</div>
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf" multiple style={{ display: 'none' }}
+            onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
+        </div>
+
+        {files.length > 0 && (
+          <div style={{ border: '1px solid ' + C.border, borderRadius: 10, padding: 10, background: C.white, marginBottom: 12 }}>
+            {files.map((f, i) => (
+              <div key={`${f.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', borderBottom: i < files.length - 1 ? '1px solid ' + C.border : 0 }}>
+                <FileText size={14} color={C.red} />
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 700 }}>{f.name}</span>
+                <span style={{ fontSize: 11, color: C.muted }}>{formatBytes(f.size)}</span>
+                <button type="button" onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))}
+                  style={{ border: 0, background: 'transparent', color: C.muted, cursor: 'pointer', display: 'flex' }}><X size={14} /></button>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+              <button onClick={processarArquivos} disabled={processing}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, border: 0, borderRadius: 8,
+                  background: processing ? C.muted : C.navy, color: 'white', padding: '9px 15px',
+                  fontWeight: 800, cursor: processing ? 'not-allowed' : 'pointer' }}>
+                {processing ? <Loader size={14} style={{ animation: 'spin .8s linear infinite' }} /> : <ShieldAlert size={14} />}
+                {processing ? 'Analisando...' : `Analisar ${files.length} PDF${files.length > 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: C.redBg, color: C.red, border: '1px solid ' + C.red, borderRadius: 8, padding: '9px 12px', fontSize: 13, marginBottom: 12 }}><AlertCircle size={14} />{error}</div>}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 12 }}>
+          {[
+            ['Total', stats.total, C.navy],
+            ['Verde', stats.baixo, C.green],
+            ['Amarela', stats.medio, C.amber],
+            ['Vermelha', stats.alto, C.red],
+          ].map(([label, value, color]) => (
+            <div key={label} style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 9, padding: '10px 12px' }}>
+              <div style={{ fontSize: 21, fontWeight: 900, color }}>{value}</div>
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
+          {loading ? <div style={{ padding: 24, color: C.muted, textAlign: 'center' }}>Carregando analises...</div>
+            : rows.length === 0 ? <div style={{ padding: 30, color: C.muted, textAlign: 'center' }}>Nenhuma analise registrada.</div>
+            : rows.map(row => {
+              const meta = RISCO_CONFLITO_META[row.nivel_risco] || RISCO_CONFLITO_META.BAIXO
+              return (
+                <div key={row.id} role="button" tabIndex={0} onClick={() => setSelected(row)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelected(row) }}
+                  style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'center',
+                    padding: '11px 13px', border: 0, borderBottom: '1px solid ' + C.border,
+                    background: detalhe?.id === row.id ? meta.bg : C.white, textAlign: 'left', cursor: 'pointer' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.arquivo_nome}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{fmt(row.criado_em)} - {meta.statusLabel}</div>
+                  </div>
+                  <RiskBadge risco={row.nivel_risco} />
+                  <button type="button" onClick={e => { e.stopPropagation(); abrirArquivo(row) }} title="Visualizar PDF"
+                    style={{ display: 'flex', border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: 6, color: C.muted, cursor: 'pointer' }}>
+                    <Eye size={14} />
+                  </button>
+                </div>
+              )
+            })}
+        </div>
+      </div>
+
+      <aside style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, padding: 14, position: 'sticky', top: 18 }}>
+        {!detalhe ? (
+          <div style={{ color: C.muted, textAlign: 'center', padding: 20 }}>Selecione uma analise.</div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>Analise de conflito</div>
+                <div style={{ fontWeight: 900, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis' }}>{detalhe.arquivo_nome}</div>
+              </div>
+              <RiskBadge risco={detalhe.nivel_risco} />
+            </div>
+            <div style={{ border: '1px solid ' + (RISCO_CONFLITO_META[detalhe.nivel_risco]?.color || C.border), borderRadius: 9, padding: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Status</div>
+              <div style={{ color: RISCO_CONFLITO_META[detalhe.nivel_risco]?.color || C.text, fontWeight: 900 }}>{RISCO_CONFLITO_META[detalhe.nivel_risco]?.statusLabel || detalhe.status}</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>{detalhe.recomendacao}</div>
+            </div>
+            <div style={{ display: 'grid', gap: 7 }}>
+              {CHECKBOX_CONFLITO_ROWS.map(row => {
+                const value = detalhe.respostas?.[row.key]
+                return (
+                  <div key={row.key} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', borderBottom: '1px solid ' + C.border, paddingBottom: 7 }}>
+                    <span style={{ fontSize: 12, color: C.text }}>{row.label}</span>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: value ? C.red : C.green }}>{value ? 'SIM' : 'NAO'}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, fontSize: 11, color: C.muted }}>
+              <span>Metodo: {detalhe.metodo_extracao || 'n/d'}</span>
+              <span>Confianca: {Math.round(Number(detalhe.confianca_extracao || 0) * 100)}%</span>
+            </div>
+          </>
+        )}
+      </aside>
+    </div>
+  )
+}
+
 function DenunciasList({ profile }) {
   const [denuncias, setDenuncias]       = useState([])
   const [loading, setLoading]           = useState(true)
@@ -2286,12 +2690,16 @@ export default function Compliance({ profile }) {
         <button style={tabStyle(mainTab === 'denuncias')} onClick={() => setMainTab('denuncias')}>
           <ShieldAlert size={14} />Denúncias
         </button>
+        <button style={tabStyle(mainTab === 'conflitos')} onClick={() => setMainTab('conflitos')}>
+          <AlertTriangle size={14} />Conflitos de interesse
+        </button>
         <button style={tabStyle(mainTab === 'configuracoes')} onClick={() => setMainTab('configuracoes')}>
           <Settings size={14} />Configurações de e-mail
         </button>
       </div>
 
       {mainTab === 'denuncias'     && <DenunciasList profile={profile} />}
+      {mainTab === 'conflitos'     && <ConflitosInteresseTab profile={profile} />}
       {mainTab === 'configuracoes' && <ComplianceSettings profile={profile} />}
 
       {showRelatorios && (
