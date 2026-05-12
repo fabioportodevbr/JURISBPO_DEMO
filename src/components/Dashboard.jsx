@@ -6,6 +6,7 @@ import ClippingJuridico from './ClippingJuridico.jsx'
 import MuralRecados from './MuralRecados.jsx'
 import { NotificacoesModal } from './Notificacoes.jsx'
 import { FinanceiroResumoDashboard } from './FinanceiroResumoDashboard.tsx'
+import { motivoDesconsideracaoPush, registrarPushDesconsiderado } from '../lib/pushArquivo.js'
 
 import { C } from '../lib/theme'
 import { useTheme } from '../lib/ThemeContext'
@@ -22,6 +23,15 @@ function isTaskOrDeadline(a){return ['tarefa','prazo_processual'].includes(a.tip
 function isHearing(a){return a.tipo==='audiencia'}
 function isMeeting(a){return a.tipo==='reuniao'}
 function compareByDate(a,b){return String(a.prazo||'9999-99-99').localeCompare(String(b.prazo||'9999-99-99')) || String(a.horario||'').localeCompare(String(b.horario||''))}
+function scheduledDateTime(a){
+  if(!a?.prazo)return null
+  const horario=String(a.horario||'').match(/^\d{2}:\d{2}/)?.[0]||'23:59'
+  return new Date(`${a.prazo}T${horario}:00`)
+}
+function isScheduledNowOrFuture(a,now=new Date()){
+  const dt=scheduledDateTime(a)
+  return dt ? dt >= now : false
+}
 function shortText(v='',limit=190){const t=String(v||'').replace(/\s+/g,' ').trim();return t.length>limit?t.slice(0,limit).trim()+'...':t}
 
 const PUSH_IMPORTANTE=/senten[cç]a|ac[oó]rd[aã]o|decis[aã]o|liminar|tutela|intima[cç][aã]o|cita[cç][aã]o|prazo|audi[eê]ncia|per[ií]cia|bloqueio|penhora|publica[cç][aã]o|di[aá]rio|urgente|manifestar/iu
@@ -48,7 +58,7 @@ function PushDashboardHeader({novos,importantes,ultimo,onClick}){
       <div style={{fontSize:12,color:C.muted,marginTop:3}}>{ultimo?`Último recebimento: ${new Date(ultimo.criado_em).toLocaleString('pt-BR')}`:'Últimos andamentos recebidos por e-mail dos tribunais.'}</div>
     </div>
     <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-      <span style={{border:'1px solid '+C.blue,background:C.white,color:C.blue,borderRadius:999,padding:'6px 10px',fontSize:12,fontWeight:900}}>{novos} novo(s) em 24h</span>
+      <span style={{border:'1px solid '+C.red,background:C.redBg,color:C.red,borderRadius:999,padding:'6px 10px',fontSize:12,fontWeight:900}}>{novos} novo(s) em 24h</span>
       <span style={{border:'1px solid '+(importantes?C.amber:C.green),background:C.white,color:importantes?C.amber:C.green,borderRadius:999,padding:'6px 10px',fontSize:12,fontWeight:900}}>{importantes} importante(s)</span>
       <span style={{border:'1px solid '+C.border,background:C.white,color:C.text,borderRadius:999,padding:'6px 10px',fontSize:12,fontWeight:900,display:'inline-flex',alignItems:'center',gap:5}}><ExternalLink size={13}/> Ver pushes</span>
     </div>
@@ -233,6 +243,7 @@ export default function Dashboard({profile, unreadCount=0}){
     const amanha=addDaysISO(1)
     const fimSemana=addDaysISO(7)
     const desde24h=new Date(Date.now()-24*60*60*1000).toISOString()
+    const agora=new Date()
     const atividadesQueryFactory=()=>{let query=supabase.from('atividades').select('*').eq('escritorio_id',eid).neq('status','concluida');if(profile.role!=='gerente'){query=query.or(`tipo.in.(audiencia,reuniao),and(tipo.in.(tarefa,prazo_processual),responsavel_id.eq.${profile.id})`)}return query}
     const[p,c,a,{data:push}]=await Promise.all([
       fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
@@ -243,7 +254,7 @@ export default function Dashboard({profile, unreadCount=0}){
     const atividades=(a||[]).filter(isOpen)
     const pendentes=atividades.filter(x=>isTaskOrDeadline(x)&&x.prazo&&x.prazo<=hoje).sort(compareByDate)
     const futuras=atividades.filter(x=>isTaskOrDeadline(x)&&x.prazo&&x.prazo>=amanha).sort(compareByDate)
-    const audienciasSemana=atividades.filter(x=>isHearing(x)&&x.prazo&&x.prazo>=hoje&&x.prazo<=fimSemana).sort(compareByDate)
+    const audienciasSemana=atividades.filter(x=>isHearing(x)&&x.prazo&&x.prazo>=hoje&&x.prazo<=fimSemana&&isScheduledNowOrFuture(x,agora)).sort(compareByDate)
     const reunioesSemana=atividades.filter(x=>isMeeting(x)&&x.prazo&&x.prazo>=hoje&&x.prazo<=fimSemana).sort(compareByDate)
     const ren=(c||[]).map(x=>({...x,renovacao:renewalState(x)})).filter(x=>x.renovacao).sort((x,y)=>x.renovacao.days-y.renovacao.days).slice(0,5)
     const pushItems=push||[]
@@ -259,7 +270,9 @@ export default function Dashboard({profile, unreadCount=0}){
   }
 
   const desconsiderarPush=async(p)=>{
-    const {error}=await supabase.from('andamentos_processuais_push').update({status_associacao:'ignorado',ignorado_em:new Date().toISOString(),motivo_ignorado:'Desconsiderado manualmente no JurisBPO'}).eq('id',p.id)
+    const motivo=motivoDesconsideracaoPush(profile)
+    await registrarPushDesconsiderado(supabase,p,profile,motivo)
+    const {error}=await supabase.from('andamentos_processuais_push').update({status_associacao:'ignorado',ignorado_em:new Date().toISOString(),motivo_ignorado:motivo}).eq('id',p.id)
     if(error){alert('Erro ao desconsiderar: '+error.message);return}
     setSt(prev=>({...prev,pushItems:prev.pushItems.filter(x=>x.id!==p.id),pushNovos:prev.pushNovos-1,pushImportantes:isImportantPush(p)?prev.pushImportantes-1:prev.pushImportantes}))
   }

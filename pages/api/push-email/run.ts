@@ -21,7 +21,7 @@ function getProvidedSecret(req: NextApiRequest) {
   return querySecret || headerSecret || bearer
 }
 
-async function isGerenteRequest(req: NextApiRequest, config: PushEmailConfig) {
+async function isActiveMemberRequest(req: NextApiRequest, config: PushEmailConfig) {
   const token = getBearerToken(req)
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!token || !anonKey) return false
@@ -39,11 +39,10 @@ async function isGerenteRequest(req: NextApiRequest, config: PushEmailConfig) {
     .select('id')
     .eq('usuario_id', userData.user.id)
     .eq('ativo', true)
-    .eq('papel', 'gerente')
     .limit(1)
 
   if (error) {
-    console.error('[push-email] Erro ao validar gerente:', error)
+    console.error('[push-email] Erro ao validar usuario ativo:', error)
     return false
   }
 
@@ -55,7 +54,7 @@ async function isAuthorized(req: NextApiRequest, config: PushEmailConfig) {
   const providedSecret = getProvidedSecret(req)
 
   if (configuredSecret && providedSecret === configuredSecret) return true
-  if (await isGerenteRequest(req, config)) return true
+  if (await isActiveMemberRequest(req, config)) return true
 
   return !configuredSecret && process.env.NODE_ENV !== 'production'
 }

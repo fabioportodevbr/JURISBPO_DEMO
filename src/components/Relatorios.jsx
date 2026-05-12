@@ -11,6 +11,9 @@ const TIPOS_ATIVIDADE={tarefa:'Tarefa',prazo_processual:'Prazo processual',audie
 const STATUS_ATIVIDADE={a_fazer:'A fazer',em_andamento:'Em andamento',concluida:'Concluída',cancelada:'Cancelada'}
 const CATEGORIAS={trabalhista:'Trabalhista',civel:'Cível',administrativo:'Administrativo',tributario:'Tributário',criminal:'Criminal'}
 const FASES={conhecimento:'Conhecimento',recurso:'Recurso',execucao_sentenca:'Execução de sentença',arquivo_definitivo:'Arquivo definitivo'}
+const PERICIAS_PROCESSO={medica:'Médica',tecnica:'Técnica'}
+const RESULTADOS_PRIMEIRA={procedente:'Procedente',procedente_em_parte:'Procedente em parte',improcedente:'Improcedente',acordo:'Acordo',ausencia_reclamante:'Ausência do(a) reclamante',extinto_sem_julgamento_merito:'Extinto sem julgamento do mérito'}
+const RESULTADOS_SEGUNDA={reclamante_total:'Totalmente provido o recurso do reclamante',reclamante_parcial:'Parcialmente provido o recurso do reclamante',reclamada_total:'Totalmente provido o recurso da reclamada',reclamada_parcial:'Parcialmente provido o recurso da reclamada',mantida_primeiro_grau:'Mantida a decisão de primeiro grau'}
 
 function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function num(v){return Number(v||0).toLocaleString('pt-BR')}
@@ -24,6 +27,10 @@ function monthName(ref){return ref.toLocaleDateString('pt-BR',{month:'long',year
 function clean(s){return String(s??'').replace(/[<>&]/g,m=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[m]))}
 function slug(s){return String(s||'relatorio').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()}
 function parseMoney(v){if(v===null||v===undefined||v==='')return 0;if(typeof v==='number')return Number.isFinite(v)?v:0;let s=String(v).replace(/[^\d,.-]/g,'');if(!s)return 0;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');return Number(s)||0}
+function normalizarResultadoPrimeira(v=''){const s=String(v||'');if(RESULTADOS_PRIMEIRA[s])return s;const low=s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();return Object.entries(RESULTADOS_PRIMEIRA).find(([,l])=>l.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()===low)?.[0]||''}
+function extrairPericiasProcesso(p={}){const m=String(p?.observacoes||'').match(/\[PERICIAS_PROCESSO:([^\]]*)\]/);if(!m)return [];try{return (JSON.parse(decodeURIComponent(m[1]))||[]).filter(v=>PERICIAS_PROCESSO[v])}catch{return []}}
+function extrairResultadosProcesso(p={}){const m=String(p?.observacoes||'').match(/\[RESULTADOS_PROCESSO:([^\]]*)\]/);if(!m)return {primeira:normalizarResultadoPrimeira(p?.resultado),segunda:[]};try{const r=JSON.parse(decodeURIComponent(m[1]))||{};return {primeira:normalizarResultadoPrimeira(r.primeira||p?.resultado),segunda:Array.isArray(r.segunda)?r.segunda.filter(v=>RESULTADOS_SEGUNDA[v]):[]}}catch{return {primeira:normalizarResultadoPrimeira(p?.resultado),segunda:[]}}}
+function enriquecerProcessoRelatorio(p={}){const pericias=extrairPericiasProcesso(p);const resultados=extrairResultadosProcesso(p);return {...p,pericias,pericias_label:pericias.map(v=>PERICIAS_PROCESSO[v]).join(', '),resultado_primeira_instancia:resultados.primeira,resultado_primeira_instancia_label:RESULTADOS_PRIMEIRA[resultados.primeira]||'',resultado_segunda_instancia:resultados.segunda,resultado_segunda_instancia_label:resultados.segunda.map(v=>RESULTADOS_SEGUNDA[v]).join(', '),resultado:resultados.primeira||p.resultado||''}}
 const PAGO_MARK='[PAGAMENTOS_CAMPOS:'
 const EXCLUIDO_MARK='[REGISTRO_FINANCEIRO_EXCLUIDO:'
 function extrairPagamentosCampos(obj={}){const obs=String(obj?.observacoes||'');const m=obs.match(/\[PAGAMENTOS_CAMPOS:([^\]]*)\]/);if(!m)return {};try{return JSON.parse(decodeURIComponent(m[1]))||{}}catch{return {}}}
@@ -71,7 +78,7 @@ const REPORTS=[
 
 const FIELD_SETS={
   processos:[
-    ['numero','Número'],['titulo','Título/parte principal'],['parte_contraria','Parte contrária'],['categoria','Categoria'],['tribunal','Tribunal'],['orgao','Órgão administrativo'],['status','Status'],['fase','Fase'],['data_ajuizamento','Data de ajuizamento'],['valor_acao','Valor da ação'],['valor_gasto','Valor efetivamente gasto'],['valor_economizado','Valor economizado'],['transito_julgado','Trânsito em julgado'],['resultado','Resultado/sentença'],['resumo_processo','Resumo'],['observacoes','Observações']
+    ['numero','Número'],['titulo','Título/parte principal'],['parte_contraria','Parte contrária'],['categoria','Categoria'],['tribunal','Tribunal'],['orgao','Órgão administrativo'],['status','Status'],['fase','Fase'],['data_ajuizamento','Data de ajuizamento'],['valor_acao','Valor da ação'],['valor_gasto','Valor efetivamente gasto'],['valor_economizado','Valor economizado'],['pericias_label','Perícias'],['transito_julgado','Trânsito em julgado'],['resultado_primeira_instancia_label','Resultado 1ª instância'],['resultado_segunda_instancia_label','Resultado 2ª instância'],['resultado','Resultado/sentença'],['resumo_processo','Resumo'],['observacoes','Observações']
   ],
   financeiro:[
     ['processo','Processo'],['natureza','Natureza'],['data_referencia','Data referência'],['valor_bruto','Valor bruto'],['valor_restituido','Valor restituido'],['forma_pagamento','Forma de pagamento'],['numero_parcelas','Número de parcelas'],['data_vencimento','Vencimento'],['custas','Custas'],['fgts','FGTS'],['honorarios_sucumbenciais','Honorários sucumbenciais'],['honorarios_periciais','Honorários periciais'],['inss_reclamante','INSS reclamante'],['inss_reclamada','INSS reclamada'],['multa_inadimplemento','Multa'],['status_pagamento','Status pagamento'],['seguro_garantia','Seguro-garantia'],['apolice_numero','Nº apólice'],['apolice_inicio','Início vigência'],['apolice_fim','Fim vigência'],['valor_assegurado','Valor assegurado'],['seguro_premio','Prêmio pago'],['total','Total estimado']
@@ -166,6 +173,8 @@ export default function Relatorios({profile}){
     if(field==='created_at')return brDateTime(row[field])
     if(field==='transito_julgado')return row[field]?'Sim':'Não'
     if(field==='seguro_garantia')return row[field]?'Sim':'Não'
+    if(field==='resultado')return RESULTADOS_PRIMEIRA[row[field]]||row[field]||'—'
+    if(['pericias_label','resultado_primeira_instancia_label','resultado_segunda_instancia_label'].includes(field))return row[field]||'—'
     if(field==='categoria')return CATEGORIAS[row[field]]||row[field]||'—'
     if(field==='fase')return FASES[row[field]]||row[field]||'—'
     if(field==='tipo')return TIPOS_ATIVIDADE[row[field]]||row[field]||'—'
@@ -183,7 +192,7 @@ export default function Relatorios({profile}){
     let title=REPORTS.find(r=>r.id===tipo)?.nome||'Relatório'
     let rows=[]
     if(kind==='processos'){
-      rows=viewData.processos.filter(p=>categoria==='todas'||(p.categoria||'trabalhista')===categoria)
+      rows=viewData.processos.map(enriquecerProcessoRelatorio).filter(p=>categoria==='todas'||(p.categoria||'trabalhista')===categoria)
       if(tipo==='processos_ativos')rows=rows.filter(p=>p.status!=='encerrado'&&p.status!=='arquivado')
       if(tipo==='processos_arquivados')rows=rows.filter(p=>p.status==='encerrado'||p.status==='arquivado'||p.fase==='arquivo_definitivo')
       if(tipo==='sentencas_procedentes')rows=rows.filter(p=>String(p.resultado||'').toLowerCase().includes('proced')&&!String(p.resultado||'').toLowerCase().includes('improced'))

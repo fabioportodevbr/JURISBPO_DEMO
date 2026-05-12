@@ -128,7 +128,7 @@ export function NotificacoesModal({profile,onClose}){
   return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:680,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:760,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:18,borderBottom:'1px solid '+C.border}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,color:C.text,fontWeight:900}}><Bell size={17}/>NotificaÃ§Ãµes</div>
+        <div style={{display:'flex',alignItems:'center',gap:8,color:C.text,fontWeight:900}}><Bell size={17}/>Notificações</div>
         <button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',display:'flex',padding:4,color:C.text}}><X/></button>
       </div>
       <div style={{padding:18,overflow:'auto'}}>

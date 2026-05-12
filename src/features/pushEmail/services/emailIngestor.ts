@@ -1,5 +1,5 @@
 import { ImapFlow } from 'imapflow'
-import { getPushEmailConfig } from '../config'
+import { getPushEmailConfig, resolveRuntimePushEmailConfig } from '../config'
 import { createPushEmailSupabase } from '../db/supabaseServer'
 import { parseCourtEmail } from '../parsers/emailParser'
 import type { PushEmailResult } from '../types'
@@ -195,8 +195,9 @@ async function downloadTextPart(client: ImapFlow, uid: number): Promise<string> 
 }
 
 export async function ingestUnreadEmails(): Promise<PushEmailResult> {
-  const config = getPushEmailConfig()
-  const supabase = createPushEmailSupabase(config)
+  const baseConfig = getPushEmailConfig()
+  const supabase = createPushEmailSupabase(baseConfig)
+  const config = await resolveRuntimePushEmailConfig(supabase, baseConfig)
   const client = new ImapFlow({
     host: config.IMAP_HOST,
     port: config.IMAP_PORT,
@@ -216,7 +217,7 @@ export async function ingestUnreadEmails(): Promise<PushEmailResult> {
   await client.connect()
 
   try {
-    const lock = await client.getMailboxLock('INBOX')
+    const lock = await client.getMailboxLock(config.IMAP_MAILBOX || 'INBOX')
 
     try {
       const unseenUidsResult = await client.search({ seen: false }, { uid: true })
