@@ -20,7 +20,7 @@ import {
   Mail, Server, Eye, EyeOff, ToggleLeft, ToggleRight,
   AlertCircle, CheckCircle2, Wifi, HelpCircle, Reply,
   Archive, RotateCcw, Paperclip, Download, Upload,
-  BarChart2, Printer, Filter, AlertTriangle,
+  BarChart2, Printer, Filter, AlertTriangle, Trash2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { C } from '../lib/theme.js'
@@ -2248,6 +2248,25 @@ function RiskBadge({ risco }) {
   )
 }
 
+const CONFLITO_GESTAO_KEY = '_gestao'
+
+function conflitoGestao(row) {
+  return row?.respostas?.[CONFLITO_GESTAO_KEY] || {}
+}
+
+function conflitoArquivado(row) {
+  return conflitoGestao(row).arquivado === true
+}
+
+function respostasComGestao(row, patch) {
+  const respostas = { ...(row?.respostas || {}) }
+  respostas[CONFLITO_GESTAO_KEY] = {
+    ...(respostas[CONFLITO_GESTAO_KEY] || {}),
+    ...patch,
+  }
+  return respostas
+}
+
 function ConflitosInteresseTab({ profile }) {
   const [rows, setRows] = useState([])
   const [files, setFiles] = useState([])
@@ -2255,6 +2274,10 @@ function ConflitosInteresseTab({ profile }) {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [selected, setSelected] = useState(null)
+  const [archiveView, setArchiveView] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [savingDecision, setSavingDecision] = useState(false)
+  const [decisionForm, setDecisionForm] = useState({ observacoes_resultado: '', parecer_decisao: '' })
   const [error, setError] = useState('')
   const fileRef = useRef(null)
 
@@ -2379,14 +2402,157 @@ function ConflitosInteresseTab({ profile }) {
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
-  const stats = useMemo(() => ({
-    total: rows.length,
-    baixo: rows.filter(r => r.nivel_risco === 'BAIXO').length,
-    medio: rows.filter(r => r.nivel_risco === 'MEDIO').length,
-    alto: rows.filter(r => r.nivel_risco === 'ALTO').length,
-  }), [rows])
+  async function atualizarGestaoAnalises(targetRows, patch) {
+    const targets = (targetRows || []).filter(Boolean)
+    if (!targets.length) return []
+    setError('')
+    const atualizadas = []
+    for (const row of targets) {
+      const payload = {
+        respostas: respostasComGestao(row, patch),
+        atualizado_em: new Date().toISOString(),
+      }
+      const { data, error: err } = await supabase
+        .from('compliance_conflito_interesse_analises')
+        .update(payload)
+        .eq('id', row.id)
+        .eq('escritorio_id', profile.escritorio_id)
+        .select('*')
+        .single()
+      if (err) throw err
+      atualizadas.push(data)
+    }
+    const map = new Map(atualizadas.map(row => [row.id, row]))
+    setRows(prev => prev.map(row => map.get(row.id) || row))
+    setSelected(prev => (prev && map.get(prev.id)) || prev)
+    return atualizadas
+  }
 
-  const detalhe = selected || rows[0] || null
+  async function arquivarAnalises(targetRows) {
+    const targets = (targetRows || []).filter(row => row && !conflitoArquivado(row))
+    if (!targets.length) return
+    try {
+      const agora = new Date().toISOString()
+      await atualizarGestaoAnalises(targets, {
+        arquivado: true,
+        arquivado_em: agora,
+        arquivado_por: profile.id,
+        arquivado_por_nome: profile.nome || profile.email,
+      })
+      setSelectedIds([])
+      if (targets.some(row => row.id === selected?.id)) setSelected(null)
+    } catch (e) {
+      setError(e?.message || String(e))
+    }
+  }
+
+  async function reativarAnalises(targetRows) {
+    const targets = (targetRows || []).filter(row => row && conflitoArquivado(row))
+    if (!targets.length) return
+    try {
+      const agora = new Date().toISOString()
+      await atualizarGestaoAnalises(targets, {
+        arquivado: false,
+        reativado_em: agora,
+        reativado_por: profile.id,
+        reativado_por_nome: profile.nome || profile.email,
+      })
+      setSelectedIds([])
+      if (targets.some(row => row.id === selected?.id)) setSelected(null)
+    } catch (e) {
+      setError(e?.message || String(e))
+    }
+  }
+
+  async function excluirAnalises(targetRows) {
+    const targets = (targetRows || []).filter(Boolean)
+    if (!targets.length) return
+    const ok = window.confirm(`Excluir definitivamente ${targets.length} analise${targets.length > 1 ? 's' : ''}? Esta acao remove tambem os PDFs anexados.`)
+    if (!ok) return
+    try {
+      setError('')
+      const pathsByBucket = targets.reduce((acc, row) => {
+        if (!row.storage_path) return acc
+        const bucket = row.storage_bucket || COMPLIANCE_ANEXOS_BUCKET
+        acc[bucket] = acc[bucket] || []
+        acc[bucket].push(row.storage_path)
+        return acc
+      }, {})
+      for (const [bucket, paths] of Object.entries(pathsByBucket)) {
+        const { error: stErr } = await supabase.storage.from(bucket).remove(paths)
+        if (stErr) throw stErr
+      }
+      const ids = targets.map(row => row.id)
+      const { error: dbErr } = await supabase
+        .from('compliance_conflito_interesse_analises')
+        .delete()
+        .eq('escritorio_id', profile.escritorio_id)
+        .in('id', ids)
+      if (dbErr) throw dbErr
+      setRows(prev => prev.filter(row => !ids.includes(row.id)))
+      setSelectedIds(prev => prev.filter(id => !ids.includes(id)))
+      if (selected && ids.includes(selected.id)) setSelected(null)
+    } catch (e) {
+      setError(e?.message || String(e))
+    }
+  }
+
+  async function salvarParecer() {
+    if (!detalhe || savingDecision) return
+    setSavingDecision(true)
+    try {
+      const agora = new Date().toISOString()
+      const [updated] = await atualizarGestaoAnalises([detalhe], {
+        observacoes_resultado: decisionForm.observacoes_resultado || '',
+        parecer_decisao: decisionForm.parecer_decisao || '',
+        parecer_atualizado_em: agora,
+        parecer_atualizado_por: profile.id,
+        parecer_atualizado_por_nome: profile.nome || profile.email,
+      })
+      if (updated) setSelected(updated)
+    } catch (e) {
+      setError(e?.message || String(e))
+    } finally {
+      setSavingDecision(false)
+    }
+  }
+
+  function toggleSelecionado(id) {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
+  }
+
+  const activeRows = useMemo(() => rows.filter(row => !conflitoArquivado(row)), [rows])
+  const archivedRows = useMemo(() => rows.filter(row => conflitoArquivado(row)), [rows])
+  const visibleRows = useMemo(() => archiveView ? archivedRows : activeRows, [archiveView, activeRows, archivedRows])
+  const stats = useMemo(() => ({
+    total: visibleRows.length,
+    baixo: visibleRows.filter(r => r.nivel_risco === 'BAIXO').length,
+    medio: visibleRows.filter(r => r.nivel_risco === 'MEDIO').length,
+    alto: visibleRows.filter(r => r.nivel_risco === 'ALTO').length,
+  }), [visibleRows])
+  const selectedRows = useMemo(() => visibleRows.filter(row => selectedIds.includes(row.id)), [visibleRows, selectedIds])
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every(row => selectedIds.includes(row.id))
+  const detalhe = selected && visibleRows.some(row => row.id === selected.id) ? selected : visibleRows[0] || null
+
+  useEffect(() => {
+    setSelectedIds([])
+    setSelected(null)
+  }, [archiveView])
+
+  useEffect(() => {
+    const gestao = conflitoGestao(detalhe)
+    setDecisionForm({
+      observacoes_resultado: gestao.observacoes_resultado || '',
+      parecer_decisao: gestao.parecer_decisao || '',
+    })
+  }, [detalhe?.id])
+
+  function toggleSelecionarTodos() {
+    setSelectedIds(allVisibleSelected ? [] : visibleRows.map(row => row.id))
+  }
+
+  const detalheGestao = conflitoGestao(detalhe)
+  const detalheArquivado = conflitoArquivado(detalhe)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18, alignItems: 'start' }}>
@@ -2431,6 +2597,38 @@ function ConflitosInteresseTab({ profile }) {
 
         {error && <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: C.redBg, color: C.red, border: '1px solid ' + C.red, borderRadius: 8, padding: '9px 12px', fontSize: 13, marginBottom: 12 }}><AlertCircle size={14} />{error}</div>}
 
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div style={{ display: 'inline-flex', border: '1px solid ' + C.border, borderRadius: 9, overflow: 'hidden', background: C.white }}>
+            <button type="button" onClick={() => setArchiveView(false)}
+              style={{ border: 0, borderRight: '1px solid ' + C.border, background: !archiveView ? C.greenBg : C.white, color: !archiveView ? C.green : C.text, padding: '8px 11px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
+              Em analise ({activeRows.length})
+            </button>
+            <button type="button" onClick={() => setArchiveView(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, border: 0, background: archiveView ? C.grayBg : C.white, color: archiveView ? C.gray : C.text, padding: '8px 11px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
+              <Archive size={13} /> Arquivo ({archivedRows.length})
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, fontWeight: 800, cursor: visibleRows.length ? 'pointer' : 'default' }}>
+              <input type="checkbox" checked={allVisibleSelected} disabled={!visibleRows.length} onChange={toggleSelecionarTodos} />
+              Selecionar todos
+            </label>
+            {selectedRows.length > 0 && (
+              <span style={{ fontSize: 11, color: C.muted, fontWeight: 800 }}>{selectedRows.length} selecionada{selectedRows.length > 1 ? 's' : ''}</span>
+            )}
+            <button type="button" disabled={!selectedRows.length} onClick={() => archiveView ? reativarAnalises(selectedRows) : arquivarAnalises(selectedRows)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.text : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+              {archiveView ? <RotateCcw size={13} /> : <Archive size={13} />}
+              {archiveView ? 'Reativar' : 'Arquivar'}
+            </button>
+            <button type="button" disabled={!selectedRows.length} onClick={() => excluirAnalises(selectedRows)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + (selectedRows.length ? C.red : C.border), background: C.white, color: selectedRows.length ? C.red : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+              <Trash2 size={13} /> Excluir
+            </button>
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 12 }}>
           {[
             ['Total', stats.total, C.navy],
@@ -2447,23 +2645,38 @@ function ConflitosInteresseTab({ profile }) {
 
         <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
           {loading ? <div style={{ padding: 24, color: C.muted, textAlign: 'center' }}>Carregando analises...</div>
-            : rows.length === 0 ? <div style={{ padding: 30, color: C.muted, textAlign: 'center' }}>Nenhuma analise registrada.</div>
-            : rows.map(row => {
+            : visibleRows.length === 0 ? <div style={{ padding: 30, color: C.muted, textAlign: 'center' }}>{archiveView ? 'Nenhuma analise arquivada.' : 'Nenhuma analise registrada.'}</div>
+            : visibleRows.map(row => {
               const meta = RISCO_CONFLITO_META[row.nivel_risco] || RISCO_CONFLITO_META.BAIXO
+              const gestao = conflitoGestao(row)
+              const isChecked = selectedIds.includes(row.id)
               return (
                 <div key={row.id} role="button" tabIndex={0} onClick={() => setSelected(row)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelected(row) }}
-                  style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'center',
+                  style={{ width: '100%', display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto auto', gap: 10, alignItems: 'center',
                     padding: '11px 13px', border: 0, borderBottom: '1px solid ' + C.border,
                     background: detalhe?.id === row.id ? meta.bg : C.white, textAlign: 'left', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={isChecked} onChange={() => toggleSelecionado(row.id)}
+                    onClick={e => e.stopPropagation()} title="Selecionar analise" />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.arquivo_nome}</div>
-                    <div style={{ fontSize: 11, color: C.muted }}>{fmt(row.criado_em)} - {meta.statusLabel}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>
+                      {fmt(row.criado_em)} - {meta.statusLabel}
+                      {gestao.arquivado_em ? ` - Arquivada em ${fmt(gestao.arquivado_em)}` : ''}
+                    </div>
                   </div>
                   <RiskBadge risco={row.nivel_risco} />
                   <button type="button" onClick={e => { e.stopPropagation(); abrirArquivo(row) }} title="Visualizar PDF"
                     style={{ display: 'flex', border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: 6, color: C.muted, cursor: 'pointer' }}>
                     <Eye size={14} />
+                  </button>
+                  <button type="button" onClick={e => { e.stopPropagation(); archiveView ? reativarAnalises([row]) : arquivarAnalises([row]) }} title={archiveView ? 'Reativar analise' : 'Arquivar analise'}
+                    style={{ display: 'flex', border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: 6, color: C.muted, cursor: 'pointer' }}>
+                    {archiveView ? <RotateCcw size={14} /> : <Archive size={14} />}
+                  </button>
+                  <button type="button" onClick={e => { e.stopPropagation(); excluirAnalises([row]) }} title="Excluir analise"
+                    style={{ display: 'flex', border: '1px solid ' + C.red, background: C.white, borderRadius: 7, padding: 6, color: C.red, cursor: 'pointer' }}>
+                    <Trash2 size={14} />
                   </button>
                 </div>
               )
@@ -2483,10 +2696,30 @@ function ConflitosInteresseTab({ profile }) {
               </div>
               <RiskBadge risco={detalhe.nivel_risco} />
             </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              <button type="button" onClick={() => abrirArquivo(detalhe)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, color: C.text, cursor: 'pointer' }}>
+                <Eye size={13} /> Visualizar
+              </button>
+              <button type="button" onClick={() => detalheArquivado ? reativarAnalises([detalhe]) : arquivarAnalises([detalhe])}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, color: C.text, cursor: 'pointer' }}>
+                {detalheArquivado ? <RotateCcw size={13} /> : <Archive size={13} />}
+                {detalheArquivado ? 'Reativar' : 'Arquivar'}
+              </button>
+              <button type="button" onClick={() => excluirAnalises([detalhe])}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.red, background: C.white, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, color: C.red, cursor: 'pointer' }}>
+                <Trash2 size={13} /> Excluir
+              </button>
+            </div>
             <div style={{ border: '1px solid ' + (RISCO_CONFLITO_META[detalhe.nivel_risco]?.color || C.border), borderRadius: 9, padding: 10, marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: C.muted, fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Status</div>
               <div style={{ color: RISCO_CONFLITO_META[detalhe.nivel_risco]?.color || C.text, fontWeight: 900 }}>{RISCO_CONFLITO_META[detalhe.nivel_risco]?.statusLabel || detalhe.status}</div>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>{detalhe.recomendacao}</div>
+              {detalheArquivado && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid ' + C.border, fontSize: 11, color: C.muted, lineHeight: 1.45 }}>
+                  Arquivada em {fmt(detalheGestao.arquivado_em)}{detalheGestao.arquivado_por_nome ? ` por ${detalheGestao.arquivado_por_nome}` : ''}
+                </div>
+              )}
             </div>
             <div style={{ display: 'grid', gap: 7 }}>
               {CHECKBOX_CONFLITO_ROWS.map(row => {
@@ -2502,6 +2735,30 @@ function ConflitosInteresseTab({ profile }) {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, fontSize: 11, color: C.muted }}>
               <span>Metodo: {detalhe.metodo_extracao || 'n/d'}</span>
               <span>Confianca: {Math.round(Number(detalhe.confianca_extracao || 0) * 100)}%</span>
+            </div>
+            <div style={{ borderTop: '1px solid ' + C.border, marginTop: 14, paddingTop: 12 }}>
+              <label style={{ display: 'block', fontSize: 11, color: C.muted, fontWeight: 900, textTransform: 'uppercase', marginBottom: 6 }}>Observacoes sobre o resultado</label>
+              <textarea value={decisionForm.observacoes_resultado}
+                onChange={e => setDecisionForm(prev => ({ ...prev, observacoes_resultado: e.target.value }))}
+                placeholder="Registre observacoes sobre a leitura automatica, conferencias realizadas ou contexto do caso."
+                style={{ width: '100%', minHeight: 74, resize: 'vertical', border: '1px solid ' + C.border, borderRadius: 8, padding: 10, fontSize: 12, color: C.text, outline: 'none', marginBottom: 10 }} />
+
+              <label style={{ display: 'block', fontSize: 11, color: C.muted, fontWeight: 900, textTransform: 'uppercase', marginBottom: 6 }}>Parecer / decisao e medida adotada</label>
+              <textarea value={decisionForm.parecer_decisao}
+                onChange={e => setDecisionForm(prev => ({ ...prev, parecer_decisao: e.target.value }))}
+                placeholder="Registre o parecer, a decisao tomada e a medida adotada para dirimir ou mitigar o conflito."
+                style={{ width: '100%', minHeight: 92, resize: 'vertical', border: '1px solid ' + C.border, borderRadius: 8, padding: 10, fontSize: 12, color: C.text, outline: 'none' }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 11, color: C.muted }}>
+                  {detalheGestao.parecer_atualizado_em ? `Atualizado em ${fmt(detalheGestao.parecer_atualizado_em)}` : 'Sem parecer salvo.'}
+                </div>
+                <button type="button" onClick={salvarParecer} disabled={savingDecision}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, border: 0, background: savingDecision ? C.muted : C.navy, color: 'white', borderRadius: 8, padding: '9px 12px', fontSize: 12, fontWeight: 900, cursor: savingDecision ? 'not-allowed' : 'pointer' }}>
+                  {savingDecision ? <Loader size={13} style={{ animation: 'spin .8s linear infinite' }} /> : <CheckCircle2 size={13} />}
+                  {savingDecision ? 'Salvando...' : 'Salvar parecer'}
+                </button>
+              </div>
             </div>
           </>
         )}
