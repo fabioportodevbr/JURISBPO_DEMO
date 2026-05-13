@@ -205,6 +205,10 @@ function descricaoDepoisDe(bloco, marcador) {
 
 function limparDescricaoConflito(texto = '') {
   const limpo = texto
+    .replace(/\d{2}\/\d{2}\/\d{4},?\s*\d{2}:\d{2}/g, ' ')
+    .replace(/workforce\s*-\s*documento eletronico/g, ' ')
+    .replace(/workforce\.brbpo\.com\.br\S*/g, ' ')
+    .replace(/\b\d+\s*\/\s*\d+\b/g, ' ')
     .replace(/nome da empresa:/g, ' ')
     .replace(/natureza da participacao\/interesse:/g, ' ')
     .replace(/[•*_]+/g, ' ')
@@ -239,9 +243,6 @@ function respostasPorTextoConflito(texto = '') {
   }
   if (atividadeDesc) {
     respostas.hasParallelActivity = true
-    respostas.parallelCompetes = /\b(concorr|compet|mesmo ramo|servico semelhante)\b/.test(atividadeDesc)
-    respostas.parallelUsesResources = /\b(recurso|informacao|sistema|equipamento|corporativo|brbpo)\b/.test(atividadeDesc)
-    respostas.parallelConflictHours = /\b(horario|expediente|durante o trabalho|jornada)\b/.test(atividadeDesc)
   }
   if (societarioDesc) respostas.societarySuppliersClients = true
   if (decisaoDesc) respostas.makesDecisionsForRelatedParties = true
@@ -407,7 +408,7 @@ async function extrairConflitoPdf(file) {
   let parsed = texto.trim() ? respostasPorTextoConflito(texto) : { respostas: {}, confianca: 0 }
   if (texto.trim()) {
     const byTextRadios = await respostasPorRadiosTextuais(pdf)
-    if (byTextRadios.confianca > 0) {
+    if (byTextRadios.confianca >= 0.8) {
       parsed = {
         respostas: { ...parsed.respostas, ...byTextRadios.respostas },
         confianca: Math.max(parsed.confianca, byTextRadios.confianca),
