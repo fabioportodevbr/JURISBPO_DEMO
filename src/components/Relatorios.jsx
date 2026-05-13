@@ -38,7 +38,7 @@ function financeiroExcluido(f={}){return String(f?.observacoes||'').includes(EXC
 function valorRestituidoFinanceiro(f={}){const direto=parseMoney(f.valor_restituido);if(direto>0)return direto;const m=String(f?.observacoes||'').match(/\[VALOR_RESTITUIDO:([^\]]*)\]/);return m?parseMoney(m[1]):0}
 function dataPagamentoCampo(f={},campo){const pagos=extrairPagamentosCampos(f);return pagos?.[campo]?.data_pagamento||pagos?.[campo]?.data||null}
 function dataGastoCampo(f={},campo){if(campo==='seguro_premio')return dataPagamentoCampo(f,campo)||f.apolice_inicio||f.data_referencia||f.created_at;if(campo==='valor_bruto'||campo==='valor_restituido')return f.data_referencia||f.primeiro_vencimento||f.data_vencimento||f.created_at;return dataPagamentoCampo(f,campo)||f.data_referencia||f.primeiro_vencimento||f.data_vencimento||f.created_at}
-const CAMPOS_ENCARGOS=['deposito_ro','deposito_rr','deposito_embargos','custas','fgts','honorarios_sucumbenciais','honorarios_periciais','honorarios_e_custos','inss_reclamante','inss_reclamada','multa_inadimplemento']
+const CAMPOS_ENCARGOS=['deposito_ro','deposito_rr','deposito_embargos','agravo_instrumento','custas','fgts','honorarios_sucumbenciais','honorarios_periciais','honorarios_e_custos','inss_reclamante','inss_reclamada','multa_inadimplemento']
 function itensFinanceiros(f={}){
   if(financeiroExcluido(f))return []
   const itens=[]
@@ -81,7 +81,7 @@ const FIELD_SETS={
     ['numero','Número'],['titulo','Título/parte principal'],['parte_contraria','Parte contrária'],['categoria','Categoria'],['tribunal','Tribunal'],['orgao','Órgão administrativo'],['status','Status'],['fase','Fase'],['data_ajuizamento','Data de ajuizamento'],['valor_acao','Valor da ação'],['valor_gasto','Valor efetivamente gasto'],['valor_economizado','Valor economizado'],['pericias_label','Perícias'],['transito_julgado','Trânsito em julgado'],['resultado_primeira_instancia_label','Resultado 1ª instância'],['resultado_segunda_instancia_label','Resultado 2ª instância'],['resultado','Resultado/sentença'],['resumo_processo','Resumo'],['observacoes','Observações']
   ],
   financeiro:[
-    ['processo','Processo'],['natureza','Natureza'],['data_referencia','Data referência'],['valor_bruto','Valor bruto'],['valor_restituido','Valor restituido'],['forma_pagamento','Forma de pagamento'],['numero_parcelas','Número de parcelas'],['data_vencimento','Vencimento'],['custas','Custas'],['fgts','FGTS'],['honorarios_sucumbenciais','Honorários sucumbenciais'],['honorarios_periciais','Honorários periciais'],['honorarios_e_custos','Honorários e custos'],['inss_reclamante','INSS reclamante'],['inss_reclamada','INSS reclamada'],['multa_inadimplemento','Multa'],['status_pagamento','Status pagamento'],['seguro_garantia','Seguro-garantia'],['apolice_numero','Nº apólice'],['apolice_inicio','Início vigência'],['apolice_fim','Fim vigência'],['valor_assegurado','Valor assegurado'],['seguro_premio','Prêmio pago'],['total','Total estimado']
+    ['processo','Processo'],['natureza','Natureza'],['data_referencia','Data referência'],['valor_bruto','Valor bruto'],['valor_restituido','Valor restituido'],['forma_pagamento','Forma de pagamento'],['numero_parcelas','Número de parcelas'],['data_vencimento','Vencimento'],['agravo_instrumento','AGRAVO DE INSTRUMENTO'],['custas','Custas'],['fgts','FGTS'],['honorarios_sucumbenciais','Honorários sucumbenciais'],['honorarios_periciais','Honorários periciais'],['honorarios_e_custos','Honorários e custos'],['inss_reclamante','INSS reclamante'],['inss_reclamada','INSS reclamada'],['multa_inadimplemento','Multa'],['status_pagamento','Status pagamento'],['seguro_garantia','Seguro-garantia'],['apolice_numero','Nº apólice'],['apolice_inicio','Início vigência'],['apolice_fim','Fim vigência'],['valor_assegurado','Valor assegurado'],['seguro_premio','Prêmio pago'],['total','Total estimado']
   ],
   atividades:[
     ['tipo','Tipo'],['titulo','Título'],['descricao','Descrição'],['status','Status'],['prioridade','Prioridade'],['responsavel','Responsável'],['processo','Processo'],['contrato','Contrato'],['prazo','Data/prazo'],['horario','Horário'],['local','Local/link'],['audiencia_modalidade','Modalidade'],['audiencia_tipo','Tipo de audiência'],['created_at','Criada em']
@@ -168,7 +168,7 @@ export default function Relatorios({profile}){
   useEffect(()=>{setCampos(defaultFields(kind))},[kind])
 
   function formatValue(row,field){
-    if(['valor_acao','valor_gasto','valor_economizado','valor_bruto','valor_restituido','custas','fgts','honorarios_sucumbenciais','honorarios_periciais','honorarios_e_custos','inss_reclamante','inss_reclamada','multa_inadimplemento','valor_assegurado','seguro_premio','total'].includes(field))return money(row[field])
+    if(['valor_acao','valor_gasto','valor_economizado','valor_bruto','valor_restituido','agravo_instrumento','custas','fgts','honorarios_sucumbenciais','honorarios_periciais','honorarios_e_custos','inss_reclamante','inss_reclamada','multa_inadimplemento','valor_assegurado','seguro_premio','total'].includes(field))return money(row[field])
     if(['data_ajuizamento','data_referencia','data_vencimento','apolice_inicio','apolice_fim','prazo'].includes(field))return brDate(row[field])
     if(field==='created_at')return brDateTime(row[field])
     if(field==='transito_julgado')return row[field]?'Sim':'Não'

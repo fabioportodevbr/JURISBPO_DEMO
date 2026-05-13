@@ -13,24 +13,48 @@ function compactAlnum(s) {
   return normalizeEmpresaNome(s).replace(/[^a-z0-9]/g, '')
 }
 
+function processoReclamadas(processo) {
+  const rows = Array.isArray(processo?.partes_contrarias) ? processo.partes_contrarias : []
+  const normalizadas = rows
+    .map((r) => ({
+      id: r?.id || r?.parte_contraria_id || null,
+      nome: r?.nome || r?.parte_contraria || '',
+    }))
+    .filter((r) => r.id || r.nome)
+  if (normalizadas.length) return normalizadas
+  const nomes = String(processo?.parte_contraria || '')
+    .split(/\s+\|\s+|;\s*/)
+    .map((nome) => nome.trim())
+    .filter(Boolean)
+  if (nomes.length) {
+    return nomes.map((nome, index) => ({
+      id: index === 0 ? processo?.parte_contraria_id || null : null,
+      nome,
+    }))
+  }
+  return processo?.parte_contraria_id ? [{ id: processo.parte_contraria_id, nome: '' }] : []
+}
+
 /**
  * Processo vinculado à empresa do grupo (CRM): por ID ou por nome / nome fantasia (tolerante a grafias).
- * @param { { parte_contraria_id?: string | null, parte_contraria?: string | null } | null | undefined } processo
+ * @param { { parte_contraria_id?: string | null, parte_contraria?: string | null, partes_contrarias?: any[] | null } | null | undefined } processo
  * @param { ParteEmpresaGrupo } empresa
  */
 export function processoPertenceEmpresaGrupo(processo, empresa) {
   if (!processo || !empresa?.id) return false
-  const pid = processo.parte_contraria_id
-  if (pid && String(pid) === String(empresa.id)) return true
-  const pn = normalizeEmpresaNome(processo.parte_contraria)
-  if (!pn) return false
+  const reclamadas = processoReclamadas(processo)
+  if (reclamadas.some((r) => r.id && String(r.id) === String(empresa.id))) return true
   const nomes = [empresa.nome, empresa.nome_fantasia].map(normalizeEmpresaNome).filter(Boolean)
-  for (const en of nomes) {
-    if (pn === en) return true
-    const pc = compactAlnum(processo.parte_contraria)
-    const ec = compactAlnum(en)
-    if (pc && ec && pc === ec) return true
-    if (pc.length >= 12 && ec.length >= 12 && (pc.includes(ec) || ec.includes(pc))) return true
+  for (const reclamada of reclamadas) {
+    const pn = normalizeEmpresaNome(reclamada.nome)
+    if (!pn) continue
+    for (const en of nomes) {
+      if (pn === en) return true
+      const pc = compactAlnum(reclamada.nome)
+      const ec = compactAlnum(en)
+      if (pc && ec && pc === ec) return true
+      if (pc.length >= 12 && ec.length >= 12 && (pc.includes(ec) || ec.includes(pc))) return true
+    }
   }
   return false
 }

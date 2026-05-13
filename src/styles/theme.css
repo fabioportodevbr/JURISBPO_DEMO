@@ -41,6 +41,8 @@
   --c-sidebarActive: rgba(6,78,59,0.35);
   --c-sidebarText: rgba(255,255,255,0.75);
   --c-sidebarMuted: rgba(255,255,255,0.35);
+  --selection-bg: rgba(16, 185, 129, 0.28);
+  --selection-text: #022c22;
 }
 
 :root.dark {
@@ -74,6 +76,8 @@
   --c-sidebarActive: rgba(129, 201, 149, 0.2);
   --c-sidebarText: rgba(255,255,255,0.85);
   --c-sidebarMuted: rgba(255,255,255,0.4);
+  --selection-bg: #8ab4f8;
+  --selection-text: #0b1220;
 }
 
 html, body, #root, #__next {
@@ -160,5 +164,11 @@ button, input, select, textarea {
 }
 
 ::selection {
-  background: rgba(6, 78, 59, 0.18);
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+::-moz-selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
 }

@@ -281,7 +281,7 @@ export default function Dashboard({profile, unreadCount=0}){
     if(!createPush)return
     if(!createForm.titulo.trim())return alert('Informe o título do processo.')
     setSavingProcess(true)
-    const {data,error}=await supabase.from('processos').insert({escritorio_id:profile.escritorio_id,numero:createForm.numero||null,titulo:createForm.titulo.trim(),parte_contraria:createForm.parte_contraria||null,tribunal:createForm.tribunal||null,categoria:createForm.categoria||'trabalhista',resumo_processo:createForm.resumo_processo||null,status:'ativo',fase:'conhecimento',responsavel_id:profile.id,created_by:profile.id}).select('id').single()
+    const {data,error}=await supabase.from('processos').insert({escritorio_id:profile.escritorio_id,numero:createForm.numero||null,titulo:createForm.titulo.trim(),parte_contraria:createForm.parte_contraria||null,partes_contrarias:createForm.parte_contraria?[{nome:createForm.parte_contraria}]:[],tribunal:createForm.tribunal||null,categoria:createForm.categoria||'trabalhista',resumo_processo:createForm.resumo_processo||null,status:'ativo',fase:'conhecimento',responsavel_id:profile.id,created_by:profile.id}).select('id').single()
     if(error){setSavingProcess(false);return alert(error.message)}
     const {error:linkError}=await supabase.from('andamentos_processuais_push').update({processo_id:data.id,cliente_id:null,escritorio_id:profile.escritorio_id,status_associacao:'associado'}).eq('id',createPush.id)
     setSavingProcess(false)

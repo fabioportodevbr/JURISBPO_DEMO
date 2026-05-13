@@ -9,6 +9,7 @@ type RegistroFinanceiro = {
   deposito_ro?: number | string | null;
   deposito_rr?: number | string | null;
   deposito_embargos?: number | string | null;
+  agravo_instrumento?: number | string | null;
   custas?: number | string | null;
   fgts?: number | string | null;
   honorarios_sucumbenciais?: number | string | null;
@@ -33,6 +34,7 @@ const CAMPOS_ENCARGOS = [
   "deposito_ro",
   "deposito_rr",
   "deposito_embargos",
+  "agravo_instrumento",
   "custas",
   "fgts",
   "honorarios_sucumbenciais",

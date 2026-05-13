@@ -87,6 +87,7 @@ export function calcularResumoFinanceiroProcesso(proc, financeiros = []) {
     parseMoney(f.deposito_ro) +
     parseMoney(f.deposito_rr) +
     parseMoney(f.deposito_embargos) +
+    parseMoney(f.agravo_instrumento) +
     parseMoney(f.custas) +
     parseMoney(f.custas_processuais) +
     parseMoney(f.fgts) +

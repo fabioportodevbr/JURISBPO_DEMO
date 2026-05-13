@@ -15,6 +15,24 @@ function Modal({title,onClose,children}){return <div onClick={e=>e.target===e.cu
 function Chip({children,kind='gray'}){const m={blue:[C.blueBg,C.blue],green:[C.greenBg,C.green],red:[C.redBg,C.red],amber:[C.amberBg,C.amber],purple:[C.purpleBg,C.purple],gray:[C.grayBg,C.muted]};const[bg,color]=m[kind]||m.gray;return <span style={{fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:20,background:bg,color,textTransform:'uppercase',whiteSpace:'nowrap'}}>{children}</span>}
 
 const empty={nome:'',nome_fantasia:'',cnpj:'',tipo:'parte_contraria',grupo_economico:'',email:'',telefone:'',contato_principal:'',endereco:'',observacoes:'',status:'ativo'}
+function normalizeParteNome(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()}
+function compactParteNome(s){return normalizeParteNome(s).replace(/[^a-z0-9]/g,'')}
+function processoVinculadoParte(processo,parte){
+  const parteId=String(parte?.id||'')
+  const rows=Array.isArray(processo?.partes_contrarias)?processo.partes_contrarias:[]
+  if(parteId&&rows.some(r=>String(r?.id||r?.parte_contraria_id||'')===parteId))return true
+  if(parteId&&String(processo?.parte_contraria_id||'')===parteId)return true
+  const nomes=[parte?.nome,parte?.nome_fantasia].map(normalizeParteNome).filter(Boolean)
+  const procNomes=rows.map(r=>r?.nome||r?.parte_contraria).filter(Boolean)
+  if(!procNomes.length&&processo?.parte_contraria)procNomes.push(...String(processo.parte_contraria).split(/\s+\|\s+|;\s*/))
+  return procNomes.some(pn=>{
+    const norm=normalizeParteNome(pn),pc=compactParteNome(pn)
+    return nomes.some(en=>{
+      const ec=compactParteNome(en)
+      return norm===en || (pc&&ec&&(pc===ec||(pc.length>=12&&ec.length>=12&&(pc.includes(ec)||ec.includes(pc)))))
+    })
+  })
+}
 
 /* ── Card clicável de parte ── */
 function ParteCard({p,s,onOpen}){
@@ -106,7 +124,7 @@ export default function PartesCRM({profile}){
     const eid=profile.escritorio_id
     const[p,proc]=await Promise.all([
       fetchAllRows(()=>supabase.from('partes_crm').select('*').eq('escritorio_id',eid).order('nome')),
-      fetchAllRows(()=>supabase.from('processos').select('id,numero,titulo,parte_contraria_id,parte_contraria,status,categoria,valor_acao,valor_gasto,valor_economizado').eq('escritorio_id',eid))
+      fetchAllRows(()=>supabase.from('processos').select('id,numero,titulo,parte_contraria_id,parte_contraria,partes_contrarias,status,categoria,valor_acao,valor_gasto,valor_economizado').eq('escritorio_id',eid))
     ])
     setPartes(p||[])
     setProcessos(proc||[])
@@ -120,7 +138,7 @@ export default function PartesCRM({profile}){
   },[partes,q,tipo])
 
   const stats=(p)=>{
-    const vinculados=processos.filter(x=>x.parte_contraria_id===p.id||(!x.parte_contraria_id&&x.parte_contraria===p.nome))
+    const vinculados=processos.filter(x=>processoVinculadoParte(x,p))
     return{
       qtd:vinculados.length,
       ativos:vinculados.filter(x=>x.status!=='encerrado').length,

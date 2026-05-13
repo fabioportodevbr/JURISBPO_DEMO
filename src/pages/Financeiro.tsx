@@ -27,6 +27,7 @@ type Processo = {
   titulo?: string | null;
   parte_contraria?: string | null;
   parte_contraria_id?: string | null;
+  partes_contrarias?: Array<{ id?: string | null; nome?: string | null; parte_contraria_id?: string | null; parte_contraria?: string | null }> | null;
   categoria?: string | null;
   status?: string | null;
   valor_acao?: number | null;
@@ -46,6 +47,7 @@ type RegistroFinanceiro = {
   deposito_ro?: number | string | null;
   deposito_rr?: number | string | null;
   deposito_embargos?: number | string | null;
+  agravo_instrumento?: number | string | null;
   custas?: number | string | null;
   fgts?: number | string | null;
   honorarios_sucumbenciais?: number | string | null;
@@ -78,6 +80,7 @@ type FormState = {
   deposito_ro: string;
   deposito_rr: string;
   deposito_embargos: string;
+  agravo_instrumento: string;
   custas: string;
   fgts: string;
   honorarios_sucumbenciais: string;
@@ -144,6 +147,7 @@ const CAMPOS_VALOR = [
   "deposito_ro",
   "deposito_rr",
   "deposito_embargos",
+  "agravo_instrumento",
   "custas",
   "fgts",
   "honorarios_sucumbenciais",
@@ -160,6 +164,7 @@ const CAMPOS_ENCARGOS = [
   "deposito_ro",
   "deposito_rr",
   "deposito_embargos",
+  "agravo_instrumento",
   "custas",
   "fgts",
   "honorarios_sucumbenciais",
@@ -180,6 +185,7 @@ const initialForm: FormState = {
   deposito_ro: "",
   deposito_rr: "",
   deposito_embargos: "",
+  agravo_instrumento: "",
   custas: "",
   fgts: "",
   honorarios_sucumbenciais: "",
@@ -353,7 +359,7 @@ export default function Financeiro({ profile }: { profile: any }) {
         .order("created_at", { ascending: false })),
       fetchAllRows(() => supabase
         .from("processos")
-        .select("id, numero, titulo, parte_contraria, parte_contraria_id, categoria, status, valor_acao, transito_julgado")
+        .select("id, numero, titulo, parte_contraria, parte_contraria_id, partes_contrarias, categoria, status, valor_acao, transito_julgado")
         .eq("escritorio_id", profile.escritorio_id)
         .order("updated_at", { ascending: false })),
     ]);
@@ -467,6 +473,7 @@ export default function Financeiro({ profile }: { profile: any }) {
       deposito_ro: normalizeInputValue(registro.deposito_ro),
       deposito_rr: normalizeInputValue(registro.deposito_rr),
       deposito_embargos: normalizeInputValue(registro.deposito_embargos),
+      agravo_instrumento: normalizeInputValue(registro.agravo_instrumento),
       custas: normalizeInputValue(registro.custas),
       fgts: normalizeInputValue(registro.fgts),
       honorarios_sucumbenciais: normalizeInputValue(registro.honorarios_sucumbenciais),
@@ -774,6 +781,7 @@ export default function Financeiro({ profile }: { profile: any }) {
               <F label="Depósito RO"><input type="number" step="0.01" min="0" style={INP} value={form.deposito_ro} onChange={(event) => setForm((old) => ({ ...old, deposito_ro: event.target.value }))} /></F>
               <F label="Depósito RR"><input type="number" step="0.01" min="0" style={INP} value={form.deposito_rr} onChange={(event) => setForm((old) => ({ ...old, deposito_rr: event.target.value }))} /></F>
               <F label="Depósito embargos"><input type="number" step="0.01" min="0" style={INP} value={form.deposito_embargos} onChange={(event) => setForm((old) => ({ ...old, deposito_embargos: event.target.value }))} /></F>
+              <F label="AGRAVO DE INSTRUMENTO"><input type="number" step="0.01" min="0" style={INP} value={form.agravo_instrumento} onChange={(event) => setForm((old) => ({ ...old, agravo_instrumento: event.target.value }))} /></F>
               <F label="Custas"><input type="number" step="0.01" min="0" style={INP} value={form.custas} onChange={(event) => setForm((old) => ({ ...old, custas: event.target.value }))} /></F>
               <F label="FGTS"><input type="number" step="0.01" min="0" style={INP} value={form.fgts} onChange={(event) => setForm((old) => ({ ...old, fgts: event.target.value }))} /></F>
               <F label="Honorários sucumbenciais"><input type="number" step="0.01" min="0" style={INP} value={form.honorarios_sucumbenciais} onChange={(event) => setForm((old) => ({ ...old, honorarios_sucumbenciais: event.target.value }))} /></F>

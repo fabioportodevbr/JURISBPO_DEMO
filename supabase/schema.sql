@@ -94,6 +94,7 @@ CREATE TABLE public.processos (
   numero TEXT,
   titulo TEXT NOT NULL,
   parte_contraria TEXT,
+  partes_contrarias JSONB NOT NULL DEFAULT '[]'::jsonb,
   tribunal TEXT,
   orgao TEXT,
   data_ajuizamento DATE,
@@ -107,6 +108,7 @@ CREATE TABLE public.processos (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT processos_status_check CHECK (status IN ('ativo','arquivo_temporario','encerrado')),
   CONSTRAINT processos_fase_check CHECK (fase IN ('conhecimento','recurso','execucao_provisoria','execucao_sentenca','arquivo_definitivo')),
+  CONSTRAINT processos_partes_contrarias_array_check CHECK (jsonb_typeof(partes_contrarias) = 'array'),
   CONSTRAINT processos_encerrado_fase_check CHECK (status <> 'encerrado' OR fase = 'arquivo_definitivo')
 );
 
@@ -344,6 +346,7 @@ CREATE INDEX idx_clientes_escritorio ON public.clientes(escritorio_id);
 CREATE INDEX idx_processos_escritorio ON public.processos(escritorio_id);
 CREATE INDEX idx_processos_status ON public.processos(status);
 CREATE INDEX idx_processos_busca ON public.processos(numero, titulo, tribunal, orgao);
+CREATE INDEX idx_processos_partes_contrarias ON public.processos USING gin (partes_contrarias);
 CREATE INDEX idx_processo_apensamentos_escritorio ON public.processo_apensamentos(escritorio_id);
 CREATE INDEX idx_processo_apensamentos_processo ON public.processo_apensamentos(processo_id);
 CREATE INDEX idx_processo_apensamentos_apensado ON public.processo_apensamentos(processo_apensado_id);
