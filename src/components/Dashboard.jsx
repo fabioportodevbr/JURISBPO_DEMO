@@ -18,6 +18,15 @@ function addDaysISO(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.get
 function daysUntil(date){if(!date)return null;const today=new Date();today.setHours(0,0,0,0);const d=new Date(date+'T12:00:00');return Math.ceil((d-today)/86400000)}
 function brDate(date){return date?new Date(date+'T12:00:00').toLocaleDateString('pt-BR'):'-'}
 function renewalState(c){if(!c.notificar_renovacao||!c.data_fim)return null;const untilEnd=daysUntil(c.data_fim);const limit=untilEnd-Number(c.renovacao_antecedencia_dias||0);const alertDays=Number(c.renovacao_alerta_dias||30);if(limit<0)return {level:'vencido',days:limit,text:`Limite de renovação vencido há ${Math.abs(limit)} dia(s)`};if(limit<=alertDays)return {level:'alerta',days:limit,text:`Manifestar interesse em renovação em até ${limit} dia(s)`};return null}
+const CONTRATO_VENCIMENTO_ALERTA_DIAS=30
+function vencimentoContratoState(c){
+  if(!c.data_fim||['encerrado','arquivo_temporario'].includes(c.status))return null
+  const days=daysUntil(c.data_fim)
+  if(days===null||days>CONTRATO_VENCIMENTO_ALERTA_DIAS)return null
+  if(days<0)return {level:'critico',days,text:`Contrato vencido há ${Math.abs(days)} dia(s)`}
+  if(days===0)return {level:'critico',days,text:'Contrato vence hoje'}
+  return {level:'critico',days,text:`Contrato vence em ${days} dia(s)`}
+}
 function isOpen(a){return !['concluida','cancelada'].includes(a.status)}
 function isTaskOrDeadline(a){return ['tarefa','prazo_processual'].includes(a.tipo)}
 function isHearing(a){return a.tipo==='audiencia'}
@@ -193,17 +202,18 @@ function AtividadeModal({atividade,onClose,onOpenProcess}){
 
 function ContratoAlertaModal({contrato,onClose,onOpenContract}){
   const c=contrato
-  const vencido=c.renovacao?.level==='vencido'
-  const bg=vencido?C.redBg:C.amberBg
-  const color=vencido?C.red:C.amber
+  const critico=c.renovacao?.level==='critico'||c.renovacao?.level==='vencido'
+  const bg=critico?C.redBg:C.amberBg
+  const color=critico?C.red:C.amber
+  const alertaVencimento=c.tipoAlerta==='contrato_vencimento'
   return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:520,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:'16px 18px',borderBottom:'1px solid '+C.border,background:bg}}>
-        <div style={{display:'flex',alignItems:'flex-start',gap:10}}><AlertTriangle size={20} color={color} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{c.titulo}</b><span style={{fontSize:12,color:C.muted}}>Alerta de renovação contratual</span></div></div>
+        <div style={{display:'flex',alignItems:'flex-start',gap:10}}><AlertTriangle size={20} color={color} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{c.titulo}</b><span style={{fontSize:12,color:C.muted}}>{alertaVencimento?'Alerta de vencimento contratual':'Alerta de renovação contratual'}</span></div></div>
         <button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',color:C.muted,flexShrink:0}}><X size={20}/></button>
       </div>
       <div style={{padding:18}}>
-        <div style={{background:bg,border:'1px solid '+(vencido?'#fca5a5':'#fde68a'),borderRadius:10,padding:'12px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8}}><AlertTriangle size={16} color={color}/><span style={{fontSize:13,fontWeight:800,color}}>{c.renovacao?.text}</span></div>
+        <div style={{background:bg,border:'1px solid '+(critico?'#fca5a5':'#fde68a'),borderRadius:10,padding:'12px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8}}><AlertTriangle size={16} color={color}/><span style={{fontSize:13,fontWeight:800,color}}>{c.renovacao?.text}</span></div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
           {c.numero&&<div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Número</div><div style={{fontSize:14,fontWeight:700}}>{c.numero}</div></div>}
           <div><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',marginBottom:4}}>Vigência até</div><div style={{fontSize:18,fontWeight:900,color}}>{brDate(c.data_fim)}</div></div>
@@ -256,7 +266,14 @@ export default function Dashboard({profile, unreadCount=0}){
     const futuras=atividades.filter(x=>isTaskOrDeadline(x)&&x.prazo&&x.prazo>=amanha).sort(compareByDate)
     const audienciasSemana=atividades.filter(x=>isHearing(x)&&x.prazo&&x.prazo>=hoje&&x.prazo<=fimSemana&&isScheduledNowOrFuture(x,agora)).sort(compareByDate)
     const reunioesSemana=atividades.filter(x=>isMeeting(x)&&x.prazo&&x.prazo>=hoje&&x.prazo<=fimSemana).sort(compareByDate)
-    const ren=(c||[]).map(x=>({...x,renovacao:renewalState(x)})).filter(x=>x.renovacao).sort((x,y)=>x.renovacao.days-y.renovacao.days).slice(0,5)
+    const contratosVencimento=(c||[]).map(x=>({...x,tipoAlerta:'contrato_vencimento',alertaId:`contrato-vencimento-${x.id}`,renovacao:vencimentoContratoState(x)})).filter(x=>x.renovacao)
+    const vencimentoIds=new Set(contratosVencimento.map(x=>x.id))
+    const contratosRenovacao=(c||[]).filter(x=>!vencimentoIds.has(x.id)).map(x=>({...x,tipoAlerta:'contrato_renovacao',alertaId:`contrato-renovacao-${x.id}`,renovacao:renewalState(x)})).filter(x=>x.renovacao)
+    const ren=[...contratosVencimento,...contratosRenovacao].sort((x,y)=>{
+      const prioridade=(x.renovacao.level==='critico'||x.renovacao.level==='vencido')?-1:0
+      const prioridadeY=(y.renovacao.level==='critico'||y.renovacao.level==='vencido')?-1:0
+      return prioridade-prioridadeY || x.renovacao.days-y.renovacao.days
+    }).slice(0,7)
     const pushItems=push||[]
     setSt({p:(p||[]).filter(x=>x.status==='ativo').length,c:(c||[]).filter(x=>x.status==='ativo'||x.status==='a_vencer').length,pendentes,futuras,audienciasSemana,reunioesSemana,ren,pushNovos:pushItems.length,pushImportantes:pushItems.filter(isImportantPush).length,pushUltimo:pushItems[0]||null,pushItems})
   })()},[profile.escritorio_id,profile.id,profile.role])
@@ -330,13 +347,16 @@ export default function Dashboard({profile, unreadCount=0}){
     <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info" onItemClick={setAudienciaModal}/>
 
     <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
-      <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas de renovação contratual</h2>
-      {st.ren.length?st.ren.map(c=><div key={c.id} onClick={()=>setContratoModal(c)} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:c.renovacao.level==='vencido'?C.redBg:C.amberBg,cursor:'pointer',transition:'filter .12s'}} onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.96)'} onMouseLeave={e=>e.currentTarget.style.filter='none'}>
+      <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas de vencimento e renovação contratual</h2>
+      {st.ren.length?st.ren.map(c=>{
+        const critico=c.renovacao.level==='critico'||c.renovacao.level==='vencido'
+        return <div key={c.alertaId||c.id} onClick={()=>setContratoModal(c)} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:critico?C.redBg:C.amberBg,cursor:'pointer',transition:'filter .12s'}} onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.96)'} onMouseLeave={e=>e.currentTarget.style.filter='none'}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-          <div><b>{c.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{c.numero?'Contrato nº '+c.numero+' · ':''}{c.contratante||'Contratante não informado'} × {c.contratada||'Contratada não informada'} · fim: {brDate(c.data_fim)}</div><div style={{fontSize:12,fontWeight:900,color:c.renovacao.level==='vencido'?C.red:C.amber,marginTop:4,display:'flex',gap:6,alignItems:'center'}}><AlertTriangle size={13}/>{c.renovacao.text}</div></div>
+          <div><b>{c.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{c.numero?'Contrato nº '+c.numero+' · ':''}{c.contratante||'Contratante não informado'} × {c.contratada||'Contratada não informada'} · fim: {brDate(c.data_fim)}</div><div style={{fontSize:12,fontWeight:900,color:critico?C.red:C.amber,marginTop:4,display:'flex',gap:6,alignItems:'center'}}><AlertTriangle size={13}/>{c.renovacao.text}</div></div>
           <ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>
         </div>
-      </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>Nenhum alerta de renovação no momento.</div>}
+      </div>
+      }):<div style={{padding:24,textAlign:'center',color:C.muted}}>Nenhum alerta de vencimento ou renovação no momento.</div>}
     </div>
 
     <ListBlock title="Atividades pendentes" icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,6)} empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger" onItemClick={setAtividadeModal}/>

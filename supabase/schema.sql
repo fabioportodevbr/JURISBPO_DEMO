@@ -465,6 +465,107 @@ FOR INSERT TO authenticated WITH CHECK (
 );
 
 -- ============================================================
+-- DATA API GRANTS
+-- Supabase 2026: public schema objects are not automatically
+-- exposed to the Data API in new projects. Keep grants explicit.
+-- RLS policies above still control row-level access.
+-- ============================================================
+GRANT USAGE ON SCHEMA public TO authenticated, service_role;
+
+DO $$
+DECLARE
+  obj_name TEXT;
+  proc_sig TEXT;
+  api_tables TEXT[] := ARRAY[
+    'acervo_modelos',
+    'andamentos_processuais_push',
+    'andamentos_processuais_push_arquivo',
+    'atividade_atribuicoes',
+    'atividade_historico',
+    'atividades',
+    'chat_mensagens',
+    'chat_salas',
+    'clientes',
+    'compliance_anexos',
+    'compliance_config',
+    'compliance_conflito_interesse_analises',
+    'compliance_denuncias',
+    'compliance_mensagens',
+    'contratos',
+    'documentos',
+    'escritorios',
+    'financeiro_lancamentos',
+    'financeiro_processos',
+    'google_calendar_config',
+    'mensagens',
+    'mensagens_anexos',
+    'modelos_documentos',
+    'mural_recados',
+    'notificacoes',
+    'oficios',
+    'oficios_anexos',
+    'oficios_auditoria',
+    'oficios_controle_ano',
+    'oficios_controle_log',
+    'oficios_destinatarios',
+    'oficios_empresas',
+    'partes_crm',
+    'processo_apensamentos',
+    'processos',
+    'profiles',
+    'push_email_config',
+    'rotinas',
+    'tarefas',
+    'usuarios_escritorios'
+  ];
+  api_views TEXT[] := ARRAY[
+    'financeiro_resumo_escritorio'
+  ];
+  api_routines TEXT[] := ARRAY[
+    'marcar_chat_lido',
+    'usuario_eh_gerente',
+    'usuario_pode_editar_proprio_profile',
+    'usuario_pode_escrever',
+    'usuario_pode_escrever_storage',
+    'usuario_tem_escritorio',
+    'usuario_tem_escritorio_storage'
+  ];
+BEGIN
+  FOREACH obj_name IN ARRAY api_tables LOOP
+    IF to_regclass(format('public.%I', obj_name)) IS NOT NULL THEN
+      EXECUTE format(
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.%I TO authenticated, service_role',
+        obj_name
+      );
+    END IF;
+  END LOOP;
+
+  FOREACH obj_name IN ARRAY api_views LOOP
+    IF to_regclass(format('public.%I', obj_name)) IS NOT NULL THEN
+      EXECUTE format(
+        'GRANT SELECT ON TABLE public.%I TO authenticated, service_role',
+        obj_name
+      );
+    END IF;
+  END LOOP;
+
+  FOR proc_sig IN
+    SELECT format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = ANY(api_routines)
+  LOOP
+    EXECUTE format(
+      'GRANT EXECUTE ON FUNCTION %s TO authenticated, service_role',
+      proc_sig
+    );
+  END LOOP;
+END $$;
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
+
+-- ============================================================
 -- STORAGE
 -- Cria buckets se a tabela storage.buckets estiver acessivel.
 -- ============================================================

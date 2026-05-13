@@ -326,6 +326,7 @@ function withDeletedMarker(observacoes = "", evento: Record<string, unknown>) {
 export default function Financeiro({ profile }: { profile: any }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [registros, setRegistros] = useState<RegistroFinanceiro[]>([]);
   const [processos, setProcessos] = useState<Processo[]>([]);
@@ -351,24 +352,33 @@ export default function Financeiro({ profile }: { profile: any }) {
   async function load() {
     if (!profile?.escritorio_id) return;
     setLoading(true);
-    const [financeiros, processosData] = await Promise.all([
-      fetchAllRows(() => supabase
-        .from("financeiro_processos")
-        .select("*")
-        .eq("escritorio_id", profile.escritorio_id)
-        .order("created_at", { ascending: false })),
-      fetchAllRows(() => supabase
-        .from("processos")
-        .select("id, numero, titulo, parte_contraria, parte_contraria_id, partes_contrarias, categoria, status, valor_acao, transito_julgado")
-        .eq("escritorio_id", profile.escritorio_id)
-        .order("updated_at", { ascending: false })),
-    ]);
+    setLoadError("");
+    try {
+      const [financeiros, processosData] = await Promise.all([
+        fetchAllRows(() => supabase
+          .from("financeiro_processos")
+          .select("*")
+          .eq("escritorio_id", profile.escritorio_id)
+          .order("created_at", { ascending: false })),
+        fetchAllRows(() => supabase
+          .from("processos")
+          .select("id, numero, titulo, parte_contraria, categoria, status, valor_acao, transito_julgado")
+          .eq("escritorio_id", profile.escritorio_id)
+          .order("updated_at", { ascending: false })),
+      ]);
 
-    const registrosFinanceiros = (financeiros || []) as RegistroFinanceiro[];
-    setHasValorRestituidoColumn(registrosFinanceiros.some((registro) => Object.prototype.hasOwnProperty.call(registro, "valor_restituido")));
-    setRegistros(registrosFinanceiros);
-    setProcessos((processosData || []) as Processo[]);
-    setLoading(false);
+      const registrosFinanceiros = (financeiros || []) as RegistroFinanceiro[];
+      setHasValorRestituidoColumn(registrosFinanceiros.some((registro) => Object.prototype.hasOwnProperty.call(registro, "valor_restituido")));
+      setRegistros(registrosFinanceiros);
+      setProcessos((processosData || []) as Processo[]);
+    } catch (error: any) {
+      console.error("[Financeiro] Erro ao carregar dados:", error);
+      setLoadError(error?.message || "Nao foi possivel carregar os dados financeiros.");
+      setRegistros([]);
+      setProcessos([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -672,6 +682,11 @@ export default function Financeiro({ profile }: { profile: any }) {
       </section>
 
       <section style={{ background: C.white, border: "1px solid " + C.border, borderRadius: 12, marginTop: 22, overflow: "hidden" }}>
+        {loadError && (
+          <div style={{ padding: "12px 14px", borderBottom: "1px solid " + C.border, background: C.redBg, color: C.red, fontSize: 13, fontWeight: 700 }}>
+            Nao foi possivel carregar o financeiro: {loadError}
+          </div>
+        )}
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1260, fontSize: 13 }}>
             <thead>

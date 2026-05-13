@@ -115,22 +115,33 @@ export default function PartesCRM({profile}){
   const[modal,setModal]=useState(false)
   const[form,setForm]=useState(empty)
   const[loading,setLoading]=useState(true)
+  const[loadError,setLoadError]=useState('')
   const[saving,setSaving]=useState(false)
 
   const canEditPartes=can(profile,'processos.editar')
 
   const load=async()=>{
-    setLoading(true)
     const eid=profile.escritorio_id
-    const[p,proc]=await Promise.all([
-      fetchAllRows(()=>supabase.from('partes_crm').select('*').eq('escritorio_id',eid).order('nome')),
-      fetchAllRows(()=>supabase.from('processos').select('id,numero,titulo,parte_contraria_id,parte_contraria,partes_contrarias,status,categoria,valor_acao,valor_gasto,valor_economizado').eq('escritorio_id',eid))
-    ])
-    setPartes(p||[])
-    setProcessos(proc||[])
-    setLoading(false)
+    if(!eid){setLoading(false);return}
+    setLoading(true)
+    setLoadError('')
+    try{
+      const[p,proc]=await Promise.all([
+        fetchAllRows(()=>supabase.from('partes_crm').select('*').eq('escritorio_id',eid).order('nome')),
+        fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid))
+      ])
+      setPartes(p||[])
+      setProcessos(proc||[])
+    }catch(error){
+      console.error('[PartesCRM] Erro ao carregar dados:',error)
+      setLoadError(error?.message||'Nao foi possivel carregar as partes.')
+      setPartes([])
+      setProcessos([])
+    }finally{
+      setLoading(false)
+    }
   }
-  useEffect(()=>{load()},[profile.escritorio_id])
+  useEffect(()=>{load()},[profile?.escritorio_id])
 
   const filtradas=useMemo(()=>{
     const term=q.trim().toLowerCase()
@@ -181,6 +192,10 @@ export default function PartesCRM({profile}){
   const countPorTipo=useMemo(()=>partes.reduce((acc,p)=>{acc[p.tipo]=(acc[p.tipo]||0)+1;return acc},{}),[partes])
 
   if(loading)return <div style={{padding:40,color:C.muted}}>Carregando partes...</div>
+  if(loadError)return <div style={{padding:40,color:C.red}}>
+    <b>Nao foi possivel carregar Partes / CRM.</b>
+    <div style={{marginTop:6,fontSize:13}}>{loadError}</div>
+  </div>
 
   return(
     <div style={{padding:24}}>
