@@ -14,8 +14,8 @@ import {
   Inbox,
   Filter,
   Plus,
-  Settings,
   Archive,
+  Info,
 } from 'lucide-react'
 
 import { C } from '../lib/theme'
@@ -23,6 +23,7 @@ import { motivoDesconsideracaoPush, pushIgnoradoDentroDoPrazo, pushIgnoradoParaA
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:10,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const DEFAULT_PUSH_EMAIL='juridicocallbrbpo@gmail.com'
 const DEFAULT_PUSH_CONFIG={imap_host:'imap.gmail.com',imap_port:993,imap_secure:true,imap_user:DEFAULT_PUSH_EMAIL,imap_mailbox:'INBOX',enabled:true}
+const PUSH_EMAIL_INFO='Essa conta de e-mail está configurada no site railway.com para que ela possa rodar as buscas a cada 5 minutos, 24/7.'
 
 
 function decodeQuotedPrintableText(value=''){
@@ -97,6 +98,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
   const [arquivoQuery,setArquivoQuery]=useState('')
   const [arquivoError,setArquivoError]=useState('')
   const [openArquivo,setOpenArquivo]=useState({})
+  const [infoOpen,setInfoOpen]=useState(false)
 
   const load=async()=>{
     setLoading(true)
@@ -291,12 +293,30 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
     <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
       <div>
         <h3 style={{margin:'0 0 4px',fontSize:compact?15:18,display:'flex',gap:8,alignItems:'center'}}><Mail size={18}/> {headerTitle}</h3>
-        <div style={{fontSize:12,color:C.muted}}>Caixa monitorada: <b>{configForm.imap_user||DEFAULT_PUSH_EMAIL}</b> · {sub}</div>
+        <div style={{fontSize:12,color:C.muted,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+          <span>Caixa monitorada: <b>{configForm.imap_user||DEFAULT_PUSH_EMAIL}</b> · {sub}</span>
+          <span style={{position:'relative',display:'inline-flex'}}>
+            <button
+              type="button"
+              aria-label="Informação sobre a caixa monitorada"
+              aria-expanded={infoOpen}
+              title={PUSH_EMAIL_INFO}
+              onPointerEnter={e=>{if(e.pointerType==='mouse')setInfoOpen(true)}}
+              onPointerLeave={e=>{if(e.pointerType==='mouse')setInfoOpen(false)}}
+              onFocus={()=>setInfoOpen(true)}
+              onBlur={()=>setInfoOpen(false)}
+              onClick={()=>setInfoOpen(v=>!v)}
+              style={{border:'1px solid '+C.border,background:C.grayBg,color:C.blue,borderRadius:999,width:22,height:22,display:'inline-flex',alignItems:'center',justifyContent:'center',cursor:'pointer',padding:0}}
+            >
+              <Info size={14}/>
+            </button>
+            {infoOpen&&<span role="tooltip" style={{position:'absolute',left:0,top:28,zIndex:40,width:280,maxWidth:'min(280px,78vw)',background:C.text,color:C.white,borderRadius:8,padding:'9px 10px',fontSize:12,lineHeight:1.35,boxShadow:'0 10px 24px rgba(15,23,42,.24)'}}>{PUSH_EMAIL_INFO}</span>}
+          </span>
+        </div>
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         <button onClick={executarIngestao} disabled={runningIngest||loading} style={btnStyle('blue')}><Mail size={14}/> {runningIngest?'Buscando...':'Buscar e-mails'}</button>
         <button onClick={abrirArquivo} style={btnStyle()}><Archive size={14}/> Arquivo</button>
-        {profile?.role==='gerente'&&<button onClick={()=>setConfigModal(true)} style={btnStyle()}><Settings size={14}/> Configurar caixa</button>}
         <button onClick={load} disabled={loading} style={btnStyle()}><RefreshCw size={14}/> Atualizar</button>
       </div>
     </div>
