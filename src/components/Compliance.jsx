@@ -122,7 +122,7 @@ function avaliarRiscoConflito(respostas = {}) {
   const parallelCompetesOrUsesResources = !!(respostas.parallelCompetes || respostas.parallelUsesResources || respostas.parallelConflictHours)
   const hasSocietaryParticipation = !!(respostas.societarySuppliersClients || respostas.societaryCompetitors)
   if (respostas.hasExternalRelationship || hasSocietaryParticipation || parallelCompetesOrUsesResources || respostas.makesDecisionsForRelatedParties) return 'ALTO'
-  if (respostas.hasInternalRelationship || respostas.hasParallelActivity) return 'MEDIO'
+  if (respostas.hasInternalRelationship) return 'MEDIO'
   return 'BAIXO'
 }
 
@@ -291,6 +291,99 @@ function normalizarImagemPdf(img) {
   }
 }
 
+async function renderizarPaginaComoImagem(page, scale = 2) {
+  const viewport = page.getViewport({ scale })
+  const width = Math.ceil(viewport.width)
+  const height = Math.ceil(viewport.height)
+  const { ctx } = criarCanvasLeitura(width, height)
+  if (!ctx) return null
+  await page.render({ canvasContext: ctx, viewport }).promise
+  const imageData = ctx.getImageData(0, 0, width, height)
+  return { width, height, data: imageData.data, viewport }
+}
+
+function radioScoreRenderizado(img, pdfX, pdfY) {
+  if (!img?.viewport || !img.data?.length) return 0
+  const [vx, vy] = img.viewport.convertToViewportPoint(pdfX, pdfY)
+  const x = Math.round(vx)
+  const y = Math.round(vy)
+  const r = 3
+  let score = 0
+  let total = 0
+  for (let yy = y - r; yy <= y + r; yy += 1) {
+    if (yy < 0 || yy >= img.height) continue
+    for (let xx = x - r; xx <= x + r; xx += 1) {
+      if (xx < 0 || xx >= img.width) continue
+      const i = (yy * img.width + xx) * 4
+      const alpha = img.data[i + 3]
+      const bright = (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3
+      if (alpha > 120 && bright < 170) score += 1
+      total += 1
+    }
+  }
+  return total ? score / total : 0
+}
+
+function respostaRadioTextualRenderizado(img, simItem, naoItem) {
+  const simScore = radioScoreRenderizado(img, simItem.x - 9, simItem.y + 6)
+  const naoScore = radioScoreRenderizado(img, naoItem.x - 9, naoItem.y + 6)
+  const delta = 0.08
+  if (simScore > naoScore + delta) return true
+  if (naoScore > simScore + delta) return false
+  return null
+}
+
+function paresRadioTexto(items = []) {
+  const labels = items
+    .map(item => ({
+      str: normConflitoTexto(item.str || '').replace(/\s+/g, ''),
+      x: item.transform?.[4] || 0,
+      y: item.transform?.[5] || 0,
+    }))
+    .filter(item => item.str === 'sim' || item.str === 'nao')
+    .sort((a, b) => Math.abs(b.y - a.y) > 1.5 ? b.y - a.y : a.x - b.x)
+
+  const usados = new Set()
+  const pares = []
+  labels.forEach((item, idx) => {
+    if (usados.has(idx) || item.str !== 'sim') return
+    const naoIdx = labels.findIndex((cand, cidx) =>
+      cidx !== idx && !usados.has(cidx) && cand.str === 'nao' && Math.abs(cand.y - item.y) <= 1.5 && cand.x > item.x
+    )
+    if (naoIdx >= 0) {
+      usados.add(idx)
+      usados.add(naoIdx)
+      pares.push({ sim: item, nao: labels[naoIdx], y: item.y })
+    }
+  })
+  return pares.sort((a, b) => b.y - a.y)
+}
+
+async function respostasPorRadiosTextuais(pdf) {
+  const respostas = {}
+  let rowIndex = 0
+  let encontradas = 0
+
+  for (let p = 1; p <= pdf.numPages && rowIndex < CHECKBOX_CONFLITO_ROWS.length; p += 1) {
+    const page = await pdf.getPage(p)
+    const content = await page.getTextContent()
+    const pares = paresRadioTexto(content.items)
+    if (!pares.length) continue
+    const img = await renderizarPaginaComoImagem(page, 2)
+    if (!img) continue
+    for (const par of pares) {
+      const row = CHECKBOX_CONFLITO_ROWS[rowIndex]
+      if (!row) break
+      const value = respostaRadioTextualRenderizado(img, par.sim, par.nao)
+      respostas[row.key] = value
+      if (value !== null) encontradas += 1
+      rowIndex += 1
+    }
+  }
+
+  return { respostas, confianca: CHECKBOX_CONFLITO_ROWS.length ? encontradas / CHECKBOX_CONFLITO_ROWS.length : 0 }
+}
+
 async function extrairImagemPrincipalPdf(pdf, pdfjsLib) {
   const page = await pdf.getPage(1)
   const op = await page.getOperatorList()
@@ -312,6 +405,16 @@ async function extrairConflitoPdf(file) {
   }
   let metodo = texto.trim() ? 'texto_pdf' : 'imagem_checkbox'
   let parsed = texto.trim() ? respostasPorTextoConflito(texto) : { respostas: {}, confianca: 0 }
+  if (texto.trim()) {
+    const byTextRadios = await respostasPorRadiosTextuais(pdf)
+    if (byTextRadios.confianca > 0) {
+      parsed = {
+        respostas: { ...parsed.respostas, ...byTextRadios.respostas },
+        confianca: Math.max(parsed.confianca, byTextRadios.confianca),
+      }
+      metodo = 'texto_pdf_radio'
+    }
+  }
   if (parsed.confianca < 1) {
     const img = await extrairImagemPrincipalPdf(pdf, pdfjsLib)
     if (img) {
