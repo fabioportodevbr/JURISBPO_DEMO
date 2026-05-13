@@ -180,12 +180,74 @@ function respostasPorImagemPrincipal(img) {
   return { respostas, confianca: CHECKBOX_CONFLITO_ROWS.length ? encontradas / CHECKBOX_CONFLITO_ROWS.length : 0 }
 }
 
+function normConflitoTexto(texto = '') {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .toLowerCase()
+}
+
+function trechoEntre(texto, inicio, fim) {
+  const from = texto.indexOf(inicio)
+  if (from < 0) return ''
+  const start = from + inicio.length
+  const to = fim ? texto.indexOf(fim, start) : -1
+  return texto.slice(start, to >= 0 ? to : undefined)
+}
+
+function descricaoDepoisDe(bloco, marcador) {
+  const idx = bloco.lastIndexOf(marcador)
+  if (idx < 0) return ''
+  return bloco.slice(idx + marcador.length)
+}
+
+function limparDescricaoConflito(texto = '') {
+  const limpo = texto
+    .replace(/nome da empresa:/g, ' ')
+    .replace(/natureza da participacao\/interesse:/g, ' ')
+    .replace(/[•*_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const apenasVazio = limpo.replace(/[-–—./\\,;:()\s]/g, '')
+  if (!apenasVazio) return ''
+  if (/^(nao|n\/a|naoseaplica|nenhum|nenhuma|sem|naoinformado)+$/.test(apenasVazio)) return ''
+  return limpo
+}
+
 function respostasPorTextoConflito(texto = '') {
-  const norm = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-  const todasNao = norm.includes('situacoes potenciais') && !/\bsim\b/.test(norm)
-  if (!todasNao) return { respostas: {}, confianca: 0 }
   const respostas = Object.fromEntries(CHECKBOX_CONFLITO_ROWS.map(row => [row.key, false]))
-  return { respostas, confianca: 0.5 }
+  const norm = normConflitoTexto(texto)
+  if (!norm.includes('situacoes potenciais') && !norm.includes('declaracoes especificas')) {
+    return { respostas: {}, confianca: 0 }
+  }
+
+  const relacoes = trechoEntre(norm, 'relacoes pessoais, familiares ou afetivas:', 'atividades profissionais paralelas:')
+  const atividade = trechoEntre(norm, 'atividades profissionais paralelas:', 'participacao societaria')
+  const societario = trechoEntre(norm, 'participacao societaria', 'situacoes especificas')
+  const decisao = trechoEntre(norm, 'situacoes especificas', 'compromisso do colaborador')
+
+  const relDesc = limparDescricaoConflito(descricaoDepoisDe(relacoes, 'se sim, descreva:'))
+  const atividadeDesc = limparDescricaoConflito(descricaoDepoisDe(atividade, 'se sim, descreva:'))
+  const societarioDesc = limparDescricaoConflito(descricaoDepoisDe(societario, 'se sim, informe:'))
+  const decisaoDesc = limparDescricaoConflito(descricaoDepoisDe(decisao, 'se sim, descreva:'))
+
+  if (relDesc) {
+    const mencionaExterno = /\b(cliente|fornecedor|prestador|parceiro|concorrent|comercial)\b/.test(relDesc)
+    respostas[mencionaExterno ? 'hasExternalRelationship' : 'hasInternalRelationship'] = true
+  }
+  if (atividadeDesc) {
+    respostas.hasParallelActivity = true
+    respostas.parallelCompetes = /\b(concorr|compet|mesmo ramo|servico semelhante)\b/.test(atividadeDesc)
+    respostas.parallelUsesResources = /\b(recurso|informacao|sistema|equipamento|corporativo|brbpo)\b/.test(atividadeDesc)
+    respostas.parallelConflictHours = /\b(horario|expediente|durante o trabalho|jornada)\b/.test(atividadeDesc)
+  }
+  if (societarioDesc) respostas.societarySuppliersClients = true
+  if (decisaoDesc) respostas.makesDecisionsForRelatedParties = true
+
+  const blocosReconhecidos = [relacoes, atividade, societario, decisao].filter(Boolean).length
+  return { respostas, confianca: blocosReconhecidos >= 3 ? 0.95 : 0.5 }
 }
 
 async function getObjetoPdf(page, id) {
