@@ -323,6 +323,13 @@ function withDeletedMarker(observacoes = "", evento: Record<string, unknown>) {
   return [limpas, `[REGISTRO_FINANCEIRO_EXCLUIDO:${encodeURIComponent(JSON.stringify(evento))}]`].filter(Boolean).join("\n");
 }
 
+function schemaColumnMissing(error: any, table: string, column: string) {
+  const msg = String(error?.message || "");
+  return msg.includes(`'${column}' column of '${table}'`)
+    || msg.includes(`column "${column}" of relation "${table}" does not exist`)
+    || msg.includes(`${table}.${column}`);
+}
+
 export default function Financeiro({ profile }: { profile: any }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -565,9 +572,15 @@ export default function Financeiro({ profile }: { profile: any }) {
       payload.apolice_fim = form.apolice_fim || null;
     }
 
-    const result = form.id
-      ? await supabase.from("financeiro_processos").update(payload).eq("id", form.id).eq("escritorio_id", profile.escritorio_id)
-      : await supabase.from("financeiro_processos").insert(payload);
+    const savePayload = () => form.id
+      ? supabase.from("financeiro_processos").update(payload).eq("id", form.id).eq("escritorio_id", profile.escritorio_id)
+      : supabase.from("financeiro_processos").insert(payload);
+
+    let result = await savePayload();
+    if (result.error && schemaColumnMissing(result.error, "financeiro_processos", "agravo_instrumento")) {
+      delete payload.agravo_instrumento;
+      result = await savePayload();
+    }
 
     setSaving(false);
     if (result.error) return alert(result.error.message);
