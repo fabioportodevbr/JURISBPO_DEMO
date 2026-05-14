@@ -17,7 +17,6 @@ function todayISO(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString(
 function addDaysISO(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
 function daysUntil(date){if(!date)return null;const today=new Date();today.setHours(0,0,0,0);const d=new Date(date+'T12:00:00');return Math.ceil((d-today)/86400000)}
 function brDate(date){return date?new Date(date+'T12:00:00').toLocaleDateString('pt-BR'):'-'}
-function schemaColumnMissing(error,table,column){const msg=String(error?.message||'');return msg.includes(`'${column}' column of '${table}'`)||msg.includes(`column "${column}" of relation "${table}" does not exist`)||msg.includes(`${table}.${column}`)}
 function renewalState(c){if(!c.notificar_renovacao||!c.data_fim)return null;const untilEnd=daysUntil(c.data_fim);const limit=untilEnd-Number(c.renovacao_antecedencia_dias||0);const alertDays=Number(c.renovacao_alerta_dias||30);if(limit<0)return {level:'vencido',days:limit,text:`Limite de renovação vencido há ${Math.abs(limit)} dia(s)`};if(limit<=alertDays)return {level:'alerta',days:limit,text:`Manifestar interesse em renovação em até ${limit} dia(s)`};return null}
 const CONTRATO_VENCIMENTO_ALERTA_DIAS=30
 function vencimentoContratoState(c){
@@ -299,9 +298,7 @@ export default function Dashboard({profile, unreadCount=0}){
     if(!createPush)return
     if(!createForm.titulo.trim())return alert('Informe o título do processo.')
     setSavingProcess(true)
-    const payload={escritorio_id:profile.escritorio_id,numero:createForm.numero||null,titulo:createForm.titulo.trim(),parte_contraria:createForm.parte_contraria||null,partes_contrarias:createForm.parte_contraria?[{nome:createForm.parte_contraria}]:[],tribunal:createForm.tribunal||null,categoria:createForm.categoria||'trabalhista',resumo_processo:createForm.resumo_processo||null,status:'ativo',fase:'conhecimento',responsavel_id:profile.id,created_by:profile.id}
-    let {data,error}=await supabase.from('processos').insert(payload).select('id').single()
-    if(error&&schemaColumnMissing(error,'processos','partes_contrarias')){delete payload.partes_contrarias;({data,error}=await supabase.from('processos').insert(payload).select('id').single())}
+    const {data,error}=await supabase.from('processos').insert({escritorio_id:profile.escritorio_id,numero:createForm.numero||null,titulo:createForm.titulo.trim(),parte_contraria:createForm.parte_contraria||null,partes_contrarias:createForm.parte_contraria?[{nome:createForm.parte_contraria}]:[],tribunal:createForm.tribunal||null,categoria:createForm.categoria||'trabalhista',resumo_processo:createForm.resumo_processo||null,status:'ativo',fase:'conhecimento',responsavel_id:profile.id,created_by:profile.id}).select('id').single()
     if(error){setSavingProcess(false);return alert(error.message)}
     const {error:linkError}=await supabase.from('andamentos_processuais_push').update({processo_id:data.id,cliente_id:null,escritorio_id:profile.escritorio_id,status_associacao:'associado'}).eq('id',createPush.id)
     setSavingProcess(false)
