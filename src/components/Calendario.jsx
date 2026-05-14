@@ -120,7 +120,7 @@ function Modal({ event, onClose }) {
 
   return (
     <div
-      onClick={e => e.target === e.currentTarget && onClose()}
+      onMouseDown={e => e.target === e.currentTarget && (e.currentTarget._md = 1)} onClick={e => e.target === e.currentTarget && e.currentTarget._md && (delete e.currentTarget._md, onClose())}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
     >
       <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 560, padding: 18 }}>
@@ -164,7 +164,7 @@ function DayEventsModal({ day, onClose, onOpenEvent }) {
   if (!day) return null
   return (
     <div
-      onClick={e => e.target === e.currentTarget && onClose()}
+      onMouseDown={e => e.target === e.currentTarget && (e.currentTarget._md = 1)} onClick={e => e.target === e.currentTarget && e.currentTarget._md && (delete e.currentTarget._md, onClose())}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 590, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
     >
       <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 560, maxHeight: '88vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>

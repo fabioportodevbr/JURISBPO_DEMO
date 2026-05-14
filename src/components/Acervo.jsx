@@ -162,7 +162,7 @@ function Modal({ title, onClose, children, wide }) {
     return () => { document.body.style.overflow = '' }
   }, [])
   return (
-    <div onClick={e => e.target === e.currentTarget && onClose()}
+    <div onMouseDown={e => e.target === e.currentTarget && (e.currentTarget._md = 1)} onClick={e => e.target === e.currentTarget && e.currentTarget._md && (delete e.currentTarget._md, onClose())}
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: C.white, borderRadius: 14, boxShadow: '0 20px 60px rgba(0,0,0,0.18)', width: '100%', maxWidth: wide ? 860 : 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid ' + C.border, flexShrink: 0 }}>

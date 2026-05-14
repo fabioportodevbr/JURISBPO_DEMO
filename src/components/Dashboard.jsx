@@ -77,7 +77,7 @@ function PushDashboardHeader({novos,importantes,ultimo,onClick}){
 function PushModal({items,profile,onClose,onOpenProcess,onCreateProcess,onDismiss}){
   const podeCriar=can(profile,'processos.criar')
   const [dismissing,setDismissing]=useState(null)
-  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+  return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onClose())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:920,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',padding:18,borderBottom:'1px solid '+C.border}}>
         <div><b>Pushes novos em 24h</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>Clique em um push vinculado para abrir o processo, ou crie um novo processo para associar o andamento.</div></div>
@@ -115,7 +115,7 @@ function PushModal({items,profile,onClose,onOpenProcess,onCreateProcess,onDismis
 function Field({label,children}){return <div style={{marginBottom:12}}><label style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',display:'block',marginBottom:5}}>{label}</label>{children}</div>}
 
 function CriarProcessoPushModal({push,form,setForm,saving,onCancel,onSave}){
-  return <div onClick={e=>e.target===e.currentTarget&&onCancel()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+  return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onCancel())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:680,padding:18}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,borderBottom:'1px solid '+C.border,paddingBottom:12,marginBottom:14}}>
         <div><b>Criar processo e vincular push</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{push?.numero_processo||'Número não identificado'} · {push?.tribunal||'Tribunal não informado'}</div></div>
@@ -141,7 +141,7 @@ function AudienciaModal({audiencia,onClose,onOpenProcess}){
   const STATUS_AUD={a_fazer:'A fazer',em_andamento:'Em andamento',concluida:'Concluída',cancelada:'Cancelada'}
   const PRIOR_AUD={baixa:'Baixa',media:'Média',alta:'Alta',urgente:'Urgente'}
   const priorColor={baixa:C.muted,media:C.amber,alta:C.red,urgente:C.red}[a.prioridade]||C.muted
-  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+  return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onClose())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:520,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:'16px 18px',borderBottom:'1px solid '+C.border,background:C.blueBg}}>
         <div style={{display:'flex',alignItems:'flex-start',gap:10}}><CalendarDays size={20} color={C.blue} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{a.titulo}</b><span style={{fontSize:12,color:C.muted}}>Audiência</span></div></div>
@@ -177,7 +177,7 @@ function AtividadeModal({atividade,onClose,onOpenProcess}){
   const kindBg={tarefa:C.redBg,prazo_processual:C.redBg,reuniao:C.greenBg}[a.tipo]||C.blueBg
   const kindColor={tarefa:C.red,prazo_processual:C.red,reuniao:C.green}[a.tipo]||C.blue
   const Icon={tarefa:AlertTriangle,prazo_processual:Clock,reuniao:CalendarCheck}[a.tipo]||Clock
-  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+  return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onClose())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:520,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:'16px 18px',borderBottom:'1px solid '+C.border,background:kindBg}}>
         <div style={{display:'flex',alignItems:'flex-start',gap:10}}><Icon size={20} color={kindColor} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{a.titulo}</b><span style={{fontSize:12,color:C.muted}}>{TIPOS_MAP[a.tipo]||a.tipo}</span></div></div>
@@ -206,7 +206,7 @@ function ContratoAlertaModal({contrato,onClose,onOpenContract}){
   const bg=critico?C.redBg:C.amberBg
   const color=critico?C.red:C.amber
   const alertaVencimento=c.tipoAlerta==='contrato_vencimento'
-  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+  return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onClose())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:520,overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:'16px 18px',borderBottom:'1px solid '+C.border,background:bg}}>
         <div style={{display:'flex',alignItems:'flex-start',gap:10}}><AlertTriangle size={20} color={color} style={{marginTop:2,flexShrink:0}}/><div><b style={{fontSize:15,color:C.text,display:'block',lineHeight:1.3}}>{c.titulo}</b><span style={{fontSize:12,color:C.muted}}>{alertaVencimento?'Alerta de vencimento contratual':'Alerta de renovação contratual'}</span></div></div>

@@ -15,7 +15,7 @@ const tipoInfo={
   mensagem:['Mensagem',C.greenBg,C.green]
 }
 
-function Modal({title,onClose,children,width=720}){return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}><div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:width,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}><div style={{display:'flex',justifyContent:'space-between',padding:18,borderBottom:'1px solid '+C.border,alignItems:'center',gap:12}}><b>{title}</b><button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',display:'flex',padding:4}}><X/></button></div><div style={{padding:18,overflow:'auto'}}>{children}</div></div></div>}
+function Modal({title,onClose,children,width=720}){return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onClose())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}><div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:width,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}><div style={{display:'flex',justifyContent:'space-between',padding:18,borderBottom:'1px solid '+C.border,alignItems:'center',gap:12}}><b>{title}</b><button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',display:'flex',padding:4}}><X/></button></div><div style={{padding:18,overflow:'auto'}}>{children}</div></div></div>}
 
 function Chip({tipo}){const [label,bg,color]=tipoInfo[tipo]||[tipo||'Aviso',C.grayBg,C.muted];return <span style={{fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:20,background:bg,color,textTransform:'uppercase',whiteSpace:'nowrap'}}>{label}</span>}
 
@@ -125,7 +125,7 @@ export default function Notificacoes({profile, embedded=false}){
 }
 
 export function NotificacoesModal({profile,onClose}){
-  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:680,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+  return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onClose())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:680,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:760,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:18,borderBottom:'1px solid '+C.border}}>
         <div style={{display:'flex',alignItems:'center',gap:8,color:C.text,fontWeight:900}}><Bell size={17}/>Notificações</div>

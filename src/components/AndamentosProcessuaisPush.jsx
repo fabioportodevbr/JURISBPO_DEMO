@@ -329,7 +329,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
       </div>
     </>}
 
-    {configModal&&<div onClick={e=>e.target===e.currentTarget&&setConfigModal(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    {configModal&&<div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,setConfigModal(false))} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
       <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:560,padding:18,border:'1px solid '+C.border}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',borderBottom:'1px solid '+C.border,paddingBottom:12,marginBottom:14}}>
           <div><b>Configurar caixa monitorada</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>A alteração define a conta IMAP usada para buscar acompanhamentos processuais via push.</div></div>
@@ -351,7 +351,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
       </div>
     </div>}
 
-    {arquivoModal&&<div onClick={e=>e.target===e.currentTarget&&setArquivoModal(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    {arquivoModal&&<div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,setArquivoModal(false))} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:700,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
       <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:960,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',border:'1px solid '+C.border}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'flex-start',padding:18,borderBottom:'1px solid '+C.border}}>
           <div><b style={{display:'flex',alignItems:'center',gap:8}}><Archive size={17}/> Arquivo de pushes desconsiderados</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>Registro próprio dos pushes arquivados nos últimos 30 dias, com usuário, data e hora da desconsideração.</div></div>
