@@ -19,6 +19,13 @@ function Modal({title,onClose,children}){return <div onClick={e=>e.target===e.cu
 function label(arr,v){return arr.find(x=>x[0]===v)?.[1]||v||'—'}
 function daysUntil(date){if(!date)return null;const today=new Date();today.setHours(0,0,0,0);const d=new Date(date+'T12:00:00');return Math.ceil((d-today)/86400000)}
 function brDate(date){return date?new Date(date+'T12:00:00').toLocaleDateString('pt-BR'):'—'}
+function parseISODate(date){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))return null;const[y,m,d]=String(date).split('-').map(Number);const parsed=new Date(y,m-1,d);return parsed.getFullYear()===y&&parsed.getMonth()===m-1&&parsed.getDate()===d?parsed:null}
+function isoDate(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
+function addDays(date,days){const d=new Date(date);d.setDate(d.getDate()+days);return d}
+function daysInMonth(year,month){return new Date(year,month+1,0).getDate()}
+function addMonthsContract(date,months){const first=new Date(date.getFullYear(),date.getMonth()+months,1);const max=daysInMonth(first.getFullYear(),first.getMonth());const clamped=date.getDate()>max;return{date:new Date(first.getFullYear(),first.getMonth(),Math.min(date.getDate(),max)),clamped}}
+function calcularRenovacaoIgualPeriodo(dataInicio,dataFim){const inicio=parseISODate(dataInicio),fim=parseISODate(dataFim);if(!inicio||!fim||fim<inicio)return null;const dias=Math.round((fim-inicio)/86400000)+1;const novoInicio=addDays(fim,1);const novoFim=addDays(novoInicio,dias-1);return{data_inicio:isoDate(novoInicio),data_fim:isoDate(novoFim),dias}}
+function calcularRenovacaoMeses(dataFim,meses){const fim=parseISODate(dataFim);if(!fim||!Number.isInteger(meses)||meses<=0)return null;const novoInicio=addDays(fim,1);const limite=addMonthsContract(novoInicio,meses);const novoFim=limite.clamped?limite.date:addDays(limite.date,-1);return{data_inicio:isoDate(novoInicio),data_fim:isoDate(novoFim),meses}}
 function brMoney(v){if(v===null||v===undefined||v==='')return '—';return Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function parseMoney(v){if(v===null||v===undefined||v==='')return 0;if(typeof v==='number')return Number.isFinite(v)?v:0;let s=String(v).replace(/[^\d,.-]/g,'');if(!s)return 0;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');return Number(s)||0}
 function moeda(v){if(v===null||v===undefined||v==='')return '';return parseMoney(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
@@ -156,6 +163,32 @@ export default function Contratos({profile}){
   const toggleRelCategoria=(v)=>setRelCategorias(a=>a.includes(v)?a.filter(x=>x!==v):[...a,v])
   const toggleRelStatus=(v)=>setRelStatus(a=>a.includes(v)?a.filter(x=>x!==v):[...a,v])
   const gerarPdfContratos=()=>{const w=window.open('','_blank');if(!w)return alert('Permita pop-ups para gerar o PDF.');w.document.open();w.document.write(htmlRelatorioContratos(relatorioContratos));w.document.close();setTimeout(()=>{w.focus();w.print()},400)}
+  const aplicarPrazoIndeterminado=(checked)=>{setFlagsContrato(f=>({...f,prazo_indeterminado:checked,renovacao_automatica:checked?false:f.renovacao_automatica}));if(checked)setForm(f=>({...f,data_fim:''}))}
+  const aplicarRenovacaoAutomatica=(checked)=>{
+    if(!checked){setFlagsContrato(f=>({...f,renovacao_automatica:false,renovacao_tipo:null,renovacao_meses:null,renovacao_dias:null}));return}
+    if(!form.data_inicio||!form.data_fim){alert('Informe o início e o fim da vigência atual antes de marcar a renovação automática.');return}
+    const igualPeriodo=window.confirm('A renovação automática é por igual período?')
+    let calculo=null,extras={}
+    if(igualPeriodo){
+      calculo=calcularRenovacaoIgualPeriodo(form.data_inicio,form.data_fim)
+      extras={renovacao_tipo:'igual_periodo',renovacao_dias:calculo?.dias||null,renovacao_meses:null}
+    }else{
+      let meses=null
+      while(meses===null){
+        const resposta=window.prompt('Informe o período da renovação automática em meses:', '12')
+        if(resposta===null)return
+        const n=Number(String(resposta).replace(',','.'))
+        if(Number.isInteger(n)&&n>0)meses=n
+        else alert('Informe um número inteiro de meses maior que zero.')
+      }
+      calculo=calcularRenovacaoMeses(form.data_fim,meses)
+      extras={renovacao_tipo:'meses',renovacao_meses:meses,renovacao_dias:null}
+    }
+    if(!calculo){alert('Não foi possível calcular a nova vigência. Confira as datas informadas.');return}
+    setFlagsContrato(f=>({...f,prazo_indeterminado:false,renovacao_automatica:true,...extras}))
+    setForm(f=>({...f,data_inicio:calculo.data_inicio,data_fim:calculo.data_fim,status:f.status==='encerrado'?f.status:'ativo'}))
+    alert(`Vigência renovada automaticamente para ${brDate(calculo.data_inicio)} a ${brDate(calculo.data_fim)}.`)
+  }
   const open=(c=null)=>{if(!c&&!canCreate)return alert('Visitante possui acesso somente leitura.');if(c&&!canEdit)return alert('Visitante possui acesso somente leitura.');const base=c?{...c,categoria:contratoCategoria(c),observacoes:limparObservacoesContrato(c.observacoes||'')}:{titulo:'',numero:'',categoria:'cliente',contratante:'',contratada:'',valor:'',status:'ativo',data_inicio:'',data_fim:'',notificar_renovacao:false,renovacao_antecedencia_dias:180,renovacao_alerta_dias:30,observacoes:''};setForm(base);setAditivos(c?extrairAditivosContrato(c):[]);setFlagsContrato(c?extrairFlagsContrato(c):{renovacao_automatica:false,prazo_indeterminado:false});setSeguroContrato(c?extrairSeguroContrato(c):emptySeguroContrato());setAditivoDraft({numero:'',data_inicio:'',data_fim:'',documento:'',observacao:''});setNovaParte('');setTab('dados');setModal(true)}
   const save=async()=>{if(form.id&&!canEdit)return alert('Visitante possui acesso somente leitura.');if(!form.id&&!canCreate)return alert('Visitante possui acesso somente leitura.');if(!form.titulo)return alert('Informe o título.');let finalForm={...form};const cat=contratoCategoria(form);const precisaNova=(cat==='cliente'&&form.contratada==='__novo__')||((cat==='fornecedor'||cat==='banca')&&(form.contratante==='__novo__'||form.contratada==='__novo__'));if(precisaNova){if(!novaParte.trim())return alert('Informe o nome da nova empresa/escritório.');const tipoNovo=cat==='banca'&&form.contratada==='__novo__'?'escritorio_advocacia':'empresa_grupo';const{data,error}=await supabase.from('partes_crm').insert({escritorio_id:profile.escritorio_id,nome:novaParte.trim(),tipo:tipoNovo,status:'ativo',created_by:profile.id}).select('nome').single();if(error){if(error.code==='23505'){if(form.contratada==='__novo__')finalForm.contratada=novaParte.trim();else finalForm.contratante=novaParte.trim()}else{return alert(error.message)}}else{if(form.contratada==='__novo__')finalForm.contratada=data.nome;else finalForm.contratante=data.nome}await loadPartes()}const obs=juntarMetadadosContrato(finalForm.observacoes||'',aditivos,flagsContrato,seguroContrato);const payload={...finalForm,categoria:categoriaBanco(cat),tipo:tipoBanco(finalForm,cat),observacoes:obs,escritorio_id:profile.escritorio_id,data_inicio:finalForm.data_inicio||null,data_fim:flagsContrato.prazo_indeterminado?null:(finalForm.data_fim||null),valor:finalForm.valor===''||finalForm.valor===undefined?null:Number(finalForm.valor),renovacao_antecedencia_dias:Number(finalForm.renovacao_antecedencia_dias||180),renovacao_alerta_dias:Number(finalForm.renovacao_alerta_dias||30),created_by:finalForm.created_by||profile.id};delete payload.parte;delete payload.aditivos;delete payload.flagsContrato;delete payload.seguroContrato;const r=finalForm.id?await supabase.from('contratos').update(payload).eq('id',finalForm.id):await supabase.from('contratos').insert(payload);if(r.error)return alert(r.error.message);setModal(false);load()}
   const aditivosSequencia=useMemo(()=>aditivos.map((a,i)=>({...a,_idx:i})).sort((a,b)=>aditivoKey(a,a._idx).localeCompare(aditivoKey(b,b._idx))),[aditivos])
@@ -219,8 +252,8 @@ export default function Contratos({profile}){
 <div style={{border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:12}}>
   <h3 style={{fontSize:15,margin:'0 0 10px'}}>Vigência, renovação e aditivos</h3>
   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:10}}>
-    <label style={{display:'flex',gap:8,alignItems:'center',fontWeight:800}}><input type="checkbox" checked={!!flagsContrato.renovacao_automatica} onChange={e=>setFlagsContrato({...flagsContrato,renovacao_automatica:e.target.checked})}/>Tem renovação automática?</label>
-    <label style={{display:'flex',gap:8,alignItems:'center',fontWeight:800}}><input type="checkbox" checked={!!flagsContrato.prazo_indeterminado} onChange={e=>setFlagsContrato({...flagsContrato,prazo_indeterminado:e.target.checked})}/>Vigência por prazo indeterminado?</label>
+    <label style={{display:'flex',gap:8,alignItems:'center',fontWeight:800}}><input type="checkbox" checked={!!flagsContrato.renovacao_automatica} onChange={e=>aplicarRenovacaoAutomatica(e.target.checked)}/>Tem renovação automática?</label>
+    <label style={{display:'flex',gap:8,alignItems:'center',fontWeight:800}}><input type="checkbox" checked={!!flagsContrato.prazo_indeterminado} onChange={e=>aplicarPrazoIndeterminado(e.target.checked)}/>Vigência por prazo indeterminado?</label>
   </div>
   <p style={{fontSize:12,color:C.muted,margin:'8px 0'}}>Se houver renovação automática ou prazo indeterminado, o aditivo pode não ser necessário. Ainda assim, quando houver aditivo formal, registre abaixo para histórico.</p>
   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
