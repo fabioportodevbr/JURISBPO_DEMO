@@ -1640,11 +1640,18 @@ function ComplianceSettings({ profile }) {
     setTestResult(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await supabase.functions.invoke('compliance-test-imap', {
-        body: { escritorio_id: profile.escritorio_id },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+      const response = await fetch('/api/compliance/test-imap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ escritorio_id: profile.escritorio_id }),
       })
-      const result = res.data ?? { ok: false, erro: res.error?.message ?? 'Erro desconhecido.' }
+      const result = await response.json().catch(() => ({
+        ok: false,
+        erro: response.ok ? 'Resposta inválida do servidor.' : `Servidor retornou HTTP ${response.status}.`,
+      }))
       setTestResult(result)
       // Atualiza status local para refletir o que o banco recebeu
       setConnStatus(result.ok ? 'ok' : 'erro')
