@@ -43,7 +43,7 @@ export default function ConfiguracaoCalendario({ profile }) {
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
       redirect_uri: `${window.location.origin}/api/auth/google/callback`,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/calendar',
+      scope: 'https://www.googleapis.com/auth/calendar.events',
       access_type: 'offline',
       prompt: 'consent',
       state,
