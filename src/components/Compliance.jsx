@@ -325,9 +325,20 @@ function radioScoreRenderizado(img, pdfX, pdfY) {
 }
 
 function respostaRadioTextualRenderizado(img, simItem, naoItem) {
-  const simScore = radioScoreRenderizado(img, simItem.x - 9, simItem.y + 6)
-  const naoScore = radioScoreRenderizado(img, naoItem.x - 9, naoItem.y + 6)
-  const delta = 0.08
+  // Scan a range of offsets to robustly locate the radio circle regardless of PDF layout
+  function bestScore(item) {
+    let best = 0
+    for (let dx = -18; dx <= -4; dx += 2) {
+      for (let dy = 0; dy <= 10; dy += 2) {
+        const s = radioScoreRenderizado(img, item.x + dx, item.y + dy)
+        if (s > best) best = s
+      }
+    }
+    return best
+  }
+  const simScore = bestScore(simItem)
+  const naoScore = bestScore(naoItem)
+  const delta = 0.12
   if (simScore > naoScore + delta) return true
   if (naoScore > simScore + delta) return false
   return null
@@ -344,17 +355,17 @@ function paresRadioTexto(items = []) {
     // Exclui SIM/NÃO que aparecem junto a outro texto na mesma linha (texto instrucional,
     // ex: "assinalando SIM ou NÃO") — rótulos de radio button ficam isolados em sua linha.
     .filter(item => !allNorm.some(other =>
-      Math.abs(other.y - item.y) <= 1.5 &&
+      Math.abs(other.y - item.y) <= 4 &&
       other.str !== 'sim' && other.str !== 'nao' && other.str.length > 0
     ))
-    .sort((a, b) => Math.abs(b.y - a.y) > 1.5 ? b.y - a.y : a.x - b.x)
+    .sort((a, b) => Math.abs(b.y - a.y) > 4 ? b.y - a.y : a.x - b.x)
 
   const usados = new Set()
   const pares = []
   labels.forEach((item, idx) => {
     if (usados.has(idx) || item.str !== 'sim') return
     const naoIdx = labels.findIndex((cand, cidx) =>
-      cidx !== idx && !usados.has(cidx) && cand.str === 'nao' && Math.abs(cand.y - item.y) <= 1.5 && cand.x > item.x
+      cidx !== idx && !usados.has(cidx) && cand.str === 'nao' && Math.abs(cand.y - item.y) <= 4 && cand.x > item.x
     )
     if (naoIdx >= 0) {
       usados.add(idx)
@@ -414,8 +425,21 @@ async function extrairConflitoPdf(file) {
   if (texto.trim()) {
     const byTextRadios = await respostasPorRadiosTextuais(pdf)
     if (byTextRadios.confianca >= 0.8) {
+      const textConfiante = parsed.confianca >= 0.8
+      const mergedRespostas = {}
+      CHECKBOX_CONFLITO_ROWS.forEach(row => {
+        const textVal = parsed.respostas[row.key]
+        const radioVal = byTextRadios.respostas[row.key]
+        // Quando texto é confiante e diz false, radio não pode promover a true
+        // (evita falsos positivos de análise de pixel em PDFs do WorkForce)
+        if (textConfiante && textVal === false && radioVal === true) {
+          mergedRespostas[row.key] = false
+        } else {
+          mergedRespostas[row.key] = radioVal !== null && radioVal !== undefined ? radioVal : textVal
+        }
+      })
       parsed = {
-        respostas: { ...parsed.respostas, ...byTextRadios.respostas },
+        respostas: mergedRespostas,
         confianca: Math.max(parsed.confianca, byTextRadios.confianca),
       }
       metodo = 'texto_pdf_radio'
