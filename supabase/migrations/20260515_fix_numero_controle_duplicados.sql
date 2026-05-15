@@ -60,10 +60,11 @@ BEGIN
   FOR rec IN
     SELECT id FROM (
       SELECT id,
+             created_at,
              numero_controle,
              ROW_NUMBER() OVER (
-               PARTITION BY COALESCE(numero_controle, gen_random_uuid()::text)
-               ORDER BY created_at, id
+               PARTITION BY COALESCE(numero_controle, 'NULL_' || id::text)
+               ORDER BY id
              ) AS rn
       FROM public.processos
     ) t
@@ -76,9 +77,6 @@ BEGIN
       FOR i IN 1..8 LOOP
         ctrl := ctrl || substr(chars, floor(random() * length(chars) + 1)::int, 1);
       END LOOP;
-      -- Verifica unicidade considerando os UPDATEs já feitos nesta sessão
-      -- (usa PERFORM + SELECT para forçar re-leitura)
-      PERFORM pg_sleep(0); -- força flush do snapshot interno
       IF NOT EXISTS (SELECT 1 FROM public.processos WHERE numero_controle = ctrl) THEN
         UPDATE public.processos SET numero_controle = ctrl WHERE id = rec.id;
         RAISE NOTICE 'CTL % atribuído ao processo id=%', ctrl, rec.id;
