@@ -205,11 +205,13 @@ function descricaoDepoisDe(bloco, marcador) {
 function limparDescricaoConflito(texto = '') {
   const limpo = texto
     .replace(/\d{2}\/\d{2}\/\d{4},?\s*\d{2}:\d{2}/g, ' ')
-    .replace(/workforce\s*-\s*documento eletronico/g, ' ')
+    .replace(/(?:workforce\s*-\s*)?documento eletronico/g, ' ')
     .replace(/workforce\.brbpo\.com\.br\S*/g, ' ')
     .replace(/\b\d+\s*\/\s*\d+\b/g, ' ')
     .replace(/nome da empresa:/g, ' ')
     .replace(/natureza da participacao\/interesse:/g, ' ')
+    .replace(/funcionario/g, ' ')
+    .replace(/brbpo tecnologia e servicos s\/a/g, ' ')
     .replace(/[•*_]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
