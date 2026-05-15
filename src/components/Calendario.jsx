@@ -226,8 +226,13 @@ export default function Calendario({ profile }) {
     }
     if (searchParams.get('calendar_error')) {
       const err = searchParams.get('calendar_error')
-      setGoogleError(`Erro ao conectar Google Calendar: ${err}`)
-      setTimeout(() => setGoogleError(''), 6000)
+      const msgs = {
+        no_refresh_token: 'Google não retornou token de atualização. Tente desconectar e reconectar.',
+        no_code: 'Autorização cancelada ou código ausente.',
+        db_error: 'Erro ao salvar credenciais. Contate o suporte.',
+      }
+      setGoogleError(`Erro ao conectar Google Calendar: ${msgs[err] || err}`)
+      // Não remove automaticamente — erro de conexão deve ser lido com calma
     }
   }, [searchParams])
 
@@ -375,8 +380,11 @@ export default function Calendario({ profile }) {
         </div>
       )}
       {googleError && (
-        <div style={{ background: C.redBg, border: '1px solid '+C.red, borderRadius: 8, padding: '10px 14px', marginTop: 12, color: C.red }}>
-          {googleError}
+        <div style={{ background: C.redBg, border: '1px solid '+C.red, borderRadius: 8, padding: '10px 14px', marginTop: 12, color: C.red, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <span>{googleError}</span>
+          <button onClick={() => setGoogleError('')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.red, padding: 0, flexShrink: 0 }}>
+            <X size={14} />
+          </button>
         </div>
       )}
 

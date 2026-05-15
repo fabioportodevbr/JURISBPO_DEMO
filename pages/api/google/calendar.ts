@@ -18,6 +18,9 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
     }),
   })
   const data = await res.json()
+  if (data.error) {
+    console.error('Google refresh token error:', data.error, data.error_description)
+  }
   return data.access_token || null
 }
 

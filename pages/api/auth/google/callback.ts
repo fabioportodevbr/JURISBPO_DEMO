@@ -29,7 +29,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const tokens = await tokenRes.json()
 
+    // Expõe o erro real do Google para facilitar diagnóstico
+    if (tokens.error) {
+      console.error('Google token exchange error:', tokens.error, tokens.error_description)
+      const code = encodeURIComponent(tokens.error)
+      return res.redirect(`/calendario?calendar_error=google_${code}`)
+    }
+
     if (!tokens.refresh_token) {
+      console.error('Google did not return refresh_token. Token response:', JSON.stringify(tokens))
       return res.redirect('/calendario?calendar_error=no_refresh_token')
     }
 
