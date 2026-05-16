@@ -192,7 +192,7 @@ function AppLayout() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont,sans-serif', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif", overflow: 'hidden' }}>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.sidebar-nav::-webkit-scrollbar{display:none}.sidebar-nav{scrollbar-width:none;-ms-overflow-style:none}`}</style>
       <Sidebar nav={nav} currentPath={currentPath} onNav={navigate} open={sbOpen} onClose={() => mobile && setSbOpen(false)} profile={profile} onLogout={handleLogout} mobile={mobile} unreadCount={unreadCount} />
       <div style={{ flex: 1, marginLeft: mobile ? 0 : 224, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s' }}>
