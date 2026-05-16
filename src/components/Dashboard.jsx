@@ -10,7 +10,7 @@ import { motivoDesconsideracaoPush, registrarPushDesconsiderado } from '../lib/p
 import { C } from '../lib/theme'
 import { useTheme } from '../lib/ThemeContext'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
-const Card=({title,value,sub,color})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:'22px 24px',borderLeft:'4px solid '+color}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div style={{fontSize:42,fontWeight:900,color,marginTop:8,lineHeight:1}}>{value}</div><div style={{fontSize:13,color:C.muted,marginTop:6}}>{sub}</div></div>
+const Card=({title,value,sub,color})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:'22px 24px'}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div style={{fontSize:42,fontWeight:900,color,marginTop:8,lineHeight:1}}>{value}</div><div style={{fontSize:13,color:C.muted,marginTop:6}}>{sub}</div></div>
 
 function todayISO(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString().slice(0,10)}
 function addDaysISO(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
