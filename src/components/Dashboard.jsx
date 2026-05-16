@@ -46,16 +46,53 @@ const PUSH_IMPORTANTE=/senten[cç]a|ac[oó]rd[aã]o|decis[aã]o|liminar|tutela|i
 function pushText(p){return [p.movimento,p.assunto_email,p.corpo_email_resumo,p.corpo_resumo,p.corpo_email_limpo].filter(Boolean).join(' ')}
 function isImportantPush(p){return PUSH_IMPORTANTE.test(pushText(p))}
 
-function ListBlock({title,icon,items,empty,kind='default',onItemClick}){
+function ListBlock({title,icon,items,empty,kind='default',onItemClick,limit=3}){
+  const [expanded,setExpanded]=useState(false)
   const bg=kind==='danger'?C.redBg:kind==='warning'?C.amberBg:kind==='info'?C.blueBg:kind==='success'?C.greenBg:C.white
-  return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,overflow:'hidden'}}>
-    <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}>{icon}{title}</h2>
-    {items.length?items.map(t=><div key={t.id} onClick={onItemClick?()=>onItemClick(t):undefined} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:bg,cursor:onItemClick?'pointer':'default',transition:'filter .12s'}} onMouseEnter={onItemClick?e=>e.currentTarget.style.filter='brightness(0.96)':undefined} onMouseLeave={onItemClick?e=>e.currentTarget.style.filter='none':undefined}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-        <div><b>{t.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{t.tipo} · {brDate(t.prazo)}{t.horario?` às ${t.horario}`:''}{t.status?` · ${t.status}`:''}</div></div>
-        {onItemClick&&<ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>}
-      </div>
-    </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>{empty}</div>}
+  const visible=expanded?items:items.slice(0,limit)
+  const overflow=items.length-limit
+  return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,overflow:'hidden',display:'flex',flexDirection:'column',height:'100%'}}>
+    <h2 style={{fontSize:15,padding:'14px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+      {icon}{title}
+      {items.length>0&&<span style={{marginLeft:'auto',fontSize:11,fontWeight:900,background:C.border,color:C.text,borderRadius:999,padding:'1px 8px'}}>{items.length}</span>}
+    </h2>
+    <div style={{flex:1}}>
+      {visible.length?visible.map(t=><div key={t.id} onClick={onItemClick?()=>onItemClick(t):undefined} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:bg,cursor:onItemClick?'pointer':'default',transition:'filter .12s'}} onMouseEnter={onItemClick?e=>e.currentTarget.style.filter='brightness(0.96)':undefined} onMouseLeave={onItemClick?e=>e.currentTarget.style.filter='none':undefined}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+          <div><b>{t.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{t.tipo} · {brDate(t.prazo)}{t.horario?` às ${t.horario}`:''}{t.status?` · ${t.status}`:''}</div></div>
+          {onItemClick&&<ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>}
+        </div>
+      </div>):<div style={{padding:24,textAlign:'center',color:C.muted}}>{empty}</div>}
+    </div>
+    {items.length>limit&&<button onClick={()=>setExpanded(v=>!v)} style={{border:0,borderTop:'1px solid '+C.border,background:C.bg,color:C.muted,padding:'9px 18px',cursor:'pointer',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6,flexShrink:0,width:'100%'}}>
+      {expanded?'↑ Ver menos':<><span style={{background:C.border,color:C.text,borderRadius:999,padding:'1px 7px',fontWeight:900,fontSize:11}}>+{overflow}</span> Ver todos ↓</>}
+    </button>}
+  </div>
+}
+
+function AlertasContratuaisBlock({items,onItemClick,limit=3}){
+  const [expanded,setExpanded]=useState(false)
+  const visible=expanded?items:items.slice(0,limit)
+  const overflow=items.length-limit
+  return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,overflow:'hidden',display:'flex',flexDirection:'column',height:'100%'}}>
+    <h2 style={{fontSize:15,padding:'14px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+      <Bell size={16}/>Alertas contratuais
+      {items.length>0&&<span style={{marginLeft:'auto',fontSize:11,fontWeight:900,background:C.border,color:C.text,borderRadius:999,padding:'1px 8px'}}>{items.length}</span>}
+    </h2>
+    <div style={{flex:1}}>
+      {visible.length?visible.map(c=>{
+        const critico=c.renovacao.level==='critico'||c.renovacao.level==='vencido'
+        return <div key={c.alertaId||c.id} onClick={()=>onItemClick(c)} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:critico?C.redBg:C.amberBg,cursor:'pointer',transition:'filter .12s'}} onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.96)'} onMouseLeave={e=>e.currentTarget.style.filter='none'}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+            <div><b style={{fontSize:13}}>{c.titulo}</b><div style={{fontSize:11,color:critico?C.red:C.amber,marginTop:3,fontWeight:800,display:'flex',gap:5,alignItems:'center'}}><AlertTriangle size={12}/>{c.renovacao.text}</div></div>
+            <ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>
+          </div>
+        </div>
+      }):<div style={{padding:24,textAlign:'center',color:C.muted,fontSize:13}}>Nenhum alerta de vencimento ou renovação no momento.</div>}
+    </div>
+    {items.length>limit&&<button onClick={()=>setExpanded(v=>!v)} style={{border:0,borderTop:'1px solid '+C.border,background:C.bg,color:C.muted,padding:'9px 18px',cursor:'pointer',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:6,flexShrink:0,width:'100%'}}>
+      {expanded?'↑ Ver menos':<><span style={{background:C.border,color:C.text,borderRadius:999,padding:'1px 7px',fontWeight:900,fontSize:11}}>+{overflow}</span> Ver todos ↓</>}
+    </button>}
   </div>
 }
 
@@ -358,32 +395,21 @@ export default function Dashboard({profile, unreadCount=0}){
     </div>
 
     {/* ── Mural + Alertas contratuais ───────────────────────── */}
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20,alignItems:'start'}}>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
       <MuralRecados profile={profile}/>
-      <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,overflow:'hidden'}}>
-        <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas contratuais</h2>
-        {st.ren.length?st.ren.slice(0,5).map(c=>{
-          const critico=c.renovacao.level==='critico'||c.renovacao.level==='vencido'
-          return <div key={c.alertaId||c.id} onClick={()=>setContratoModal(c)} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:critico?C.redBg:C.amberBg,cursor:'pointer',transition:'filter .12s'}} onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.96)'} onMouseLeave={e=>e.currentTarget.style.filter='none'}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-              <div><b style={{fontSize:13}}>{c.titulo}</b><div style={{fontSize:11,color:critico?C.red:C.amber,marginTop:3,fontWeight:800,display:'flex',gap:5,alignItems:'center'}}><AlertTriangle size={12}/>{c.renovacao.text}</div></div>
-              <ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>
-            </div>
-          </div>
-        }):<div style={{padding:24,textAlign:'center',color:C.muted,fontSize:13}}>Nenhum alerta de vencimento ou renovação no momento.</div>}
-      </div>
+      <AlertasContratuaisBlock items={st.ren} onItemClick={setContratoModal}/>
     </div>
 
     {/* ── Audiências + Pendentes ────────────────────────────── */}
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20,alignItems:'start'}}>
-      <ListBlock title="Audiências na semana"   icon={<CalendarDays size={16}/>}  items={st.audienciasSemana.slice(0,5)} empty="Nenhuma audiência nos próximos 7 dias."          kind="info"   onItemClick={setAudienciaModal}/>
-      <ListBlock title="Atividades pendentes"   icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,5)}        empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger" onItemClick={setAtividadeModal}/>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+      <ListBlock title="Audiências na semana"   icon={<CalendarDays size={16}/>}  items={st.audienciasSemana} empty="Nenhuma audiência nos próximos 7 dias."          kind="info"   onItemClick={setAudienciaModal}/>
+      <ListBlock title="Atividades pendentes"   icon={<AlertTriangle size={16}/>} items={st.pendentes}        empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger" onItemClick={setAtividadeModal}/>
     </div>
 
     {/* ── Futuras + Reuniões ────────────────────────────────── */}
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20,alignItems:'start'}}>
-      <ListBlock title="Atividades futuras"     icon={<Clock size={16}/>}         items={st.futuras.slice(0,5)}          empty="Nenhuma tarefa ou prazo futuro agendado."       kind="warning" onItemClick={setAtividadeModal}/>
-      <ListBlock title="Reuniões na semana"     icon={<CalendarCheck size={16}/>} items={st.reunioesSemana.slice(0,5)}   empty="Nenhuma reunião nos próximos 7 dias."           kind="success" onItemClick={setAtividadeModal}/>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+      <ListBlock title="Atividades futuras"     icon={<Clock size={16}/>}         items={st.futuras}          empty="Nenhuma tarefa ou prazo futuro agendado."       kind="warning" onItemClick={setAtividadeModal}/>
+      <ListBlock title="Reuniões na semana"     icon={<CalendarCheck size={16}/>} items={st.reunioesSemana}   empty="Nenhuma reunião nos próximos 7 dias."           kind="success" onItemClick={setAtividadeModal}/>
     </div>
 
     {/* ── Financeiro — largura total ────────────────────────── */}
