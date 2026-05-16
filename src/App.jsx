@@ -54,6 +54,7 @@ function buildNav(profile) {
 }
 
 function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mobile, unreadCount }) {
+  const [hovered, setHovered] = useState(null)
   const initials = profile?.nome?.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?'
   return (
     <>
@@ -78,7 +79,9 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
             const active = currentPath === path
             return (
               <button key={path} onClick={() => { onNav(path); onClose() }}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 1, textAlign: 'left', background: active ? C.navyL : (accent && !active ? 'rgba(6,78,59,0.16)' : 'transparent'), color: active ? C.gold : (accent ? '#86efac' : 'rgba(255,255,255,0.6)'), fontSize: 14, fontWeight: active ? 700 : 400, transition: 'all 0.12s' }}>
+                onMouseEnter={() => setHovered(path)}
+                onMouseLeave={() => setHovered(null)}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 1, textAlign: 'left', background: active ? C.navyL : hovered === path ? 'rgba(255,255,255,0.10)' : (accent ? 'rgba(6,78,59,0.16)' : 'transparent'), color: active ? C.gold : (accent ? '#86efac' : 'rgba(255,255,255,0.6)'), fontSize: 14, fontWeight: active ? 700 : 400, transition: 'background 0.15s' }}>
                 <Icon size={16} />{label}
                 {(path === '/dashboard') && unreadCount > 0 && <span title={`${unreadCount} item(ns) não lido(s)`} style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999, background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
                 {active && (path !== '/dashboard' || unreadCount === 0) && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
