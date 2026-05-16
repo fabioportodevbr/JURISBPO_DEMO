@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Bell, AlertTriangle, Mail, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff, Sun, Moon } from 'lucide-react'
-import ClippingJuridico from './ClippingJuridico.jsx'
 import MuralRecados from './MuralRecados.jsx'
 import { NotificacoesModal } from './Notificacoes.jsx'
 import { FinanceiroResumoDashboard } from './FinanceiroResumoDashboard.tsx'
@@ -11,7 +10,7 @@ import { motivoDesconsideracaoPush, registrarPushDesconsiderado } from '../lib/p
 import { C } from '../lib/theme'
 import { useTheme } from '../lib/ThemeContext'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
-const Card=({title,value,sub,color})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:18}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div style={{fontSize:30,fontWeight:900,color,marginTop:8}}>{value}</div><div style={{fontSize:13,color:C.muted}}>{sub}</div></div>
+const Card=({title,value,sub,color})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:'22px 24px',borderLeft:'4px solid '+color}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div style={{fontSize:42,fontWeight:900,color,marginTop:8,lineHeight:1}}>{value}</div><div style={{fontSize:13,color:C.muted,marginTop:6}}>{sub}</div></div>
 
 function todayISO(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString().slice(0,10)}
 function addDaysISO(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
@@ -49,7 +48,7 @@ function isImportantPush(p){return PUSH_IMPORTANTE.test(pushText(p))}
 
 function ListBlock({title,icon,items,empty,kind='default',onItemClick}){
   const bg=kind==='danger'?C.redBg:kind==='warning'?C.amberBg:kind==='info'?C.blueBg:kind==='success'?C.greenBg:C.white
-  return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
+  return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,overflow:'hidden'}}>
     <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}>{icon}{title}</h2>
     {items.length?items.map(t=><div key={t.id} onClick={onItemClick?()=>onItemClick(t):undefined} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:bg,cursor:onItemClick?'pointer':'default',transition:'filter .12s'}} onMouseEnter={onItemClick?e=>e.currentTarget.style.filter='brightness(0.96)':undefined} onMouseLeave={onItemClick?e=>e.currentTarget.style.filter='none':undefined}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
@@ -324,61 +323,73 @@ export default function Dashboard({profile, unreadCount=0}){
 
   const { theme, toggleTheme } = useTheme()
 
-  return <div style={{padding:24}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+  return <div style={{padding:'24px 28px',maxWidth:1400,margin:'0 auto'}}>
+
+    {/* ── Cabeçalho ─────────────────────────────────────────── */}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:28}}>
       <div>
-        <h1 style={{margin:0,fontSize:22,fontWeight:900,color:C.text}}>Painel Jurídico</h1>
-        <p style={{color:C.muted,marginTop:6}}>{saudacaoHorario()}, {profile.nome}</p>
+        <h1 style={{margin:0,fontSize:28,fontWeight:900,color:C.text,lineHeight:1.1}}>Painel Jurídico</h1>
+        <p style={{color:C.muted,marginTop:6,fontSize:15,margin:'6px 0 0'}}>{saudacaoHorario()}, {profile.nome}</p>
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center'}}>
         <button onClick={()=>setNotificacoesModal(true)} title="Notificações" style={{position:'relative',border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-          <Bell size={18} />
+          <Bell size={18}/>
           {unreadCount>0&&<span title={`${unreadCount} notificação(ões) não lida(s)`} style={{position:'absolute',top:-7,right:-7,minWidth:18,height:18,borderRadius:999,background:'#dc2626',color:'white',fontSize:10,fontWeight:900,display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 0 0 2px '+C.bg}}>{unreadCount>9?'9+':unreadCount}</span>}
         </button>
         <button onClick={toggleTheme} title="Alternar modo Claro / Escuro" style={{border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          {theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}
         </button>
       </div>
     </div>
 
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14,marginTop:22}}>
-      <Card title="Processos ativos" value={st.p} sub="em andamento" color={C.blue}/>
-      <Card title="Contratos ativos" value={st.c} sub="vigentes ou a vencer" color={C.green}/>
-      <Card title="Atividades pendentes" value={st.pendentes.length} sub="vencidas ou vencendo hoje" color={st.pendentes.length?C.red:C.green}/>
-      <Card title="Atividades futuras" value={st.futuras.length} sub="tarefas e prazos a partir de amanhã" color={C.amber}/>
-      <Card title="Audiências na semana" value={st.audienciasSemana.length} sub="próximos 7 dias" color={C.blue}/>
-      <Card title="Reuniões na semana" value={st.reunioesSemana.length} sub="próximos 7 dias" color={C.green}/>
-      <Card title="Notificações" value={unreadCount} sub="itens não lidos" color={unreadCount?C.red:C.green}/>
+    {/* ── 6 cards em 3 colunas ──────────────────────────────── */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:20}}>
+      <Card title="Processos ativos"      value={st.p}                   sub="em andamento"                          color={C.blue}/>
+      <Card title="Contratos ativos"      value={st.c}                   sub="vigentes ou a vencer"                  color={C.green}/>
+      <Card title="Notificações"          value={unreadCount}            sub="itens não lidos"                       color={unreadCount?C.red:C.green}/>
+      <Card title="Atividades pendentes"  value={st.pendentes.length}    sub="vencidas ou vencendo hoje"             color={st.pendentes.length?C.red:C.green}/>
+      <Card title="Audiências na semana"  value={st.audienciasSemana.length} sub="próximos 7 dias"                  color={C.blue}/>
+      <Card title="Reuniões na semana"    value={st.reunioesSemana.length}   sub="próximos 7 dias"                  color={C.green}/>
     </div>
 
-    <div style={{marginTop:22}}>
-      <MuralRecados profile={profile}/>
-    </div>
-    <div style={{marginTop:12}}>
+    {/* ── Push — largura total ──────────────────────────────── */}
+    <div style={{marginBottom:20}}>
       <PushDashboardHeader novos={st.pushNovos} importantes={st.pushImportantes} ultimo={st.pushUltimo} onClick={()=>setPushModal(true)}/>
     </div>
 
-    <ListBlock title="Audiências na semana" icon={<CalendarDays size={16}/>} items={st.audienciasSemana.slice(0,6)} empty="Nenhuma audiência nos próximos 7 dias." kind="info" onItemClick={setAudienciaModal}/>
-
-    <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,marginTop:22,overflow:'hidden'}}>
-      <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas de vencimento e renovação contratual</h2>
-      {st.ren.length?st.ren.map(c=>{
-        const critico=c.renovacao.level==='critico'||c.renovacao.level==='vencido'
-        return <div key={c.alertaId||c.id} onClick={()=>setContratoModal(c)} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:critico?C.redBg:C.amberBg,cursor:'pointer',transition:'filter .12s'}} onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.96)'} onMouseLeave={e=>e.currentTarget.style.filter='none'}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-          <div><b>{c.titulo}</b><div style={{fontSize:12,color:C.muted,marginTop:3}}>{c.numero?'Contrato nº '+c.numero+' · ':''}{c.contratante||'Contratante não informado'} × {c.contratada||'Contratada não informada'} · fim: {brDate(c.data_fim)}</div><div style={{fontSize:12,fontWeight:900,color:critico?C.red:C.amber,marginTop:4,display:'flex',gap:6,alignItems:'center'}}><AlertTriangle size={13}/>{c.renovacao.text}</div></div>
-          <ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>
-        </div>
+    {/* ── Mural + Alertas contratuais ───────────────────────── */}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20,alignItems:'start'}}>
+      <MuralRecados profile={profile}/>
+      <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,overflow:'hidden'}}>
+        <h2 style={{fontSize:15,padding:'16px 18px',margin:0,borderBottom:'1px solid '+C.border,display:'flex',alignItems:'center',gap:8}}><Bell size={16}/>Alertas contratuais</h2>
+        {st.ren.length?st.ren.slice(0,5).map(c=>{
+          const critico=c.renovacao.level==='critico'||c.renovacao.level==='vencido'
+          return <div key={c.alertaId||c.id} onClick={()=>setContratoModal(c)} style={{padding:'12px 18px',borderBottom:'1px solid '+C.border,background:critico?C.redBg:C.amberBg,cursor:'pointer',transition:'filter .12s'}} onMouseEnter={e=>e.currentTarget.style.filter='brightness(0.96)'} onMouseLeave={e=>e.currentTarget.style.filter='none'}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+              <div><b style={{fontSize:13}}>{c.titulo}</b><div style={{fontSize:11,color:critico?C.red:C.amber,marginTop:3,fontWeight:800,display:'flex',gap:5,alignItems:'center'}}><AlertTriangle size={12}/>{c.renovacao.text}</div></div>
+              <ExternalLink size={13} color={C.muted} style={{flexShrink:0}}/>
+            </div>
+          </div>
+        }):<div style={{padding:24,textAlign:'center',color:C.muted,fontSize:13}}>Nenhum alerta de vencimento ou renovação no momento.</div>}
       </div>
-      }):<div style={{padding:24,textAlign:'center',color:C.muted}}>Nenhum alerta de vencimento ou renovação no momento.</div>}
     </div>
 
-    <ListBlock title="Atividades pendentes" icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,6)} empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger" onItemClick={setAtividadeModal}/>
-    <ListBlock title="Atividades futuras" icon={<Clock size={16}/>} items={st.futuras.slice(0,6)} empty="Nenhuma tarefa ou prazo futuro agendado." kind="warning" onItemClick={setAtividadeModal}/>
-    <ListBlock title="Reuniões na semana" icon={<CalendarCheck size={16}/>} items={st.reunioesSemana.slice(0,6)} empty="Nenhuma reunião nos próximos 7 dias." kind="success" onItemClick={setAtividadeModal}/>
-    <FinanceiroResumoDashboard profile={profile}/>
-    <ClippingJuridico/>
+    {/* ── Audiências + Pendentes ────────────────────────────── */}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20,alignItems:'start'}}>
+      <ListBlock title="Audiências na semana"   icon={<CalendarDays size={16}/>}  items={st.audienciasSemana.slice(0,5)} empty="Nenhuma audiência nos próximos 7 dias."          kind="info"   onItemClick={setAudienciaModal}/>
+      <ListBlock title="Atividades pendentes"   icon={<AlertTriangle size={16}/>} items={st.pendentes.slice(0,5)}        empty="Nenhuma tarefa ou prazo vencido/vencendo hoje." kind="danger" onItemClick={setAtividadeModal}/>
+    </div>
 
+    {/* ── Futuras + Reuniões ────────────────────────────────── */}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20,alignItems:'start'}}>
+      <ListBlock title="Atividades futuras"     icon={<Clock size={16}/>}         items={st.futuras.slice(0,5)}          empty="Nenhuma tarefa ou prazo futuro agendado."       kind="warning" onItemClick={setAtividadeModal}/>
+      <ListBlock title="Reuniões na semana"     icon={<CalendarCheck size={16}/>} items={st.reunioesSemana.slice(0,5)}   empty="Nenhuma reunião nos próximos 7 dias."           kind="success" onItemClick={setAtividadeModal}/>
+    </div>
+
+    {/* ── Financeiro — largura total ────────────────────────── */}
+    <FinanceiroResumoDashboard profile={profile}/>
+
+    {/* ── Modais ───────────────────────────────────────────── */}
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso} onDismiss={desconsiderarPush}/>}
     {notificacoesModal&&<NotificacoesModal profile={profile} onClose={()=>setNotificacoesModal(false)}/>}
     {audienciaModal&&<AudienciaModal audiencia={audienciaModal} onClose={()=>setAudienciaModal(null)} onOpenProcess={abrirProcesso}/>}
