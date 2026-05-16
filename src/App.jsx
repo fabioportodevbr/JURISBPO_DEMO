@@ -58,7 +58,7 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
   return (
     <>
       {mobile && open && <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 98 }} />}
-      <aside style={{ position: 'fixed', top: 0, bottom: 0, width: 224, left: open ? 0 : -240, background: C.navy, display: 'flex', flexDirection: 'column', zIndex: 99, transition: 'left 0.22s ease' }}>
+      <aside style={{ position: 'fixed', top: 0, bottom: 0, width: 224, left: open ? 0 : -240, background: C.navy, display: 'flex', flexDirection: 'column', zIndex: 99, transition: 'left 0.22s ease', fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif" }}>
         {/* Logo */}
         <div style={{ padding: '22px 18px 16px', borderBottom: '1px solid ' + C.navyL }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
