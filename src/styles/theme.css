@@ -1,48 +1,48 @@
 :root {
-  --color-primary: #15632e;
-  --color-primary-dark: #0a2e14;
-  --color-primary-soft: #d1fae5;
-  --color-bg: #f5f7f5;
+  --color-primary: #4a7c5e;
+  --color-primary-dark: #0e4f47;
+  --color-primary-soft: #d1ece3;
+  --color-bg: #eef1ee;
   --color-card: #ffffff;
-  --color-sidebar: #0a2e14;
-  --color-sidebar-soft: #1a5e35;
-  --color-text: #111c14;
-  --color-muted: #4b6354;
-  --color-border: #ccd8ce;
-  --color-success: #166534;
+  --color-sidebar: #0e4f47;
+  --color-sidebar-soft: #1a6b62;
+  --color-text: #111c18;
+  --color-muted: #4d6b5a;
+  --color-border: #c8d4ca;
+  --color-success: #3a6b4d;
   --color-warning: #92400e;
   --color-danger: #dc2626;
 
   /* Variáveis globais do sistema de temas em JS (objeto C) */
-  --c-navy: #0a2e14;
-  --c-navyL: #1a5e35;
+  --c-navy: #0e4f47;
+  --c-navyL: #1a6b62;
   --c-white: #fff;
-  --c-text: #111c14;
-  --c-muted: #4b6354;
-  --c-border: #ccd8ce;
+  --c-text: #111c18;
+  --c-muted: #4d6b5a;
+  --c-border: #c8d4ca;
   --c-blue: #1d4ed8;
   --c-blueBg: #dbeafe;
-  --c-green: #166534;
-  --c-greenBg: #dcfce7;
+  --c-green: #4a7c5e;
+  --c-greenBg: #d9ede1;
   --c-amber: #92400e;
   --c-amberBg: #fef3c7;
   --c-red: #dc2626;
   --c-redBg: #fee2e2;
   --c-purple: #6d28d9;
   --c-purpleBg: #ede9fe;
-  --c-gray: #4b6354;
-  --c-grayBg: #f5f7f5;
-  --c-grayText: #4b6354;
-  --c-bg: #f5f7f5;
-  --c-soft: #e2ebe4;
-  --c-gold: #34d399;
-  --c-sidebarBg: #0a2e14;
+  --c-gray: #4d6b5a;
+  --c-grayBg: #eef1ee;
+  --c-grayText: #4d6b5a;
+  --c-bg: #eef1ee;
+  --c-soft: #e0e8e2;
+  --c-gold: #5eead4;
+  --c-sidebarBg: #0e4f47;
   --c-sidebarItem: rgba(255,255,255,0.06);
-  --c-sidebarActive: rgba(52,211,153,0.16);
-  --c-sidebarText: rgba(255,255,255,0.82);
-  --c-sidebarMuted: rgba(255,255,255,0.38);
-  --selection-bg: rgba(22,101,52,0.22);
-  --selection-text: #0a2e14;
+  --c-sidebarActive: rgba(94,234,212,0.18);
+  --c-sidebarText: rgba(255,255,255,0.85);
+  --c-sidebarMuted: rgba(255,255,255,0.40);
+  --selection-bg: rgba(74,124,94,0.24);
+  --selection-text: #0e4f47;
 }
 
 :root.dark {
