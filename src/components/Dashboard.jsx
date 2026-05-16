@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Bell, AlertTriangle, Mail, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff, Sun, Moon } from 'lucide-react'
@@ -235,6 +235,10 @@ function saudacaoHorario(){
   return 'Boa noite'
 }
 
+// Cache processos/contratos/atividades (pesados) — push sempre fresco
+let _dashboard_cache=null
+const DASHBOARD_CACHE_TTL=2*60*1000 // 2 min (dados mais dinâmicos)
+
 export default function Dashboard({profile, unreadCount=0}){
   const navigate=useNavigate()
   const[pushModal,setPushModal]=useState(false)
@@ -246,21 +250,31 @@ export default function Dashboard({profile, unreadCount=0}){
   const[createForm,setCreateForm]=useState({numero:'',titulo:'',tribunal:'',categoria:'trabalhista',parte_contraria:'',resumo_processo:''})
   const[savingProcess,setSavingProcess]=useState(false)
   const[st,setSt]=useState({p:0,c:0,pendentes:[],futuras:[],audienciasSemana:[],reunioesSemana:[],ren:[],pushNovos:0,pushImportantes:0,pushUltimo:null,pushItems:[]})
+  const firstLoad=useRef(true)
 
   useEffect(()=>{(async()=>{
     const eid=profile.escritorio_id
+    const isFirst=firstLoad.current
+    if(isFirst)firstLoad.current=false
     const hoje=todayISO()
     const amanha=addDaysISO(1)
     const fimSemana=addDaysISO(7)
     const desde24h=new Date(Date.now()-24*60*60*1000).toISOString()
     const agora=new Date()
     const atividadesQueryFactory=()=>{let query=supabase.from('atividades').select('*').eq('escritorio_id',eid).neq('status','concluida');if(profile.role!=='gerente'){query=query.or(`tipo.in.(audiencia,reuniao),and(tipo.in.(tarefa,prazo_processual),responsavel_id.eq.${profile.id})`)}return query}
-    const[p,c,a,{data:push}]=await Promise.all([
-      fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
-      fetchAllRows(()=>supabase.from('contratos').select('*').eq('escritorio_id',eid)),
-      fetchAllRows(atividadesQueryFactory),
-      supabase.from('andamentos_processuais_push').select('id,processo_id,cliente_id,numero_processo,tribunal,movimento,assunto_email,corpo_email_resumo,corpo_resumo,corpo_email_limpo,remetente,data_movimento,criado_em,status_associacao').eq('escritorio_id',eid).neq('status_associacao','ignorado').gte('criado_em',desde24h).order('criado_em',{ascending:false}).limit(100),
-    ])
+    // Cache: p/c/a são pesados; push é rápido e deve ser sempre fresco
+    let p,c,a
+    if(isFirst&&_dashboard_cache?.eid===eid&&Date.now()-_dashboard_cache.ts<DASHBOARD_CACHE_TTL){
+      p=_dashboard_cache.p;c=_dashboard_cache.c;a=_dashboard_cache.a
+    }else{
+      ;[p,c,a]=await Promise.all([
+        fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
+        fetchAllRows(()=>supabase.from('contratos').select('*').eq('escritorio_id',eid)),
+        fetchAllRows(atividadesQueryFactory),
+      ])
+      _dashboard_cache={eid,ts:Date.now(),p,c,a}
+    }
+    const{data:push}=await supabase.from('andamentos_processuais_push').select('id,processo_id,cliente_id,numero_processo,tribunal,movimento,assunto_email,corpo_email_resumo,corpo_resumo,corpo_email_limpo,remetente,data_movimento,criado_em,status_associacao').eq('escritorio_id',eid).neq('status_associacao','ignorado').gte('criado_em',desde24h).order('criado_em',{ascending:false}).limit(100)
     const atividades=(a||[]).filter(isOpen)
     const pendentes=atividades.filter(x=>isTaskOrDeadline(x)&&x.prazo&&x.prazo<=hoje).sort(compareByDate)
     const futuras=atividades.filter(x=>isTaskOrDeadline(x)&&x.prazo&&x.prazo>=amanha).sort(compareByDate)

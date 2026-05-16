@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Building2, Plus, Search, X, Save, Trash2 } from 'lucide-react'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 
@@ -107,6 +107,9 @@ function ParteCard({p,s,onOpen}){
 }
 
 /* ── Componente principal ── */
+let _partes_cache=null
+const PARTES_CACHE_TTL=5*60*1000
+
 export default function PartesCRM({profile}){
   const[partes,setPartes]=useState([])
   const[processos,setProcessos]=useState([])
@@ -119,10 +122,16 @@ export default function PartesCRM({profile}){
   const[saving,setSaving]=useState(false)
 
   const canEditPartes=can(profile,'processos.editar')
+  const firstLoad=useRef(true)
 
   const load=async()=>{
     const eid=profile.escritorio_id
     if(!eid){setLoading(false);return}
+    const isFirst=firstLoad.current
+    if(isFirst)firstLoad.current=false
+    if(isFirst&&_partes_cache?.eid===eid&&Date.now()-_partes_cache.ts<PARTES_CACHE_TTL){
+      setPartes(_partes_cache.partes);setProcessos(_partes_cache.processos);setLoading(false);return
+    }
     setLoading(true)
     setLoadError('')
     try{
@@ -132,6 +141,7 @@ export default function PartesCRM({profile}){
       ])
       setPartes(p||[])
       setProcessos(proc||[])
+      _partes_cache={eid,ts:Date.now(),partes:p||[],processos:proc||[]}
     }catch(error){
       console.error('[PartesCRM] Erro ao carregar dados:',error)
       setLoadError(error?.message||'Nao foi possivel carregar as partes.')
