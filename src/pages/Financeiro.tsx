@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -323,6 +323,9 @@ function withDeletedMarker(observacoes = "", evento: Record<string, unknown>) {
   return [limpas, `[REGISTRO_FINANCEIRO_EXCLUIDO:${encodeURIComponent(JSON.stringify(evento))}]`].filter(Boolean).join("\n");
 }
 
+let _financeiro_cache: any = null
+const FINANCEIRO_CACHE_TTL = 5 * 60 * 1000
+
 export default function Financeiro({ profile }: { profile: any }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -348,9 +351,20 @@ export default function Financeiro({ profile }: { profile: any }) {
   const canCreate = can(profile, "financeiro.criar");
   const canEdit = can(profile, "financeiro.editar");
   const canDelete = can(profile, "financeiro.excluir");
+  const firstLoad = useRef(true);
 
   async function load() {
     if (!profile?.escritorio_id) return;
+    const eid = profile.escritorio_id;
+    const isFirst = firstLoad.current;
+    if (isFirst) firstLoad.current = false;
+    if (isFirst && _financeiro_cache?.eid === eid && Date.now() - _financeiro_cache.ts < FINANCEIRO_CACHE_TTL) {
+      setRegistros(_financeiro_cache.registros);
+      setProcessos(_financeiro_cache.processos);
+      setHasValorRestituidoColumn(_financeiro_cache.hasValorRestituido);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError("");
     try {
@@ -358,19 +372,20 @@ export default function Financeiro({ profile }: { profile: any }) {
         fetchAllRows(() => supabase
           .from("financeiro_processos")
           .select("*")
-          .eq("escritorio_id", profile.escritorio_id)
+          .eq("escritorio_id", eid)
           .order("created_at", { ascending: false })),
         fetchAllRows(() => supabase
           .from("processos")
           .select("id, numero, titulo, parte_contraria, categoria, status, valor_acao, transito_julgado")
-          .eq("escritorio_id", profile.escritorio_id)
+          .eq("escritorio_id", eid)
           .order("updated_at", { ascending: false })),
       ]);
-
       const registrosFinanceiros = (financeiros || []) as RegistroFinanceiro[];
-      setHasValorRestituidoColumn(registrosFinanceiros.some((registro) => Object.prototype.hasOwnProperty.call(registro, "valor_restituido")));
+      const hasValorRestituido = registrosFinanceiros.some((r) => Object.prototype.hasOwnProperty.call(r, "valor_restituido"));
+      setHasValorRestituidoColumn(hasValorRestituido);
       setRegistros(registrosFinanceiros);
       setProcessos((processosData || []) as Processo[]);
+      _financeiro_cache = { eid, ts: Date.now(), registros: registrosFinanceiros, processos: (processosData || []) as Processo[], hasValorRestituido };
     } catch (error: any) {
       console.error("[Financeiro] Erro ao carregar dados:", error);
       setLoadError(error?.message || "Nao foi possivel carregar os dados financeiros.");

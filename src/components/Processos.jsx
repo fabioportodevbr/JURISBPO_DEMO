@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Plus, Search, Edit2, Trash2, X, FolderOpen, Clock, CheckSquare, DollarSign, Download, Upload, ChevronDown, ChevronRight, Eye } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
@@ -403,10 +403,15 @@ function parseCSV(text){
 
 function gerarNumeroControle(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let r='CTL-';for(let i=0;i<8;i++)r+=c[Math.floor(Math.random()*c.length)];return r}
 
+// Cache em memória — sobrevive à navegação entre módulos (TTL 5 min)
+let _processos_cache=null
+const PROCESSOS_CACHE_TTL=5*60*1000
+
 export default function Processos({profile}){
   const [items,setItems]=useState([]),[team,setTeam]=useState([]),[atividades,setAtividades]=useState([]),[financeiros,setFinanceiros]=useState([]),[partes,setPartes]=useState([]),[apensamentos,setApensamentos]=useState([])
   const [q,setQ]=useState(''),[showAll,setShowAll]=useState(true),[statusFilter,setStatusFilter]=useState('ativos'),[catFilter,setCatFilter]=useState('todas'),[advOpen,setAdvOpen]=useState(false),[adv,setAdv]=useState({transito:'todos',audiencia:'todos',deposito_ro:'todos',deposito_rr:'todos',deposito_embargos:'todos',agravo_instrumento:'todos',apolice:'todos',acordo:'todos',execucao:'todos',numero_controle:''}),[reclamadaFilter,setReclamadaFilter]=useState(''),[sortMode,setSortMode]=useState('data_ajuizamento_desc'),[modal,setModal]=useState(false),[tab,setTab]=useState('dados'),[form,setForm]=useState({}),[task,setTask]=useState({tipo:'tarefa',status:'a_fazer',titulo:'',descricao:'',prioridade:'media',responsavel_id:'',prazo:'',horario:'',local:'',audiencia_modalidade:'presencial',audiencia_tipo:'inicial'}),[fin,setFin]=useState(emptyFinance),[editingFinanceId,setEditingFinanceId]=useState(null),[paidModal,setPaidModal]=useState(null),[gastoModal,setGastoModal]=useState(false),[apFinanceiro,setApFinanceiro]=useState(null),[loading,setLoading]=useState(true),[importModal,setImportModal]=useState(false),[importRows,setImportRows]=useState([]),[importLog,setImportLog]=useState([]),[importing,setImporting]=useState(false),[recentOpen,setRecentOpen]=useState(true),[dupNumero,setDupNumero]=useState(null)
   const [pushPendente,setPushPendente]=useState(null)
+  const firstLoad=useRef(true)
   const accessKey='jurisbpo_recent_processos_v2'
   const canCreateProcesso=can(profile,'processos.criar')
   const canEditProcesso=can(profile,'processos.editar')
@@ -416,7 +421,33 @@ export default function Processos({profile}){
   const canCreateFinanceiro=can(profile,'financeiro.criar')
   const canEditFinanceiro=can(profile,'financeiro.editar')
   const canDeleteFinanceiro=can(profile,'financeiro.excluir')
-  const load=async()=>{const eid=profile.escritorio_id;const[p,{data:l},a,f,{data:pc},aps]=await Promise.all([fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid).order('updated_at',{ascending:false})),supabase.from('usuarios_escritorios').select('usuario_id,papel,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),fetchAllRows(()=>supabase.from('atividades').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false})),fetchAllRows(()=>supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false})),supabase.from('partes_crm').select('*').eq('escritorio_id',eid).eq('status','ativo').order('nome'),fetchAllRows(()=>supabase.from('processo_apensamentos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false}))]);setItems(p||[]);setTeam((l||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id})));setAtividades(a||[]);setFinanceiros(f||[]);setPartes(pc||[]);setApensamentos(aps||[]);setLoading(false)}
+  const load=async()=>{
+    const eid=profile.escritorio_id
+    // Cache: só usa no primeiro mount (não após saves/deletes)
+    const isFirst=firstLoad.current
+    if(isFirst)firstLoad.current=false
+    if(isFirst&&_processos_cache?.eid===eid&&Date.now()-_processos_cache.ts<PROCESSOS_CACHE_TTL){
+      setItems(_processos_cache.items);setTeam(_processos_cache.team);setAtividades(_processos_cache.atividades)
+      setFinanceiros(_processos_cache.financeiros);setPartes(_processos_cache.partes);setApensamentos(_processos_cache.apensamentos)
+      setLoading(false);return
+    }
+    // Fase 1: processos + team + partes → lista renderiza aqui
+    const[p,{data:l},{data:pc}]=await Promise.all([
+      fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid).order('updated_at',{ascending:false})),
+      supabase.from('usuarios_escritorios').select('usuario_id,papel,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),
+      supabase.from('partes_crm').select('*').eq('escritorio_id',eid).eq('status','ativo').order('nome')
+    ])
+    const teamMapped=(l||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id}))
+    setItems(p||[]);setTeam(teamMapped);setPartes(pc||[]);setLoading(false)
+    // Fase 2: atividades + financeiros + apensamentos (background, necessários para filtros avançados e modal)
+    const[a,f,aps]=await Promise.all([
+      fetchAllRows(()=>supabase.from('atividades').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false})),
+      fetchAllRows(()=>supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false})),
+      fetchAllRows(()=>supabase.from('processo_apensamentos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false}))
+    ])
+    setAtividades(a||[]);setFinanceiros(f||[]);setApensamentos(aps||[])
+    _processos_cache={eid,ts:Date.now(),items:p||[],team:teamMapped,atividades:a||[],financeiros:f||[],partes:pc||[],apensamentos:aps||[]}
+  }
   useEffect(()=>{load()},[profile.escritorio_id])
   const active=items.filter(p=>p.status!=='encerrado'), closed=items.filter(p=>p.status==='encerrado')
   const latestAccessed=useMemo(()=>{let ids=[];try{ids=JSON.parse(localStorage.getItem(accessKey)||'[]')}catch{};return ids.map(id=>items.find(p=>p.id===id)).filter(Boolean).slice(0,5)},[items])

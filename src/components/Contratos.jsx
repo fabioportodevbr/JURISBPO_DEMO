@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, can } from '../lib/supabase.js'
 import { Plus, Trash2, X, Bell, AlertTriangle, Upload, Eye, BarChart3, Printer } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
@@ -119,6 +119,9 @@ function htmlRelatorioContratos(rel){
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório de Contratos</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111827;margin:0;padding:32px;background:#fff;font-size:12px}.hdr{background:#064e3b;color:white;padding:22px 26px;margin:-32px -32px 24px;display:flex;justify-content:space-between;gap:16px;align-items:flex-end}.hdr h1{margin:0;font-size:22px}.hdr p{margin:5px 0 0;color:#d1fae5}.btn{background:#064e3b;color:white;border:0;border-radius:8px;padding:10px 14px;font-weight:800;margin:0 0 18px;cursor:pointer}.note{border:1px solid #f59e0b;background:#fffbeb;color:#92400e;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-weight:700}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}.metric{border:1px solid #e5e7eb;border-radius:8px;padding:9px 10px}.metric span{display:block;color:#64748b;font-size:10px;text-transform:uppercase;font-weight:800}.metric b{display:block;font-size:15px;margin-top:4px}h2{font-size:15px;margin:18px 0 8px;color:#064e3b}table{width:100%;border-collapse:collapse;margin-bottom:14px}th{background:#f1f5f9;color:#334155;text-align:left;font-size:10px;text-transform:uppercase}td,th{border:1px solid #e5e7eb;padding:7px;vertical-align:top}.small{font-size:10px;color:#64748b}@media print{.btn{display:none}body{padding:22px}.hdr{margin:-22px -22px 18px}.grid{grid-template-columns:repeat(3,1fr)}table{page-break-inside:auto}tr{page-break-inside:avoid;page-break-after:auto}}</style></head><body><div class="hdr"><div><h1>Relatório de Contratos</h1><p>JurisBPO — Gestão Jurídica</p></div><div>${htmlEscape(new Date().toLocaleString('pt-BR'))}</div></div><button class="btn" onclick="window.print()">Imprimir / salvar PDF</button><div class="note">Apólices registradas em contratos servem apenas para controle de garantia contratual e não somam nos módulos Financeiro, Relatórios ou Dashboard.</div><div class="grid">${metricasHtml}</div><h2>Resumo por categoria</h2><table><thead><tr><th>Categoria</th><th>Quantidade</th><th>Valor dos contratos</th><th>Com apólice</th></tr></thead><tbody>${categoriaHtml}</tbody></table><h2>Resumo por status</h2><table><thead><tr><th>Status</th><th>Quantidade</th><th>Valor dos contratos</th></tr></thead><tbody>${statusHtml}</tbody></table><h2>Contratos considerados</h2><table><thead><tr><th>Nº</th><th>Título</th><th>Categoria</th><th>Contratante</th><th>Contratada</th><th>Status</th><th>Valor</th><th>Vigência</th><th>Seguro</th><th>Apólice</th><th>Valor assegurado</th><th>Prêmio</th><th>Aditivos</th><th>Renovação</th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="14">Nenhum contrato encontrado.</td></tr>'}</tbody></table><p class="small">Valores de apólices neste relatório são informativos e não representam custos financeiros do sistema.</p></body></html>`
 }
 
+let _contratos_cache=null
+const CONTRATOS_CACHE_TTL=5*60*1000
+
 export default function Contratos({profile}){
   const [items,setItems]=useState([]),[partes,setPartes]=useState([]),[novaParte,setNovaParte]=useState(''),[modal,setModal]=useState(false),[form,setForm]=useState({}),[tab,setTab]=useState('dados'),[categoria,setCategoria]=useState('cliente'),[q,setQ]=useState(''),[advOpen,setAdvOpen]=useState(false),[adv,setAdv]=useState({vigente:'todos',status:'todos',renovacao:'todos',valor:'todos'}),[ordem,setOrdem]=useState('fim_asc'),[aditivos,setAditivos]=useState([]),[aditivoDraft,setAditivoDraft]=useState({numero:'',data_inicio:'',data_fim:'',documento:'',observacao:''}),[flagsContrato,setFlagsContrato]=useState({renovacao_automatica:false,prazo_indeterminado:false}),[importModal,setImportModal]=useState(false),[importRows,setImportRows]=useState([]),[importLog,setImportLog]=useState([]),[importing,setImporting]=useState(false)
   const [aditivoFileKey,setAditivoFileKey]=useState(0)
@@ -130,7 +133,17 @@ export default function Contratos({profile}){
   const canCreate = can(profile, 'contratos.criar')
   const canEdit = can(profile, 'contratos.editar')
   const canDelete = can(profile, 'contratos.excluir')
-  const load=async()=>{const{data,error}=await supabase.from('contratos').select('*').eq('escritorio_id',profile.escritorio_id).order('created_at',{ascending:false});if(error)alert(error.message);setItems(data||[])}
+  const firstLoad=useRef(true)
+  const load=async()=>{
+    const eid=profile.escritorio_id
+    const isFirst=firstLoad.current
+    if(isFirst)firstLoad.current=false
+    if(isFirst&&_contratos_cache?.eid===eid&&Date.now()-_contratos_cache.ts<CONTRATOS_CACHE_TTL){setItems(_contratos_cache.items);return}
+    const{data,error}=await supabase.from('contratos').select('*').eq('escritorio_id',eid).order('created_at',{ascending:false})
+    if(error)alert(error.message)
+    setItems(data||[])
+    _contratos_cache={eid,ts:Date.now(),items:data||[]}
+  }
   const loadPartes=async()=>{const{data,error}=await supabase.from('partes_crm').select('id,nome,nome_fantasia,tipo,status').eq('escritorio_id',profile.escritorio_id).eq('status','ativo').order('nome');if(error)console.error(error);setPartes(data||[])}
   useEffect(()=>{load();loadPartes()},[profile.escritorio_id])
   useEffect(()=>{if(!items.length)return;const params=new URLSearchParams(window.location.search);const id=params.get('contrato_id');if(!id)return;const alvo=items.find(c=>c.id===id);if(alvo){open(alvo);window.history.replaceState(null,'','/contratos')}},[items])

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAllRows, supabase } from '../lib/supabase.js'
 import { BarChart3, FileText, DollarSign, Scale, Download, Printer, SlidersHorizontal, ArrowLeft, CalendarDays, CheckSquare } from 'lucide-react'
 import { APP_CONFIG } from '../config/appConfig.js'
@@ -8,6 +8,9 @@ import { pickDefaultEmpresaGrupoId, scopeDataByEmpresaGrupo } from '../lib/empre
 import EmpresaGrupoToggleBar from './EmpresaGrupoToggleBar.jsx'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const TIPOS_ATIVIDADE={tarefa:'Tarefa',prazo_processual:'Prazo processual',audiencia:'Audiência',reuniao:'Reunião'}
+
+let _relatorios_cache=null
+const RELATORIOS_CACHE_TTL=5*60*1000
 const STATUS_ATIVIDADE={a_fazer:'A fazer',em_andamento:'Em andamento',concluida:'Concluída',cancelada:'Cancelada'}
 const CATEGORIAS={trabalhista:'Trabalhista',civel:'Cível',administrativo:'Administrativo',tributario:'Tributário',criminal:'Criminal'}
 const FASES={conhecimento:'Conhecimento',recurso:'Recurso',execucao_provisoria:'Execução Provisória',execucao_sentenca:'Execução de sentença',arquivo_definitivo:'Arquivo definitivo'}
@@ -104,25 +107,34 @@ export default function Relatorios({profile}){
   const [parteFilter,setParteFilter]=useState('')
   const [empresasGrupo,setEmpresasGrupo]=useState([])
   const [empresaVista,setEmpresaVista]=useState('')
+  const firstLoad=useRef(true)
 
-  useEffect(()=>{(async()=>{
+  useEffect(()=>{
     const eid=profile.escritorio_id
-    const [processos, financeiros, atividades, contratos, equipeRes]=await Promise.all([
-      fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
-      fetchAllRows(()=>supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid)),
-      fetchAllRows(()=>supabase.from('atividades').select('*').eq('escritorio_id',eid)),
-      fetchAllRows(()=>supabase.from('contratos').select('*').eq('escritorio_id',eid)),
-      supabase.from('usuarios_escritorios').select('usuario_id,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),
-    ])
-    setData({
-      processos:processos||[],
-      financeiros:financeiros||[],
-      atividades:atividades||[],
-      contratos:contratos||[],
-      equipe:(equipeRes.data||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id,email:x.profiles?.email||''}))
-    })
-    setLoading(false)
-  })()},[profile.escritorio_id])
+    const isFirst=firstLoad.current
+    if(isFirst)firstLoad.current=false
+    if(isFirst&&_relatorios_cache?.eid===eid&&Date.now()-_relatorios_cache.ts<RELATORIOS_CACHE_TTL){
+      setData(_relatorios_cache.data);setLoading(false);return
+    }
+    ;(async()=>{
+      const [processos, financeiros, atividades, contratos, equipeRes]=await Promise.all([
+        fetchAllRows(()=>supabase.from('processos').select('*').eq('escritorio_id',eid)),
+        fetchAllRows(()=>supabase.from('financeiro_processos').select('*').eq('escritorio_id',eid)),
+        fetchAllRows(()=>supabase.from('atividades').select('*').eq('escritorio_id',eid)),
+        fetchAllRows(()=>supabase.from('contratos').select('*').eq('escritorio_id',eid)),
+        supabase.from('usuarios_escritorios').select('usuario_id,profiles(id,nome,email)').eq('escritorio_id',eid).eq('ativo',true),
+      ])
+      const d={
+        processos:processos||[],
+        financeiros:financeiros||[],
+        atividades:atividades||[],
+        contratos:contratos||[],
+        equipe:(equipeRes.data||[]).map(x=>({id:x.usuario_id,nome:x.profiles?.nome||x.profiles?.email||x.usuario_id,email:x.profiles?.email||''}))
+      }
+      setData(d);setLoading(false)
+      _relatorios_cache={eid,ts:Date.now(),data:d}
+    })()
+  },[profile.escritorio_id])
 
   useEffect(()=>{(async()=>{
     const { data }=await supabase.from('partes_crm').select('id,nome,nome_fantasia').eq('escritorio_id',profile.escritorio_id).eq('tipo','empresa_grupo').eq('status','ativo').order('nome')
