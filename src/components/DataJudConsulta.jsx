@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { Scale, Search, RefreshCw, AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Info, X } from 'lucide-react'
+import { Scale, Search, RefreshCw, AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Info, X, RotateCcw } from 'lucide-react'
 import { C } from '../lib/theme'
 
 /* ── Helpers ── */
@@ -215,6 +215,16 @@ export default function DataJudConsulta({ profile, processos = [] }) {
     }
   }
 
+  const novaConsulta = () => {
+    setSelectedId('')
+    setParteSearch('')
+    setManualNumero('')
+    setManualTribunal('')
+    setResultado(null)
+    setErro('')
+    setExpandidos({})
+  }
+
   const toggleExpandido = (idx) =>
     setExpandidos(prev => ({ ...prev, [idx]: !prev[idx] }))
 
@@ -236,7 +246,45 @@ export default function DataJudConsulta({ profile, processos = [] }) {
         </span>
       </div>
 
+      {/* ── Barra de resultado ativo (substitui formulário após consulta) ── */}
+      {resultado && !loading && (
+        <div style={{ padding: '10px 18px', borderBottom: '1px solid ' + C.border, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12, color: C.muted, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Search size={13} />
+            {selectedId && procSelecionado ? (
+              <>
+                <span style={{ fontFamily: 'monospace', color: C.text, fontWeight: 700 }}>{procSelecionado.numero}</span>
+                <span>{procSelecionado.titulo || procSelecionado.parte_contraria || '—'}</span>
+                {resultado.index && (
+                  <span style={{ fontSize: 10, fontWeight: 900, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 8 }}>
+                    {resultado.index.replace('api_publica_', '').toUpperCase()}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <span style={{ fontFamily: 'monospace', color: C.text, fontWeight: 700 }}>{manualNumero}</span>
+                {resultado.index && (
+                  <span style={{ fontSize: 10, fontWeight: 900, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 8 }}>
+                    {resultado.index.replace('api_publica_', '').toUpperCase()}
+                  </span>
+                )}
+              </>
+            )}
+            <span style={{ color: C.green, fontWeight: 700 }}>{resultado.total} resultado(s)</span>
+          </div>
+          <button
+            onClick={novaConsulta}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1px solid ' + C.border, borderRadius: 8, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}
+          >
+            <RotateCcw size={13} />
+            Nova consulta
+          </button>
+        </div>
+      )}
+
       {/* ── Formulário ── */}
+      {!resultado && (
       <div style={{ padding: '14px 18px', borderBottom: '1px solid ' + C.border }}>
 
         {/* ── Busca de processo cadastrado ── */}
@@ -406,6 +454,7 @@ export default function DataJudConsulta({ profile, processos = [] }) {
           {loading ? 'Consultando DataJud…' : 'Consultar movimentações'}
         </button>
       </div>
+      )}
 
       {/* ── Resultados ── */}
       <div style={{ padding: '14px 18px' }}>
