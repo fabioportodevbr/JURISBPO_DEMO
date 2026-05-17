@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import { C } from '../lib/theme'
+import { Prv } from '../lib/PrivacyContext'
 import { motivoDesconsideracaoPush, pushIgnoradoDentroDoPrazo, pushIgnoradoParaArquivo, registrarPushDesconsiderado } from '../lib/pushArquivo.js'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:10,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const DEFAULT_PUSH_EMAIL='juridicocallbrbpo@gmail.com'
@@ -401,8 +402,8 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
       return <article key={a.id} style={{border:'1px solid '+(ignored?C.redBg:C.border),borderRadius:14,padding:12,background:ignored?C.redBg:C.grayBg,opacity:ignored?.78:1}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'flex-start',flexWrap:'wrap'}}>
           <div style={{minWidth:0}}>
-            <div style={{display:'flex',gap:7,alignItems:'center',flexWrap:'wrap'}}><b style={{fontSize:14}}>{a.movimento||'Andamento recebido'}</b><span style={{fontSize:11,fontWeight:900,borderRadius:999,padding:'3px 8px',background:st.bg,color:st.color,display:'inline-flex',gap:4,alignItems:'center'}}>{st.icon} {st.label}</span></div>
-            <div style={{fontSize:12,color:C.muted,marginTop:4}}>{a.numero_processo||'Processo não identificado'}{a.tribunal?` · ${a.tribunal}`:''} · movimento em {dateBR(a.data_movimento)} · recebido em {datetimeBR(a.criado_em)}</div>
+            <div style={{display:'flex',gap:7,alignItems:'center',flexWrap:'wrap'}}><b className="prv" style={{fontSize:14}}>{a.movimento||'Andamento recebido'}</b><span style={{fontSize:11,fontWeight:900,borderRadius:999,padding:'3px 8px',background:st.bg,color:st.color,display:'inline-flex',gap:4,alignItems:'center'}}>{st.icon} {st.label}</span></div>
+            <div style={{fontSize:12,color:C.muted,marginTop:4}}><span className="prv">{a.numero_processo||'Processo não identificado'}{a.tribunal?` · ${a.tribunal}`:''}</span> · movimento em {dateBR(a.data_movimento)} · recebido em {datetimeBR(a.criado_em)}</div>
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {temDetalhe&&<button type="button" onClick={()=>toggleBody(a.id)} style={btnStyle()}><Eye size={13}/> {expanded?'Ocultar e-mail':temCorpo?'Ver corpo do e-mail':'Ver detalhes'}</button>}
@@ -412,7 +413,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
           {(a.assunto_email||a.remetente)&&<div style={{fontSize:12,color:C.muted,marginBottom:8}}>E-mail: {a.assunto_email||'Sem assunto'}{a.remetente?` · ${a.remetente}`:''}</div>}
           {temCorpo&&<>
             <div style={{fontSize:12,fontWeight:900,color:C.text,marginBottom:6}}>Corpo do e-mail recebido</div>
-            <pre style={{fontFamily:'inherit',fontSize:13,lineHeight:1.45,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word',margin:0,maxHeight:260,overflow:'auto'}}>{corpoLimpo}</pre>
+            <pre className="prv" style={{fontFamily:'inherit',fontSize:13,lineHeight:1.45,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word',margin:0,maxHeight:260,overflow:'auto'}}>{corpoLimpo}</pre>
           </>}
           <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end',marginTop:12}}>
             {a.url_origem&&<a href={a.url_origem} target="_blank" rel="noreferrer" style={{...btnStyle(),textDecoration:'none'}}><ExternalLink size={13}/> Abrir origem</a>}

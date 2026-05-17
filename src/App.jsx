@@ -295,7 +295,7 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
             onMouseEnter={e => e.currentTarget.style.background = RHOVER}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
-            <AvatarUsuario profile={profile} size={30} fontSize={11} />
+            <span className="prv" style={{display:'inline-flex'}}><AvatarUsuario profile={profile} size={30} fontSize={11} /></span>
             {!mobile && (
               <span style={{ fontSize: 13, fontWeight: 700, color: RTEXT, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <Prv>{profile?.nome?.split(' ')[0]}</Prv>

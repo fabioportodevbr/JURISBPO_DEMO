@@ -9,7 +9,7 @@ import { motivoDesconsideracaoPush, registrarPushDesconsiderado } from '../lib/p
 import { C } from '../lib/theme'
 import { Prv } from '../lib/PrivacyContext'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
-const Card=({title,value,sub,color})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:'22px 24px'}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div style={{fontSize:42,fontWeight:900,color,marginTop:8,lineHeight:1}}>{value}</div><div style={{fontSize:13,color:C.muted,marginTop:6}}>{sub}</div></div>
+const Card=({title,value,sub,color,prv=false})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:'22px 24px'}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div className={prv?'prv':undefined} style={{fontSize:42,fontWeight:900,color,marginTop:8,lineHeight:1}}>{value}</div><div style={{fontSize:13,color:C.muted,marginTop:6}}>{sub}</div></div>
 
 function todayISO(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString().slice(0,10)}
 function addDaysISO(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
@@ -366,12 +366,12 @@ export default function Dashboard({profile, unreadCount=0}){
 
     {/* ── 6 cards em 3 colunas ──────────────────────────────── */}
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:20}}>
-      <Card title="Processos ativos"      value={st.p}                   sub="em andamento"                          color={C.blue}/>
-      <Card title="Contratos ativos"      value={st.c}                   sub="vigentes ou a vencer"                  color={C.green}/>
-      <Card title="Notificações"          value={unreadCount}            sub="itens não lidos"                       color={unreadCount?C.red:C.green}/>
-      <Card title="Atividades pendentes"  value={st.pendentes.length}    sub="vencidas ou vencendo hoje"             color={st.pendentes.length?C.red:C.green}/>
-      <Card title="Audiências na semana"  value={st.audienciasSemana.length} sub="próximos 7 dias"                  color={C.blue}/>
-      <Card title="Reuniões na semana"    value={st.reunioesSemana.length}   sub="próximos 7 dias"                  color={C.green}/>
+      <Card title="Processos ativos"      value={st.p}                   sub="em andamento"                          color={C.blue}  prv/>
+      <Card title="Contratos ativos"      value={st.c}                   sub="vigentes ou a vencer"                  color={C.green} prv/>
+      <Card title="Notificações"          value={unreadCount}            sub="itens não lidos"                       color={unreadCount?C.red:C.green} prv/>
+      <Card title="Atividades pendentes"  value={st.pendentes.length}    sub="vencidas ou vencendo hoje"             color={st.pendentes.length?C.red:C.green} prv/>
+      <Card title="Audiências na semana"  value={st.audienciasSemana.length} sub="próximos 7 dias"                  color={C.blue}  prv/>
+      <Card title="Reuniões na semana"    value={st.reunioesSemana.length}   sub="próximos 7 dias"                  color={C.green} prv/>
     </div>
 
     {/* ── Push — largura total ──────────────────────────────── */}

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Scale, Search, RefreshCw, AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Info, X, RotateCcw, FolderOpen } from 'lucide-react'
 import { C } from '../lib/theme'
+import { Prv } from '../lib/PrivacyContext'
 
 /* ── Helpers ── */
 function parseData(s) {
@@ -118,12 +119,12 @@ function MovimentoRow({ mov }) {
               {badge.label}
             </span>
           )}
-          <span style={{ fontSize: 13, fontWeight: badge ? 700 : 400, color: C.text }}>
+          <span className="prv" style={{ fontSize: 13, fontWeight: badge ? 700 : 400, color: C.text }}>
             {mov.nome || `Código ${mov.codigo}`}
           </span>
         </div>
         {mov.complemento && (
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2, fontStyle: 'italic' }}>
+          <div className="prv" style={{ fontSize: 12, color: C.muted, marginTop: 2, fontStyle: 'italic' }}>
             {mov.complemento}
           </div>
         )}
@@ -273,8 +274,8 @@ export default function DataJudConsulta({ profile, processos = [], onOpenProcess
             <Search size={13} />
             {selectedId && procSelecionado ? (
               <>
-                <span style={{ fontFamily: 'monospace', color: C.text, fontWeight: 700 }}>{procSelecionado.numero}</span>
-                <span>{procSelecionado.titulo || procSelecionado.parte_contraria || '—'}</span>
+                <span className="prv" style={{ fontFamily: 'monospace', color: C.text, fontWeight: 700 }}>{procSelecionado.numero}</span>
+                <span className="prv">{procSelecionado.titulo || procSelecionado.parte_contraria || '—'}</span>
                 {resultado.index && (
                   <span style={{ fontSize: 10, fontWeight: 900, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 8 }}>
                     {resultado.index.replace('api_publica_', '').toUpperCase()}
@@ -283,7 +284,7 @@ export default function DataJudConsulta({ profile, processos = [], onOpenProcess
               </>
             ) : (
               <>
-                <span style={{ fontFamily: 'monospace', color: C.text, fontWeight: 700 }}>{manualNumero}</span>
+                <span className="prv" style={{ fontFamily: 'monospace', color: C.text, fontWeight: 700 }}>{manualNumero}</span>
                 {resultado.index && (
                   <span style={{ fontSize: 10, fontWeight: 900, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 8 }}>
                     {resultado.index.replace('api_publica_', '').toUpperCase()}
@@ -364,16 +365,16 @@ export default function DataJudConsulta({ profile, processos = [], onOpenProcess
                         onMouseLeave={e => e.currentTarget.style.background = 'none'}
                       >
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 2 }}>
-                          <span style={{ fontFamily: 'monospace', fontSize: 12, color: C.muted }}>{p.numero || 'sem número'}</span>
+                          <span className="prv" style={{ fontFamily: 'monospace', fontSize: 12, color: C.muted }}>{p.numero || 'sem número'}</span>
                           {auto && (
                             <span style={{ fontSize: 10, fontWeight: 900, background: '#dbeafe', color: '#1e40af', padding: '1px 6px', borderRadius: 8 }}>
                               {auto}
                             </span>
                           )}
                         </div>
-                        <b style={{ fontSize: 13, color: C.text }}>{p.titulo || '(sem título)'}</b>
+                        <b className="prv" style={{ fontSize: 13, color: C.text }}>{p.titulo || '(sem título)'}</b>
                         {reclamadas.length > 0 && (
-                          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                          <div className="prv" style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
                             Parte: {reclamadas.slice(0, 2).join(' · ')}{reclamadas.length > 2 ? ` +${reclamadas.length - 2}` : ''}
                           </div>
                         )}
@@ -439,8 +440,8 @@ export default function DataJudConsulta({ profile, processos = [], onOpenProcess
         {/* Info do processo selecionado */}
         {selectedId && procSelecionado && (
           <div style={{ background: C.grayBg, border: '1px solid ' + C.border, borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12 }}>
-            <span style={{ fontWeight: 700, color: C.text }}>{procSelecionado.numero}</span>
-            <span style={{ color: C.muted, marginLeft: 8 }}>{procSelecionado.titulo || procSelecionado.parte_contraria}</span>
+            <span className="prv" style={{ fontWeight: 700, color: C.text }}>{procSelecionado.numero}</span>
+            <span className="prv" style={{ color: C.muted, marginLeft: 8 }}>{procSelecionado.titulo || procSelecionado.parte_contraria}</span>
             <span style={{ color: C.muted, marginLeft: 8 }}>· {procSelecionado.tribunal || 'Tribunal não informado'}</span>
             {(() => {
               const num = String(procSelecionado.numero || '').replace(/\D/g, '')
@@ -545,7 +546,7 @@ export default function DataJudConsulta({ profile, processos = [], onOpenProcess
                         </button>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-                            <b style={{ fontSize: 13, color: C.text, fontFamily: 'monospace' }}>
+                            <b className="prv" style={{ fontSize: 13, color: C.text, fontFamily: 'monospace' }}>
                               {String(proc.numeroProcesso || '').replace(/(\d{7})(\d{2})(\d{4})(\d{1})(\d{2})(\d{4})/, '$1-$2.$3.$4.$5.$6')}
                             </b>
                             {proc.tribunal && (
@@ -567,7 +568,7 @@ export default function DataJudConsulta({ profile, processos = [], onOpenProcess
                               </span>
                             )}
                           </div>
-                          <div style={{ display: 'flex', gap: 14, fontSize: 12, color: C.muted, flexWrap: 'wrap' }}>
+                          <div className="prv" style={{ display: 'flex', gap: 14, fontSize: 12, color: C.muted, flexWrap: 'wrap' }}>
                             {proc.classe        && <span><b>Classe:</b> {proc.classe}</span>}
                             {proc.orgaoJulgador && <span><b>Órgão:</b> {proc.orgaoJulgador}</span>}
                             {dataAjuiz !== '—'  && <span><b>Ajuizamento:</b> {dataAjuiz}</span>}
