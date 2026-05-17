@@ -107,6 +107,25 @@ button, input, select, textarea {
   font-family: inherit;
 }
 
+/* ── Modo Privacidade ─────────────────────────────────────────────────────── */
+/*
+ * Qualquer elemento com class="prv" (ou que contenha a classe Prv) fica
+ * borrado e não-selecionável quando html tem a classe privacy-mode.
+ * O efeito é idêntico ao "modo privacidade" de apps bancários:
+ * oculta nomes, números, valores — proteção contra shoulder-surfing.
+ */
+html.privacy-mode .prv {
+  filter: blur(7px);
+  user-select: none;
+  pointer-events: none;
+  transition: filter 0.2s ease;
+}
+
+/* Ícone de status do botão de alternância */
+html.privacy-mode .privacy-toggle-icon {
+  color: var(--c-red);
+}
+
 :root.dark button,
 :root.dark input,
 :root.dark select,

@@ -11,6 +11,7 @@ import Auth from './components/Auth.jsx'
 import { APP_CONFIG } from './config/appConfig.js'
 import AvatarUsuario from './components/common/AvatarUsuario.jsx'
 import { ThemeProvider } from './lib/ThemeContext.jsx'
+import { PrivacyProvider, Prv } from './lib/PrivacyContext.jsx'
 
 // ── Importa as páginas ────────────────────────────────────────────────────
 // (cada uma em seu próprio arquivo para facilitar manutenção)
@@ -96,7 +97,7 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <AvatarUsuario profile={profile} size={34} fontSize={13} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.nome}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Prv>{profile?.nome}</Prv></div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{ROLES[profile?.role]?.label}</div>
             </div>
           </div>
@@ -281,9 +282,11 @@ function AppRouter() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppRouter />
-      </AuthProvider>
+      <PrivacyProvider>
+        <AuthProvider>
+          <AppRouter />
+        </AuthProvider>
+      </PrivacyProvider>
     </ThemeProvider>
   )
 }

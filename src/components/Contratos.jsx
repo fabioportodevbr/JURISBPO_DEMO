@@ -69,11 +69,11 @@ function Card({c,onOpen,archived=false}){
   return <button onClick={()=>onOpen(c)} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} style={{width:'100%',textAlign:'left',border:'1px solid '+(hov?C.muted:C.border),borderRadius:12,padding:'14px 16px',cursor:'pointer',background:hov?hovBg:baseBg,boxShadow:hov?'0 2px 10px rgba(0,0,0,0.07)':'none',transition:'all .12s',display:'grid',gap:9,opacity:archived?0.82:1}}>
     <div style={{fontSize:11,color:C.muted,fontWeight:800,textTransform:'uppercase',letterSpacing:'.04em'}}>{label(CATEGORIAS,contratoCategoria(c))}{c.numero?' · Nº '+c.numero:''}</div>
     <div>
-      <div style={{fontSize:14,fontWeight:700,color:C.text,lineHeight:1.3}}>{c.contratante||'—'}</div>
-      <div style={{fontSize:12,color:C.muted,marginTop:3}}>× {c.contratada||'—'}</div>
+      <div className="prv" style={{fontSize:14,fontWeight:700,color:C.text,lineHeight:1.3}}>{c.contratante||'—'}</div>
+      <div className="prv" style={{fontSize:12,color:C.muted,marginTop:3}}>× {c.contratada||'—'}</div>
     </div>
     <div style={{display:'flex',gap:14,flexWrap:'wrap',fontSize:12,color:C.muted,alignItems:'center'}}>
-      {c.valor&&<span style={{fontWeight:700,color:C.text}}>{brMoney(c.valor)}</span>}
+      {c.valor&&<span className="prv" style={{fontWeight:700,color:C.text}}>{brMoney(c.valor)}</span>}
       {(c.data_inicio||c.data_fim)&&<span>{brDate(c.data_inicio)} → {brDate(c.data_fim)}</span>}
     </div>
     <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>

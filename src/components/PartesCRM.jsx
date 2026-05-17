@@ -72,12 +72,12 @@ function ParteCard({p,s,onOpen}){
 
       {/* Linha 2: nome */}
       <div>
-        <div style={{fontSize:14,fontWeight:800,color:C.text,lineHeight:1.3,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+        <div className="prv" style={{fontSize:14,fontWeight:800,color:C.text,lineHeight:1.3,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
           {p.nome}
         </div>
-        {p.nome_fantasia&&<div style={{fontSize:12,color:C.muted,marginTop:2}}>{p.nome_fantasia}</div>}
-        {p.cnpj&&<div style={{fontSize:11,color:C.muted,marginTop:3,fontFamily:'monospace,monospace',letterSpacing:'0.02em'}}>{p.cnpj}</div>}
-        {p.grupo_economico&&<div style={{fontSize:11,color:C.muted,marginTop:2}}>Grupo: {p.grupo_economico}</div>}
+        {p.nome_fantasia&&<div className="prv" style={{fontSize:12,color:C.muted,marginTop:2}}>{p.nome_fantasia}</div>}
+        {p.cnpj&&<div className="prv" style={{fontSize:11,color:C.muted,marginTop:3,fontFamily:'monospace,monospace',letterSpacing:'0.02em'}}>{p.cnpj}</div>}
+        {p.grupo_economico&&<div className="prv" style={{fontSize:11,color:C.muted,marginTop:2}}>Grupo: {p.grupo_economico}</div>}
       </div>
 
       {/* Linha 3: stats compactas */}
@@ -88,7 +88,7 @@ function ParteCard({p,s,onOpen}){
           {v:fmtBRL(s.economia),label:'economia',color:s.economia>0?C.green:C.muted,small:true},
         ].map(({v,label:lbl,color,small})=>(
           <div key={lbl} style={{background:C.bg,borderRadius:8,padding:'7px 8px',border:'1px solid '+C.border}}>
-            <div style={{fontSize:small?11:15,fontWeight:800,color,lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v}</div>
+            <div className={lbl==='economia'?'prv':''} style={{fontSize:small?11:15,fontWeight:800,color,lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v}</div>
             <div style={{fontSize:10,color:C.muted,marginTop:2}}>{lbl}</div>
           </div>
         ))}
@@ -97,9 +97,9 @@ function ParteCard({p,s,onOpen}){
       {/* Linha 4: contato (só se existir) */}
       {(p.contato_principal||p.email||p.telefone)&&(
         <div style={{borderTop:'1px solid '+C.border,paddingTop:8,display:'flex',flexDirection:'column',gap:3}}>
-          {p.contato_principal&&<span style={{fontSize:11,color:C.muted}}>👤 {p.contato_principal}</span>}
-          {p.email&&<span style={{fontSize:11,color:C.muted}}>✉ {p.email}</span>}
-          {p.telefone&&<span style={{fontSize:11,color:C.muted}}>📞 {p.telefone}</span>}
+          {p.contato_principal&&<span className="prv" style={{fontSize:11,color:C.muted}}>👤 {p.contato_principal}</span>}
+          {p.email&&<span className="prv" style={{fontSize:11,color:C.muted}}>✉ {p.email}</span>}
+          {p.telefone&&<span className="prv" style={{fontSize:11,color:C.muted}}>📞 {p.telefone}</span>}
         </div>
       )}
     </button>

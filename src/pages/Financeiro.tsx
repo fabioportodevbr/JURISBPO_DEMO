@@ -733,18 +733,18 @@ export default function Financeiro({ profile }: { profile: any }) {
                   return (
                     <tr key={registro.id} style={{ borderTop: "1px solid " + C.border }}>
                       <td style={{ padding: 12, verticalAlign: "top", color: C.text }}>
-                        <div style={{ fontFamily: "monospace", fontSize: 12, color: C.muted }}>{processo?.numero || "sem número"}</div>
-                        <b>{processo?.titulo || "Processo não localizado"}</b>
+                        <div className="prv" style={{ fontFamily: "monospace", fontSize: 12, color: C.muted }}>{processo?.numero || "sem número"}</div>
+                        <b className="prv">{processo?.titulo || "Processo não localizado"}</b>
                         <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{label(CATEGORIAS, processoCategoria(processo))}</div>
                       </td>
-                      <td style={{ padding: 12, verticalAlign: "top", color: C.muted }}>{processo?.parte_contraria || "-"}</td>
+                      <td className="prv" style={{ padding: 12, verticalAlign: "top", color: C.muted }}>{processo?.parte_contraria || "-"}</td>
                       <td style={{ padding: 12, verticalAlign: "top", color: C.text }}>{label(NATUREZAS, registro.natureza)}</td>
                       <td style={{ padding: 12, verticalAlign: "top", color: C.muted }}>{dateBR(registro.data_referencia)}</td>
                       <td style={{ padding: 12, verticalAlign: "top", color: atrasado ? C.red : C.muted }}>{dateBR(registro.primeiro_vencimento)}</td>
-                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 800 }}>{money(registro.valor_bruto)}</td>
-                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", color: totalEncargos(registro) ? C.amber : C.muted }}>{money(totalEncargos(registro))}</td>
-                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", color: valorRestituido(registro) ? C.green : C.muted }}>{money(valorRestituido(registro))}</td>
-                      <td style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 900 }}>{money(totalRegistro(registro))}</td>
+                      <td className="prv" style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 800 }}>{money(registro.valor_bruto)}</td>
+                      <td className="prv" style={{ padding: 12, verticalAlign: "top", textAlign: "right", color: totalEncargos(registro) ? C.amber : C.muted }}>{money(totalEncargos(registro))}</td>
+                      <td className="prv" style={{ padding: 12, verticalAlign: "top", textAlign: "right", color: valorRestituido(registro) ? C.green : C.muted }}>{money(valorRestituido(registro))}</td>
+                      <td className="prv" style={{ padding: 12, verticalAlign: "top", textAlign: "right", fontWeight: 900 }}>{money(totalRegistro(registro))}</td>
                       <td style={{ padding: 12, verticalAlign: "top" }}>
                         <span style={{ display: "inline-flex", border: "1px solid " + (pago ? "#86efac" : atrasado ? "#fecaca" : "#fde68a"), background: pago ? C.greenBg : atrasado ? C.redBg : C.amberBg, color: pago ? C.green : atrasado ? C.red : C.amber, borderRadius: 999, padding: "4px 9px", fontSize: 12, fontWeight: 900 }}>
                           {atrasado && !pago ? "Atrasado" : label(STATUS, registro.status_pagamento || "pendente")}
