@@ -1,19 +1,29 @@
 import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { Scale, Search, RefreshCw, AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Info, X, RotateCcw } from 'lucide-react'
+import { Scale, Search, RefreshCw, AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Info, X, RotateCcw, FolderOpen } from 'lucide-react'
 import { C } from '../lib/theme'
 
 /* ── Helpers ── */
+function parseData(s) {
+  if (!s) return null
+  const d = new Date(String(s).includes('T') ? s : s + 'T12:00:00')
+  return isNaN(d.getTime()) ? null : d
+}
 function dataBR(s) {
-  if (!s) return '—'
-  try {
-    const d = new Date(String(s).includes('T') ? s : s + 'T12:00:00')
-    return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  } catch { return String(s) }
+  const d = parseData(s)
+  if (!d) return '—'
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 function dataSimples(s) {
-  if (!s) return '—'
-  try { return new Date(String(s).includes('T') ? s : s + 'T12:00:00').toLocaleDateString('pt-BR') } catch { return String(s) }
+  const d = parseData(s)
+  return d ? d.toLocaleDateString('pt-BR') : '—'
+}
+
+const STATUS_LABEL = { ativo: 'Ativo', arquivo_temporario: 'Arquivo temp.', encerrado: 'Encerrado' }
+const STATUS_STYLE = {
+  ativo:              { background: '#dbeafe', color: '#1e40af' },
+  arquivo_temporario: { background: '#fef3c7', color: '#92400e' },
+  encerrado:          { background: '#f3f4f6', color: '#374151' },
 }
 
 // Códigos de movimentação que indicam publicação no DJe
@@ -137,7 +147,7 @@ function nomesReclamadasProcesso(p) {
   return texto ? texto.split(/\s+\|\s+|;\s*/).map(s => s.trim()).filter(Boolean) : []
 }
 
-export default function DataJudConsulta({ profile, processos = [] }) {
+export default function DataJudConsulta({ profile, processos = [], onOpenProcess }) {
   // Lista de processos com número CNJ cadastrado
   const processosComNumero = useMemo(() =>
     processos.filter(p => String(p.numero || '').replace(/\D/g, '').length >= 7)
@@ -156,6 +166,16 @@ export default function DataJudConsulta({ profile, processos = [] }) {
   const procSelecionado = useMemo(() =>
     processos.find(p => p.id === selectedId) || null
   , [selectedId, processos])
+
+  // Índice: número limpo → processo cadastrado (para cruzar com resultados DataJud)
+  const processosByNumero = useMemo(() => {
+    const map = new Map()
+    processos.forEach(p => {
+      const num = String(p.numero || '').replace(/\D/g, '')
+      if (num) map.set(num, p)
+    })
+    return map
+  }, [processos])
 
   // Filtra processos com número pela busca de parte
   const processosFiltrados = useMemo(() => {
@@ -500,17 +520,30 @@ export default function DataJudConsulta({ profile, processos = [] }) {
                 {resultado.processos.map((proc, idx) => {
                   const aberto = expandidos[idx] !== false // aberto por padrão
                   const djeCount = (proc.movimentos || []).filter(m => DJE_CODES.has(Number(m.codigo))).length
+                  // Cruzamento com processo cadastrado no sistema
+                  const numLimpo = String(proc.numeroProcesso || '').replace(/\D/g, '')
+                  const procCadastrado = processosByNumero.get(numLimpo) || (procSelecionado && String(procSelecionado.numero || '').replace(/\D/g,'') === numLimpo ? procSelecionado : null)
+                  const statusKey = procCadastrado?.status
+                  const statusStyle = STATUS_STYLE[statusKey]
+                  const statusLabel = STATUS_LABEL[statusKey]
+                  // Data de ajuizamento: tenta DataJud primeiro, usa cadastro como fallback
+                  const dataAjuiz = dataSimples(proc.dataAjuizamento) !== '—'
+                    ? dataSimples(proc.dataAjuizamento)
+                    : dataSimples(procCadastrado?.data_ajuizamento)
+
                   return (
                     <div key={idx} style={{ border: '1px solid ' + C.border, borderRadius: 10, overflow: 'hidden' }}>
 
                       {/* Cabeçalho do processo */}
-                      <button
-                        onClick={() => toggleExpandido(idx)}
-                        style={{ width: '100%', textAlign: 'left', background: C.grayBg, border: 'none', padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                        <div style={{ marginTop: 2 }}>
-                          {aberto ? <ChevronDown size={15} color={C.muted} /> : <ChevronRight size={15} color={C.muted} />}
-                        </div>
-                        <div style={{ flex: 1 }}>
+                      <div style={{ background: C.grayBg, padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <button
+                          onClick={() => toggleExpandido(idx)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', flexShrink: 0, color: C.muted, display: 'flex' }}
+                          title={aberto ? 'Recolher' : 'Expandir'}
+                        >
+                          {aberto ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                        </button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                             <b style={{ fontSize: 13, color: C.text, fontFamily: 'monospace' }}>
                               {String(proc.numeroProcesso || '').replace(/(\d{7})(\d{2})(\d{4})(\d{1})(\d{2})(\d{4})/, '$1-$2.$3.$4.$5.$6')}
@@ -523,6 +556,11 @@ export default function DataJudConsulta({ profile, processos = [] }) {
                             {proc.grau && (
                               <span style={{ fontSize: 11, color: C.muted }}>{proc.grau}</span>
                             )}
+                            {statusLabel && statusStyle && (
+                              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 900, ...statusStyle }}>
+                                {statusLabel}
+                              </span>
+                            )}
                             {djeCount > 0 && (
                               <span style={{ fontSize: 11, background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 10, fontWeight: 900 }}>
                                 {djeCount} pub. DJe
@@ -532,14 +570,25 @@ export default function DataJudConsulta({ profile, processos = [] }) {
                           <div style={{ display: 'flex', gap: 14, fontSize: 12, color: C.muted, flexWrap: 'wrap' }}>
                             {proc.classe        && <span><b>Classe:</b> {proc.classe}</span>}
                             {proc.orgaoJulgador && <span><b>Órgão:</b> {proc.orgaoJulgador}</span>}
-                            {proc.dataAjuizamento && <span><b>Ajuizamento:</b> {dataSimples(proc.dataAjuizamento)}</span>}
+                            {dataAjuiz !== '—'  && <span><b>Ajuizamento:</b> {dataAjuiz}</span>}
                             {proc.assuntos?.length > 0 && <span><b>Assunto:</b> {proc.assuntos.slice(0,2).join(', ')}</span>}
                           </div>
                         </div>
-                        <div style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>
-                          {(proc.movimentos || []).length} mov.
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                          {procCadastrado && onOpenProcess && (
+                            <button
+                              onClick={() => onOpenProcess(procCadastrado.id)}
+                              title="Abrir cadastro deste processo no sistema"
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', border: '1px solid ' + C.border, borderRadius: 7, background: C.white, color: C.text, cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
+                            >
+                              <FolderOpen size={12} /> Abrir
+                            </button>
+                          )}
+                          <span style={{ fontSize: 12, color: C.muted }}>
+                            {(proc.movimentos || []).length} mov.
+                          </span>
                         </div>
-                      </button>
+                      </div>
 
                       {/* Movimentações */}
                       {aberto && (
