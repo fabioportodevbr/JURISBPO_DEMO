@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { Scale, Search, RefreshCw, AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Info } from 'lucide-react'
+import { Scale, Search, RefreshCw, AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Info, X } from 'lucide-react'
 import { C } from '../lib/theme'
 
 /* ── Helpers ── */
@@ -125,6 +125,18 @@ function MovimentoRow({ mov }) {
   )
 }
 
+function normParteSearch(v) {
+  return String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function nomesReclamadasProcesso(p) {
+  if (Array.isArray(p?.partes_contrarias) && p.partes_contrarias.length) {
+    return p.partes_contrarias.map(r => String(r?.nome || r?.parte_contraria || '')).filter(Boolean)
+  }
+  const texto = String(p?.parte_contraria || '')
+  return texto ? texto.split(/\s+\|\s+|;\s*/).map(s => s.trim()).filter(Boolean) : []
+}
+
 export default function DataJudConsulta({ profile, processos = [] }) {
   // Lista de processos com número CNJ cadastrado
   const processosComNumero = useMemo(() =>
@@ -132,6 +144,7 @@ export default function DataJudConsulta({ profile, processos = [] }) {
   , [processos])
 
   const [selectedId,    setSelectedId]    = useState('')
+  const [parteSearch,   setParteSearch]   = useState('')
   const [manualNumero,  setManualNumero]  = useState('')
   const [manualTribunal,setManualTribunal]= useState('')
   const [loading,       setLoading]       = useState(false)
@@ -144,14 +157,47 @@ export default function DataJudConsulta({ profile, processos = [] }) {
     processos.find(p => p.id === selectedId) || null
   , [selectedId, processos])
 
+  // Filtra processos com número pela busca de parte
+  const processosFiltrados = useMemo(() => {
+    const term = normParteSearch(parteSearch)
+    if (!term) return processosComNumero
+    return processosComNumero.filter(p => {
+      const campos = [p.numero, p.titulo, p.tribunal, p.orgao, ...nomesReclamadasProcesso(p)]
+      return campos.some(v => normParteSearch(v).includes(term))
+    })
+  }, [processosComNumero, parteSearch])
+
   const numeroFinal   = selectedId ? (procSelecionado?.numero || '') : manualNumero
   const tribunalFinal = selectedId ? (procSelecionado?.tribunal || '') : manualTribunal
+
+  // Detecta tribunal pelo código TT do número CNJ (NNNNNNN-DD.AAAA.J.TT.OOOO)
+  function detectarTribunalCNJ(num) {
+    if (num.length !== 20) return null
+    const j = num[13]
+    const tt = parseInt(num.slice(14, 16), 10)
+    const segmentos = {
+      '1': 'STF', '3': 'STJ', '7': 'STM',
+    }
+    if (segmentos[j]) return segmentos[j]
+    if (j === '4') return tt >= 1 && tt <= 6 ? `TRF${tt}` : null
+    if (j === '5') return tt === 0 ? 'TST' : (tt >= 1 && tt <= 24 ? `TRT${tt}` : null)
+    if (j === '8') {
+      const UF = ['','AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SE','SP','TO']
+      return tt >= 1 && tt <= 27 ? `TJ${UF[tt]}` : null
+    }
+    if (j === '6') {
+      const UF = ['','AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SE','SP','TO']
+      return tt >= 1 && tt <= 27 ? `TRE-${UF[tt]}` : null
+    }
+    return null
+  }
 
   const consultar = async () => {
     const num = String(numeroFinal || '').replace(/\D/g, '')
     const trib = String(tribunalFinal || '').trim()
     if (num.length < 7) { setErro('Informe um número de processo válido (mínimo 7 dígitos).'); return }
-    if (!trib)           { setErro('Informe o tribunal.'); return }
+    // Tribunal só é obrigatório se o número CNJ não tiver 20 dígitos (auto-detecção impossível)
+    if (!trib && num.length !== 20) { setErro('Informe o tribunal (ou use o número CNJ completo para detecção automática).'); return }
 
     setLoading(true); setErro(''); setResultado(null); setExpandidos({})
     try {
@@ -193,30 +239,92 @@ export default function DataJudConsulta({ profile, processos = [] }) {
       {/* ── Formulário ── */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid ' + C.border }}>
 
-        {/* Seleção de processo cadastrado */}
-        {processosComNumero.length > 0 && (
+        {/* ── Busca de processo cadastrado ── */}
+        {!selectedId && (
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: C.muted, display: 'block', marginBottom: 4 }}>
-              Selecionar processo cadastrado ({processosComNumero.length} com número CNJ)
+              {processosComNumero.length > 0
+                ? `Buscar processo cadastrado (${processosComNumero.length} com número CNJ)`
+                : 'Buscar processo cadastrado'}
             </label>
-            <select
-              style={INP}
-              value={selectedId}
-              onChange={e => { setSelectedId(e.target.value); setErro(''); setResultado(null) }}
-            >
-              <option value="">— ou preencha manualmente abaixo —</option>
-              {processosComNumero.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.numero} · {p.titulo || p.parte_contraria || '(sem título)'} · {p.tribunal || '(sem tribunal)'}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+            <div style={{ position: 'relative' }}>
+              <Search size={15} color={C.muted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              <input
+                style={{ ...INP, paddingLeft: 32 }}
+                placeholder="Buscar por número, parte contrária, tribunal ou título…"
+                value={parteSearch}
+                onChange={e => { setParteSearch(e.target.value); setErro('') }}
+                disabled={processosComNumero.length === 0}
+              />
+              {parteSearch && (
+                <button
+                  onClick={() => setParteSearch('')}
+                  style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: C.muted, cursor: 'pointer', display: 'flex', padding: 4 }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
-        {processosComNumero.length === 0 && (
-          <div style={{ background: C.amberBg, color: C.amber, borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
-            <Info size={13} /> Nenhum processo com número CNJ cadastrado. Preencha o campo "Número" nos processos para usar a seleção automática.
+            {processosComNumero.length === 0 && (
+              <div style={{ background: C.amberBg, color: C.amber, borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}>
+                <Info size={13} /> Nenhum processo com número CNJ cadastrado. Preencha o campo "Número" nos processos para usar a busca automática.
+              </div>
+            )}
+
+            {/* Lista de resultados */}
+            {processosComNumero.length > 0 && (
+              <div style={{ marginTop: 6, border: '1px solid ' + C.border, borderRadius: 10, overflow: 'hidden', maxHeight: 260, overflowY: 'auto' }}>
+                {processosFiltrados.length === 0 ? (
+                  <div style={{ padding: '12px 14px', color: C.muted, fontSize: 13, textAlign: 'center' }}>
+                    Nenhum processo encontrado para "{parteSearch}".
+                  </div>
+                ) : (
+                  processosFiltrados.slice(0, 30).map((p, idx) => {
+                    const reclamadas = nomesReclamadasProcesso(p)
+                    const auto = detectarTribunalCNJ(String(p.numero || '').replace(/\D/g, ''))
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => { setSelectedId(p.id); setParteSearch(''); setErro(''); setResultado(null) }}
+                        style={{
+                          width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                          borderBottom: idx < processosFiltrados.length - 1 ? '1px solid ' + C.border : 'none',
+                          padding: '10px 14px', cursor: 'pointer', transition: 'background .1s', color: C.text,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 2 }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: 12, color: C.muted }}>{p.numero || 'sem número'}</span>
+                          {auto && (
+                            <span style={{ fontSize: 10, fontWeight: 900, background: '#dbeafe', color: '#1e40af', padding: '1px 6px', borderRadius: 8 }}>
+                              {auto}
+                            </span>
+                          )}
+                        </div>
+                        <b style={{ fontSize: 13, color: C.text }}>{p.titulo || '(sem título)'}</b>
+                        {reclamadas.length > 0 && (
+                          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                            Parte: {reclamadas.slice(0, 2).join(' · ')}{reclamadas.length > 2 ? ` +${reclamadas.length - 2}` : ''}
+                          </div>
+                        )}
+                        {(p.tribunal || p.orgao) && (
+                          <div style={{ fontSize: 11, color: C.muted }}>
+                            {p.tribunal || p.orgao}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+                {processosFiltrados.length > 30 && (
+                  <div style={{ padding: '8px 14px', fontSize: 11, color: C.muted, background: C.bg, textAlign: 'center' }}>
+                    Mostrando 30 de {processosFiltrados.length}. Refine a busca para ver mais resultados.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -233,10 +341,20 @@ export default function DataJudConsulta({ profile, processos = [] }) {
                 value={manualNumero}
                 onChange={e => { setManualNumero(e.target.value); setErro('') }}
               />
+              {(() => {
+                const num = manualNumero.replace(/\D/g, '')
+                const auto = num.length === 20 ? detectarTribunalCNJ(num) : null
+                if (!auto) return null
+                return (
+                  <div style={{ marginTop: 5, fontSize: 11, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontWeight: 900 }}>✓</span> Tribunal detectado automaticamente: <b>{auto}</b> — campo tribunal opcional.
+                  </div>
+                )
+              })()}
             </div>
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: C.muted, display: 'block', marginBottom: 4 }}>
-                Tribunal
+                Tribunal {manualNumero.replace(/\D/g,'').length === 20 && detectarTribunalCNJ(manualNumero.replace(/\D/g,'')) ? '(opcional — detectado pelo número)' : ''}
               </label>
               <select style={INP} value={manualTribunal} onChange={e => { setManualTribunal(e.target.value); setErro('') }}>
                 <option value="">Selecione o tribunal</option>
@@ -256,6 +374,19 @@ export default function DataJudConsulta({ profile, processos = [] }) {
             <span style={{ fontWeight: 700, color: C.text }}>{procSelecionado.numero}</span>
             <span style={{ color: C.muted, marginLeft: 8 }}>{procSelecionado.titulo || procSelecionado.parte_contraria}</span>
             <span style={{ color: C.muted, marginLeft: 8 }}>· {procSelecionado.tribunal || 'Tribunal não informado'}</span>
+            {(() => {
+              const num = String(procSelecionado.numero || '').replace(/\D/g, '')
+              const auto = detectarTribunalCNJ(num)
+              // Mostra badge de auto-detecção quando o tribunal cadastrado não é código padrão
+              if (auto && !/^(TRT|TRF|TJ|TRE|TST|STF|STJ|STM|TSE)\d*/.test((procSelecionado.tribunal || '').toUpperCase().trim())) {
+                return (
+                  <span title="Tribunal identificado automaticamente pelo número CNJ" style={{ marginLeft: 8, fontSize: 10, fontWeight: 900, background: '#dbeafe', color: '#1e40af', padding: '2px 7px', borderRadius: 10 }}>
+                    {auto} ✓ auto
+                  </span>
+                )
+              }
+              return null
+            })()}
             <button onClick={() => { setSelectedId(''); setResultado(null) }} style={{ marginLeft: 10, fontSize: 11, color: C.green, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
               trocar
             </button>
