@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
-import { Bell, AlertTriangle, Mail, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff, Eye, Sun, Moon } from 'lucide-react'
+import { Bell, AlertTriangle, Mail, CalendarDays, Clock, CalendarCheck, ExternalLink, Link2, Plus, X, EyeOff } from 'lucide-react'
 import MuralRecados from './MuralRecados.jsx'
-import { NotificacoesModal } from './Notificacoes.jsx'
 import { FinanceiroResumoDashboard } from './FinanceiroResumoDashboard.tsx'
 import { motivoDesconsideracaoPush, registrarPushDesconsiderado } from '../lib/pushArquivo.js'
 
 import { C } from '../lib/theme'
-import { useTheme } from '../lib/ThemeContext'
-import { usePrivacy, Prv } from '../lib/PrivacyContext'
+import { Prv } from '../lib/PrivacyContext'
 const INP={width:'100%',padding:'10px 12px',border:'1px solid '+C.border,borderRadius:8,boxSizing:'border-box',fontSize:14,background:C.white,color:C.text}
 const Card=({title,value,sub,color})=><div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:'22px 24px'}}><div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:'uppercase',letterSpacing:'.06em'}}>{title}</div><div style={{fontSize:42,fontWeight:900,color,marginTop:8,lineHeight:1}}>{value}</div><div style={{fontSize:13,color:C.muted,marginTop:6}}>{sub}</div></div>
 
@@ -279,7 +277,6 @@ const DASHBOARD_CACHE_TTL=2*60*1000 // 2 min (dados mais dinâmicos)
 export default function Dashboard({profile, unreadCount=0}){
   const navigate=useNavigate()
   const[pushModal,setPushModal]=useState(false)
-  const[notificacoesModal,setNotificacoesModal]=useState(false)
   const[audienciaModal,setAudienciaModal]=useState(null)
   const[atividadeModal,setAtividadeModal]=useState(null)
   const[contratoModal,setContratoModal]=useState(null)
@@ -359,29 +356,12 @@ export default function Dashboard({profile, unreadCount=0}){
     abrirProcesso(data.id)
   }
 
-  const { theme, toggleTheme } = useTheme()
-  const { privacyMode, togglePrivacy } = usePrivacy()
-
   return <div style={{padding:'24px 28px',maxWidth:1400,margin:'0 auto'}}>
 
     {/* ── Cabeçalho ─────────────────────────────────────────── */}
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:28}}>
-      <div>
-        <h1 style={{margin:0,fontSize:28,fontWeight:900,color:C.text,lineHeight:1.1}}>Painel Jurídico</h1>
-        <p style={{color:C.muted,marginTop:6,fontSize:15,margin:'6px 0 0'}}>{saudacaoHorario()}, <Prv>{profile.nome}</Prv></p>
-      </div>
-      <div style={{display:'flex',gap:8,alignItems:'center'}}>
-        <button onClick={()=>setNotificacoesModal(true)} title="Notificações" style={{position:'relative',border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-          <Bell size={18}/>
-          {unreadCount>0&&<span title={`${unreadCount} notificação(ões) não lida(s)`} style={{position:'absolute',top:-7,right:-7,minWidth:18,height:18,borderRadius:999,background:'#dc2626',color:'white',fontSize:10,fontWeight:900,display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 0 0 2px '+C.bg}}>{unreadCount>9?'9+':unreadCount}</span>}
-        </button>
-        <button onClick={togglePrivacy} title={privacyMode?'Desativar modo privacidade':'Ativar modo privacidade'} style={{border:`1px solid ${privacyMode?C.red:C.border}`,background:privacyMode?C.redBg:C.white,color:privacyMode?C.red:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-          {privacyMode?<EyeOff size={18}/>:<Eye size={18}/>}
-        </button>
-        <button onClick={toggleTheme} title="Alternar modo Claro / Escuro" style={{border:`1px solid ${C.border}`,background:C.white,color:C.text,padding:8,borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-          {theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}
-        </button>
-      </div>
+    <div style={{marginBottom:28}}>
+      <h1 style={{margin:0,fontSize:28,fontWeight:900,color:C.text,lineHeight:1.1}}>Painel Jurídico</h1>
+      <p style={{color:C.muted,marginTop:6,fontSize:15,margin:'6px 0 0'}}>{saudacaoHorario()}, <Prv>{profile.nome}</Prv></p>
     </div>
 
     {/* ── 6 cards em 3 colunas ──────────────────────────────── */}
@@ -422,7 +402,6 @@ export default function Dashboard({profile, unreadCount=0}){
 
     {/* ── Modais ───────────────────────────────────────────── */}
     {pushModal&&<PushModal items={st.pushItems} profile={profile} onClose={()=>setPushModal(false)} onOpenProcess={abrirProcesso} onCreateProcess={iniciarCriacaoProcesso} onDismiss={desconsiderarPush}/>}
-    {notificacoesModal&&<NotificacoesModal profile={profile} onClose={()=>setNotificacoesModal(false)}/>}
     {audienciaModal&&<AudienciaModal audiencia={audienciaModal} onClose={()=>setAudienciaModal(null)} onOpenProcess={abrirProcesso}/>}
     {atividadeModal&&<AtividadeModal atividade={atividadeModal} onClose={()=>setAtividadeModal(null)} onOpenProcess={abrirProcesso}/>}
     {contratoModal&&<ContratoAlertaModal contrato={contratoModal} onClose={()=>setContratoModal(null)} onOpenContract={abrirContrato}/>}

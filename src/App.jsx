@@ -2,19 +2,20 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, FileText, CheckSquare, Calendar,
-  Brain, Users, LogOut, Menu, ChevronRight, Settings,
-  AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet, MessageSquare, ShieldAlert,
+  Brain, Users, LogOut, Menu, ChevronRight, ChevronDown, Settings,
+  AlertTriangle, Loader, BarChart3, Building2, Archive, Wallet,
+  MessageSquare, ShieldAlert, Bell, Eye, EyeOff, Moon, Sun, Mail,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import { supabase, signOut, can, ROLES } from './lib/supabase.js'
 import Auth from './components/Auth.jsx'
 import { APP_CONFIG } from './config/appConfig.js'
 import AvatarUsuario from './components/common/AvatarUsuario.jsx'
-import { ThemeProvider } from './lib/ThemeContext.jsx'
-import { PrivacyProvider, Prv } from './lib/PrivacyContext.jsx'
+import { ThemeProvider, useTheme } from './lib/ThemeContext.jsx'
+import { PrivacyProvider, usePrivacy, Prv } from './lib/PrivacyContext.jsx'
+import { NotificacoesModal } from './components/Notificacoes.jsx'
 
 // ── Importa as páginas ────────────────────────────────────────────────────
-// (cada uma em seu próprio arquivo para facilitar manutenção)
 import Dashboard   from './components/Dashboard.jsx'
 import Processos   from './components/Processos.jsx'
 import Contratos   from './components/Contratos.jsx'
@@ -22,54 +23,73 @@ import Atividades  from './components/Atividades.jsx'
 import Calendario  from './components/Calendario.jsx'
 import IaJuridica  from './components/IaJuridica.jsx'
 import Equipe      from './components/Equipe.jsx'
-import Forum from './components/Forum.jsx'
+import Forum       from './components/Forum.jsx'
 import MeuPerfil   from './components/MeuPerfil.jsx'
-import Relatorios   from './components/Relatorios.jsx'
+import Relatorios  from './components/Relatorios.jsx'
 import PartesCRM   from './components/PartesCRM.jsx'
 import Acervo      from './components/Acervo.jsx'
 import Financeiro  from './pages/Financeiro.tsx'
 import ConfiguracaoCalendario from './pages/ConfiguracaoCalendario.jsx'
-import Compliance from './components/Compliance.jsx'
+import Compliance  from './components/Compliance.jsx'
 
 // ── Tema ─────────────────────────────────────────────────────────────────
 import { C } from './lib/theme'
 
+// ── TopBar: constantes ────────────────────────────────────────────────────
+const TOP_H = 52
+const TBG    = '#f0fdf4'   // green-50
+const TBORD  = '#bbf7d0'   // green-200
+const TTEXT  = '#064e3b'   // dark text
+const TICON  = '#166534'   // icon colour
+
+const dropItemStyle = {
+  display: 'flex', alignItems: 'center', gap: 10,
+  width: '100%', textAlign: 'left', padding: '9px 14px',
+  border: 'none', background: 'transparent', cursor: 'pointer',
+  fontSize: 13, color: '#374151', fontWeight: 500,
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────────────
 function buildNav(profile) {
   const all = [
-    { path: '/dashboard',  label: 'Painel',        Icon: LayoutDashboard },
-    { path: '/processos',  label: 'Processos',      Icon: Scale,     perm: 'processos.ver' },
-    { path: '/contratos',  label: 'Contratos',      Icon: FileText,  perm: 'contratos.ver' },
-    { path: '/partes',     label: 'Partes / CRM',   Icon: Building2, perm: 'processos.ver' },
-    { path: '/acervo',     label: 'Acervo',        Icon: Archive,   perm: 'processos.ver' },
+    { path: '/dashboard',  label: 'Painel',       Icon: LayoutDashboard },
+    { path: '/processos',  label: 'Processos',     Icon: Scale,      perm: 'processos.ver' },
+    { path: '/contratos',  label: 'Contratos',     Icon: FileText,   perm: 'contratos.ver' },
+    { path: '/partes',     label: 'Partes / CRM',  Icon: Building2,  perm: 'processos.ver' },
+    { path: '/acervo',     label: 'Acervo',        Icon: Archive,    perm: 'processos.ver' },
     { path: '/atividades', label: 'Atividades',    Icon: CheckSquare },
-    { path: '/calendario', label: 'Calendário',     Icon: Calendar   },
-    { path: '/financeiro', label: 'Financeiro',    Icon: Wallet,    perm: 'financeiro.ver' },
-    { path: '/ia',         label: 'IA Jurídica',    Icon: Brain,     perm: 'ia.usar', accent: true },
-    { path: '/forum',         label: 'Fórum',         Icon: MessageSquare },
-    { path: '/relatorios', label: 'Relatórios', Icon: BarChart3, perm: 'processos.ver' },
-    { path: '/equipe',     label: 'Equipe',         Icon: Users,     perm: 'equipe.ver' },
-    { path: '/compliance', label: 'Compliance',     Icon: ShieldAlert, perm: 'compliance.ver' },
+    { path: '/calendario', label: 'Calendário',    Icon: Calendar    },
+    { path: '/financeiro', label: 'Financeiro',    Icon: Wallet,     perm: 'financeiro.ver' },
+    { path: '/ia',         label: 'IA Jurídica',   Icon: Brain,      perm: 'ia.usar', accent: true },
+    { path: '/relatorios', label: 'Relatórios',    Icon: BarChart3,  perm: 'processos.ver' },
+    { path: '/compliance', label: 'Compliance',    Icon: ShieldAlert, perm: 'compliance.ver' },
   ]
   return all.filter(item => !item.perm || can(profile, item.perm))
 }
 
-function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mobile, unreadCount }) {
+function Sidebar({ nav, currentPath, onNav, open, onClose, mobile, unreadCount }) {
   const [hovered, setHovered] = useState(null)
-  const initials = profile?.nome?.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?'
   return (
     <>
-      {mobile && open && <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 98 }} />}
-      <aside style={{ position: 'fixed', top: 0, bottom: 0, width: 224, left: open ? 0 : -240, background: C.navy, display: 'flex', flexDirection: 'column', zIndex: 99, transition: 'left 0.22s ease', fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif" }}>
+      {mobile && open && (
+        <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 98 }} />
+      )}
+      <aside style={{
+        position: 'fixed', top: TOP_H, bottom: 0, width: 224,
+        left: open ? 0 : -240, background: C.navy,
+        display: 'flex', flexDirection: 'column', zIndex: 99,
+        transition: 'left 0.22s ease',
+        fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif",
+      }}>
         {/* Logo */}
-        <div style={{ padding: '22px 18px 16px', borderBottom: '1px solid ' + C.navyL }}>
+        <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid ' + C.navyL }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: C.gold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Scale size={19} color={C.navy} />
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.gold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Scale size={18} color={C.navy} />
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{APP_CONFIG.nome}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{APP_CONFIG.subtitulo}</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{APP_CONFIG.nome}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{APP_CONFIG.subtitulo}</div>
             </div>
           </div>
         </div>
@@ -79,41 +99,246 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
           {nav.map(({ path, label, Icon, accent }) => {
             const active = currentPath === path
             return (
-              <button key={path} onClick={() => { onNav(path); onClose() }}
+              <button key={path}
+                onClick={() => { onNav(path); onClose() }}
                 onMouseEnter={() => setHovered(path)}
                 onMouseLeave={() => setHovered(null)}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '8px 12px', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 1, textAlign: 'left', background: active ? C.navyL : hovered === path ? 'rgba(255,255,255,0.10)' : (accent ? 'rgba(6,78,59,0.16)' : 'transparent'), color: active ? C.gold : (accent ? '#86efac' : 'rgba(255,255,255,0.6)'), fontSize: 14, fontWeight: active ? 700 : 400, transition: 'background 0.15s' }}>
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  width: '100%', padding: '8px 12px', border: 'none',
+                  borderRadius: 8, cursor: 'pointer', marginBottom: 1,
+                  textAlign: 'left',
+                  background: active ? C.navyL
+                    : hovered === path ? 'rgba(255,255,255,0.10)'
+                    : accent ? 'rgba(6,78,59,0.16)' : 'transparent',
+                  color: active ? C.gold : accent ? '#86efac' : 'rgba(255,255,255,0.6)',
+                  fontSize: 14, fontWeight: active ? 700 : 400, transition: 'background 0.15s',
+                }}>
                 <Icon size={16} />{label}
-                {(path === '/dashboard') && unreadCount > 0 && <span title={`${unreadCount} item(ns) não lido(s)`} style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999, background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
-                {active && (path !== '/dashboard' || unreadCount === 0) && <ChevronRight size={12} style={{ marginLeft: 'auto' }} />}
-                {accent && !active && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, background: 'rgba(6,78,59,0.55)', color: '#bbf7d0', padding: '2px 6px', borderRadius: 10 }}>IA</span>}
+                {path === '/dashboard' && unreadCount > 0 && (
+                  <span title={`${unreadCount} item(ns) não lido(s)`} style={{
+                    marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999,
+                    background: '#dc2626', color: 'white', fontSize: 11, fontWeight: 900,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                  }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+                )}
+                {active && (path !== '/dashboard' || unreadCount === 0) && (
+                  <ChevronRight size={12} style={{ marginLeft: 'auto' }} />
+                )}
+                {accent && !active && (
+                  <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, background: 'rgba(6,78,59,0.55)', color: '#bbf7d0', padding: '2px 6px', borderRadius: 10 }}>IA</span>
+                )}
               </button>
             )
           })}
         </nav>
-
-        {/* Usuário */}
-        <div style={{ padding: '14px 18px', borderTop: '1px solid ' + C.navyL }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <AvatarUsuario profile={profile} size={34} fontSize={13} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Prv>{profile?.nome}</Prv></div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{ROLES[profile?.role]?.label}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => { onNav('/perfil'); onClose() }}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 7, background: 'transparent', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-              <Settings size={13} />Perfil
-            </button>
-            <button onClick={onLogout}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 7, background: 'transparent', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-              <LogOut size={13} />Sair
-            </button>
-          </div>
-        </div>
       </aside>
     </>
+  )
+}
+
+// ── TopBar ────────────────────────────────────────────────────────────────
+function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotificacoes, mobile, onMenuOpen }) {
+  const { theme, toggleTheme } = useTheme()
+  const { privacyMode, togglePrivacy } = usePrivacy()
+  const [forumOpen, setForumOpen] = useState(false)
+  const [userOpen,  setUserOpen]  = useState(false)
+
+  const btnBase = {
+    position: 'relative', border: 'none', background: 'transparent',
+    cursor: 'pointer', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', padding: 7, borderRadius: 8,
+    transition: 'background .12s', color: TICON,
+  }
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    if (!forumOpen && !userOpen) return
+    const h = () => { setForumOpen(false); setUserOpen(false) }
+    window.addEventListener('click', h)
+    return () => window.removeEventListener('click', h)
+  }, [forumOpen, userOpen])
+
+  return (
+    <header style={{
+      position: 'fixed', top: 0, left: 0, right: 0, height: TOP_H,
+      background: TBG, borderBottom: `1px solid ${TBORD}`,
+      display: 'flex', alignItems: 'center', padding: '0 12px',
+      gap: 8, zIndex: 100,
+      boxShadow: '0 1px 4px rgba(6,78,59,.07)',
+      fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif",
+    }}>
+
+      {/* Hamburger — mobile only */}
+      {mobile && (
+        <button onClick={onMenuOpen} style={{ ...btnBase, marginRight: 2 }} aria-label="Abrir menu">
+          <Menu size={20} />
+        </button>
+      )}
+
+      {/* Logo mark + nome */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 'auto' }}>
+        <div style={{ width: 28, height: 28, borderRadius: 7, background: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Scale size={14} color="#d97706" />
+        </div>
+        <span style={{ fontSize: 14, fontWeight: 800, color: TTEXT, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+          {APP_CONFIG.nome}
+        </span>
+      </div>
+
+      {/* ── Ações à direita ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+
+        {/* Fórum dropdown */}
+        <div style={{ position: 'relative' }}>
+          <button
+            title="Fórum"
+            onClick={e => { e.stopPropagation(); setForumOpen(v => !v); setUserOpen(false) }}
+            style={{ ...btnBase, background: forumOpen || currentPath === '/forum' ? '#dcfce7' : 'transparent' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+            onMouseLeave={e => { if (!forumOpen && currentPath !== '/forum') e.currentTarget.style.background = 'transparent' }}
+          >
+            <MessageSquare size={17} />
+          </button>
+
+          {forumOpen && (
+            <div onClick={e => e.stopPropagation()} style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 6,
+              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+              boxShadow: '0 8px 24px rgba(0,0,0,.12)', width: 210, zIndex: 200, overflow: 'hidden',
+            }}>
+              <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 900, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.06em' }}>Fórum</div>
+              {[
+                { label: 'Chat em tempo real', Icon: MessageSquare },
+                { label: 'Mensagens',           Icon: Mail         },
+              ].map(({ label, Icon }) => (
+                <button key={label}
+                  onClick={() => { onNav('/forum'); setForumOpen(false) }}
+                  style={dropItemStyle}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Icon size={14} style={{ color: '#6b7280', flexShrink: 0 }} />{label}
+                </button>
+              ))}
+              <div style={{ height: 6 }} />
+            </div>
+          )}
+        </div>
+
+        {/* Notificações */}
+        <button
+          title="Notificações"
+          onClick={onNotificacoes}
+          style={btnBase}
+          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <Bell size={17} />
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: 3, right: 3,
+              width: 8, height: 8, borderRadius: '50%',
+              background: '#dc2626', border: '1.5px solid ' + TBG,
+            }} />
+          )}
+        </button>
+
+        {/* Modo privacidade */}
+        <button
+          title={privacyMode ? 'Desativar modo privacidade' : 'Ativar modo privacidade'}
+          onClick={togglePrivacy}
+          className={privacyMode ? 'privacy-toggle-icon' : ''}
+          style={{ ...btnBase, background: privacyMode ? '#fee2e2' : 'transparent', color: privacyMode ? '#dc2626' : TICON }}
+          onMouseEnter={e => { if (!privacyMode) e.currentTarget.style.background = '#dcfce7' }}
+          onMouseLeave={e => { if (!privacyMode) e.currentTarget.style.background = 'transparent' }}
+        >
+          {privacyMode ? <EyeOff size={17} /> : <Eye size={17} />}
+        </button>
+
+        {/* Modo escuro */}
+        <button
+          title="Alternar modo Claro / Escuro"
+          onClick={toggleTheme}
+          style={btnBase}
+          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+        </button>
+
+        {/* Separador */}
+        <div style={{ width: 1, height: 22, background: TBORD, margin: '0 6px' }} />
+
+        {/* Avatar / usuário dropdown */}
+        <div style={{ position: 'relative' }}>
+          <button
+            title="Menu do usuário"
+            onClick={e => { e.stopPropagation(); setUserOpen(v => !v); setForumOpen(false) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 6px 4px 4px', borderRadius: 8, transition: 'background .12s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <AvatarUsuario profile={profile} size={30} fontSize={11} />
+            {!mobile && (
+              <span style={{ fontSize: 13, fontWeight: 700, color: TTEXT, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Prv>{profile?.nome?.split(' ')[0]}</Prv>
+              </span>
+            )}
+            <ChevronDown size={13} color={TTEXT} style={{ flexShrink: 0 }} />
+          </button>
+
+          {userOpen && (
+            <div onClick={e => e.stopPropagation()} style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 6,
+              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+              boxShadow: '0 8px 24px rgba(0,0,0,.14)', width: 210, zIndex: 200, overflow: 'hidden',
+            }}>
+              {/* Header do dropdown */}
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid #f3f4f6' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}><Prv>{profile?.nome}</Prv></div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{ROLES[profile?.role]?.label}</div>
+              </div>
+
+              {/* Ações do usuário */}
+              <div style={{ padding: '6px 0' }}>
+                <button
+                  onClick={() => { onNav('/perfil'); setUserOpen(false) }}
+                  style={dropItemStyle}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Settings size={14} style={{ color: '#6b7280', flexShrink: 0 }} /> Meu Perfil
+                </button>
+                {can(profile, 'equipe.ver') && (
+                  <button
+                    onClick={() => { onNav('/equipe'); setUserOpen(false) }}
+                    style={dropItemStyle}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <Users size={14} style={{ color: '#6b7280', flexShrink: 0 }} /> Equipe
+                  </button>
+                )}
+              </div>
+
+              {/* Sair */}
+              <div style={{ padding: '6px 0', borderTop: '1px solid #f3f4f6' }}>
+                <button
+                  onClick={onLogout}
+                  style={{ ...dropItemStyle, color: '#dc2626' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <LogOut size={14} style={{ color: '#dc2626', flexShrink: 0 }} /> Sair
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </header>
   )
 }
 
@@ -121,9 +346,10 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, profile, onLogout, mo
 function AppLayout() {
   const { profile, loading, profileError } = useAuth()
   const navigate = useNavigate()
-  const [mobile, setMobile]   = useState(false)
-  const [sbOpen, setSbOpen]   = useState(true)
+  const [mobile, setMobile] = useState(false)
+  const [sbOpen, setSbOpen] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [notificacoesModal, setNotificacoesModal] = useState(false)
 
   useEffect(() => {
     const check = () => { const m = window.innerWidth < 768; setMobile(m); setSbOpen(!m) }
@@ -136,7 +362,12 @@ function AppLayout() {
     if (!profile?.id) return
     let alive = true
     async function carregarNaoLidas() {
-      const { count: notificacoesCount } = await supabase.from('notificacoes').select('id', { count: 'exact', head: true }).eq('usuario_id', profile.id).eq('lida', false).eq('arquivada', false)
+      const { count: notificacoesCount } = await supabase
+        .from('notificacoes')
+        .select('id', { count: 'exact', head: true })
+        .eq('usuario_id', profile.id)
+        .eq('lida', false)
+        .eq('arquivada', false)
       if (alive) setUnreadCount(notificacoesCount || 0)
     }
     carregarNaoLidas()
@@ -161,7 +392,7 @@ function AppLayout() {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 40, height: 40, border: '3px solid rgba(6, 78, 59, 0.1)', borderTopColor: C.gold, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+          <div style={{ width: 40, height: 40, border: '3px solid rgba(6,78,59,0.1)', borderTopColor: C.gold, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
           <p style={{ color: C.muted, fontSize: 14 }}>Carregando...</p>
         </div>
         <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.sidebar-nav::-webkit-scrollbar{display:none}.sidebar-nav{scrollbar-width:none;-ms-overflow-style:none}`}</style>
@@ -198,33 +429,53 @@ function AppLayout() {
   return (
     <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif", overflow: 'hidden' }}>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.sidebar-nav::-webkit-scrollbar{display:none}.sidebar-nav{scrollbar-width:none;-ms-overflow-style:none}`}</style>
-      <Sidebar nav={nav} currentPath={currentPath} onNav={navigate} open={sbOpen} onClose={() => mobile && setSbOpen(false)} profile={profile} onLogout={handleLogout} mobile={mobile} unreadCount={unreadCount} />
-      <div style={{ flex: 1, marginLeft: mobile ? 0 : 224, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s' }}>
-        {/* Topbar mobile */}
-        {mobile && (
-          <div className="mobile-topbar" style={{ padding: '12px 16px', background: C.white, borderBottom: '1px solid ' + C.border, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, paddingTop: 'calc(12px + env(safe-area-inset-top))' }}>
-            <button aria-label="Abrir menu" onClick={() => setSbOpen(true)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.text, display: 'flex', padding: 8, marginLeft: -8 }}><Menu size={22} /></button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}><Scale size={18} color={C.gold} /><span style={{ fontSize: 15, fontWeight: 800, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{APP_CONFIG.nome}</span></div>
-          </div>
-        )}
+
+      {/* ── Barra superior fixa ──────────────────────────────────────── */}
+      <TopBar
+        profile={profile}
+        currentPath={currentPath}
+        onNav={navigate}
+        onLogout={handleLogout}
+        unreadCount={unreadCount}
+        onNotificacoes={() => setNotificacoesModal(true)}
+        mobile={mobile}
+        onMenuOpen={() => setSbOpen(true)}
+      />
+
+      {/* Modal de notificações (gerenciado pelo layout) */}
+      {notificacoesModal && (
+        <NotificacoesModal profile={profile} onClose={() => setNotificacoesModal(false)} />
+      )}
+
+      <Sidebar
+        nav={nav}
+        currentPath={currentPath}
+        onNav={navigate}
+        open={sbOpen}
+        onClose={() => mobile && setSbOpen(false)}
+        mobile={mobile}
+        unreadCount={unreadCount}
+      />
+
+      <div style={{ flex: 1, marginLeft: mobile ? 0 : 224, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s', paddingTop: TOP_H }}>
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', paddingBottom: mobile ? 'calc(78px + env(safe-area-inset-bottom))' : 0 }}>
           <Routes>
             <Route path="/dashboard"  element={<Dashboard  profile={profile} unreadCount={unreadCount} />} />
             <Route path="/processos"  element={can(profile,'processos.ver') ? <Processos  profile={profile} /> : <Bloqueado />} />
             <Route path="/contratos"  element={can(profile,'contratos.ver') ? <Contratos  profile={profile} /> : <Bloqueado />} />
-            <Route path="/partes"     element={can(profile,'processos.ver') ? <PartesCRM profile={profile} /> : <Bloqueado />} />
-            <Route path="/acervo"     element={can(profile,'processos.ver') ? <Acervo profile={profile} /> : <Bloqueado />} />
+            <Route path="/partes"     element={can(profile,'processos.ver') ? <PartesCRM  profile={profile} /> : <Bloqueado />} />
+            <Route path="/acervo"     element={can(profile,'processos.ver') ? <Acervo     profile={profile} /> : <Bloqueado />} />
             <Route path="/atividades" element={<Atividades profile={profile} />} />
-            <Route path="/tarefas" element={<Navigate to="/atividades" replace />} />
+            <Route path="/tarefas"    element={<Navigate to="/atividades" replace />} />
             <Route path="/calendario" element={<Calendario profile={profile} />} />
             <Route path="/financeiro" element={can(profile,'financeiro.ver') ? <Financeiro profile={profile} /> : <Bloqueado />} />
             <Route path="/ia"         element={can(profile,'ia.usar')        ? <IaJuridica profile={profile} /> : <Bloqueado />} />
             <Route path="/notificacoes" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/forum" element={<Forum profile={profile} />} />
-            <Route path="/relatorios" element={<Relatorios profile={profile} />} />
-            <Route path="/equipe"     element={can(profile,'equipe.ver')     ? <Equipe     profile={profile} /> : <Bloqueado />} />
-            <Route path="/perfil"     element={<MeuPerfil  profile={profile} />} />
-            <Route path="/compliance"  element={can(profile,'compliance.ver') ? <Compliance profile={profile} /> : <Bloqueado />} />
+            <Route path="/forum"      element={<Forum       profile={profile} />} />
+            <Route path="/relatorios" element={<Relatorios  profile={profile} />} />
+            <Route path="/equipe"     element={can(profile,'equipe.ver') ? <Equipe profile={profile} /> : <Bloqueado />} />
+            <Route path="/perfil"     element={<MeuPerfil   profile={profile} />} />
+            <Route path="/compliance" element={can(profile,'compliance.ver') ? <Compliance profile={profile} /> : <Bloqueado />} />
             <Route path="/configuracao-calendario" element={profile?.role === 'gerente' ? <ConfiguracaoCalendario profile={profile} /> : <Bloqueado />} />
             <Route path="*"           element={<Navigate to="/dashboard" replace />} />
           </Routes>
@@ -245,7 +496,9 @@ function MobileNav({ nav, currentPath, onNav, unreadCount }) {
           <button key={path} onClick={() => onNav(path)} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
               <Icon size={20} />
-              {path === '/dashboard' && unreadCount > 0 && <span style={{ position: 'absolute', top: -6, right: -8, width: 10, height: 10, borderRadius: 999, background: '#dc2626', border: '2px solid white' }} />}
+              {path === '/dashboard' && unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: -6, right: -8, width: 10, height: 10, borderRadius: 999, background: '#dc2626', border: '2px solid white' }} />
+              )}
             </span>
             <span>{label === 'Atividades' ? 'Ativ.' : label}</span>
           </button>
@@ -268,9 +521,7 @@ function Bloqueado() {
 // ── Roteador principal ────────────────────────────────────────────────────
 function AppRouter() {
   const { session, loading } = useAuth()
-
   if (loading) return null
-
   return (
     <Routes>
       <Route path="/login" element={!session ? <Auth /> : <Navigate to="/dashboard" replace />} />
