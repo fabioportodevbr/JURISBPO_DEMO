@@ -23,7 +23,7 @@ const STATUS_LABEL = { ativo: 'Ativo', arquivo_temporario: 'Arquivo temp.', ence
 const STATUS_STYLE = {
   ativo:              { background: '#dbeafe', color: '#1e40af' },
   arquivo_temporario: { background: '#fef3c7', color: '#92400e' },
-  encerrado:          { background: '#f3f4f6', color: '#374151' },
+  encerrado:          { background: 'var(--c-purpleBg)', color: 'var(--c-purple)' },
 }
 
 // Códigos de movimentação que indicam publicação no DJe
