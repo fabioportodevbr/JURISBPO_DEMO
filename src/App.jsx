@@ -36,11 +36,12 @@ import Compliance  from './components/Compliance.jsx'
 import { C } from './lib/theme'
 
 // ── TopBar: constantes ────────────────────────────────────────────────────
-const TOP_H = 52
-const TBG    = '#f0fdf4'   // green-50
-const TBORD  = '#bbf7d0'   // green-200
-const TTEXT  = '#064e3b'   // dark text
-const TICON  = '#166534'   // icon colour
+const TOP_H   = 52
+const SB_W    = 224          // largura do menu lateral
+const TBG     = '#f0fdf4'    // verde claro — seção direita
+const TBORD   = '#bbf7d0'    // borda inferior seção direita
+const TTEXT   = '#064e3b'    // texto verde escuro
+const TICON   = '#166534'    // ícones seção direita
 
 const dropItemStyle = {
   display: 'flex', alignItems: 'center', gap: 10,
@@ -49,7 +50,7 @@ const dropItemStyle = {
   fontSize: 13, color: '#374151', fontWeight: 500,
 }
 
-// ── Sidebar ───────────────────────────────────────────────────────────────
+// ── Nav ───────────────────────────────────────────────────────────────────
 function buildNav(profile) {
   const all = [
     { path: '/dashboard',  label: 'Painel',       Icon: LayoutDashboard },
@@ -67,6 +68,7 @@ function buildNav(profile) {
   return all.filter(item => !item.perm || can(profile, item.perm))
 }
 
+// ── Sidebar (sem cabeçalho de logo — fica na TopBar) ─────────────────────
 function Sidebar({ nav, currentPath, onNav, open, onClose, mobile, unreadCount }) {
   const [hovered, setHovered] = useState(null)
   return (
@@ -75,27 +77,13 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, mobile, unreadCount }
         <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 98 }} />
       )}
       <aside style={{
-        position: 'fixed', top: TOP_H, bottom: 0, width: 224,
-        left: open ? 0 : -240, background: C.navy,
-        display: 'flex', flexDirection: 'column', zIndex: 99,
-        transition: 'left 0.22s ease',
+        position: 'fixed', top: TOP_H, bottom: 0, width: SB_W,
+        left: open ? 0 : -SB_W - 16,
+        background: C.navy, display: 'flex', flexDirection: 'column',
+        zIndex: 99, transition: 'left 0.22s ease',
         fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif",
       }}>
-        {/* Logo */}
-        <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid ' + C.navyL }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.gold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Scale size={18} color={C.navy} />
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{APP_CONFIG.nome}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{APP_CONFIG.subtitulo}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className="sidebar-nav" style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
+        <nav className="sidebar-nav" style={{ flex: 1, padding: '10px 10px', overflowY: 'auto' }}>
           {nav.map(({ path, label, Icon, accent }) => {
             const active = currentPath === path
             return (
@@ -106,8 +94,7 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, mobile, unreadCount }
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   width: '100%', padding: '8px 12px', border: 'none',
-                  borderRadius: 8, cursor: 'pointer', marginBottom: 1,
-                  textAlign: 'left',
+                  borderRadius: 8, cursor: 'pointer', marginBottom: 1, textAlign: 'left',
                   background: active ? C.navyL
                     : hovered === path ? 'rgba(255,255,255,0.10)'
                     : accent ? 'rgba(6,78,59,0.16)' : 'transparent',
@@ -151,7 +138,6 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
     transition: 'background .12s', color: TICON,
   }
 
-  // Close dropdowns on outside click
   useEffect(() => {
     if (!forumOpen && !userOpen) return
     const h = () => { setForumOpen(false); setUserOpen(false) }
@@ -162,32 +148,66 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
   return (
     <header style={{
       position: 'fixed', top: 0, left: 0, right: 0, height: TOP_H,
-      background: TBG, borderBottom: `1px solid ${TBORD}`,
-      display: 'flex', alignItems: 'center', padding: '0 12px',
-      gap: 8, zIndex: 100,
-      boxShadow: '0 1px 4px rgba(6,78,59,.07)',
+      display: 'flex', alignItems: 'stretch',
+      zIndex: 100,
       fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif",
     }}>
 
-      {/* Hamburger — mobile only */}
-      {mobile && (
-        <button onClick={onMenuOpen} style={{ ...btnBase, marginRight: 2 }} aria-label="Abrir menu">
-          <Menu size={20} />
-        </button>
+      {/* ── ESQUERDA: mesma cor e largura do menu lateral ─────── */}
+      {!mobile ? (
+        <div style={{
+          width: SB_W, flexShrink: 0,
+          background: C.navy,
+          display: 'flex', alignItems: 'center',
+          padding: '0 18px', gap: 10,
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 9,
+            background: C.gold, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Scale size={17} color={C.navy} />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>
+              {APP_CONFIG.nome}
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+              {APP_CONFIG.subtitulo}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Mobile: botão hambúrguer + logo compacto na seção verde */
+        null
       )}
 
-      {/* Logo mark + nome */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 'auto' }}>
-        <div style={{ width: 28, height: 28, borderRadius: 7, background: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Scale size={14} color="#d97706" />
-        </div>
-        <span style={{ fontSize: 14, fontWeight: 800, color: TTEXT, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-          {APP_CONFIG.nome}
-        </span>
-      </div>
+      {/* ── DIREITA: verde claro, ações ───────────────────────── */}
+      <div style={{
+        flex: 1, background: TBG,
+        borderBottom: `1px solid ${TBORD}`,
+        display: 'flex', alignItems: 'center',
+        padding: '0 14px', gap: 4,
+        boxShadow: '0 1px 4px rgba(6,78,59,.07)',
+      }}>
 
-      {/* ── Ações à direita ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        {/* Mobile: hambúrguer + logo compacto */}
+        {mobile && (
+          <>
+            <button onClick={onMenuOpen} style={{ ...btnBase, marginRight: 2 }} aria-label="Abrir menu">
+              <Menu size={20} />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginRight: 6 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Scale size={13} color="#d97706" />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: TTEXT }}>{APP_CONFIG.nome}</span>
+            </div>
+          </>
+        )}
+
+        {/* Espaçador */}
+        <div style={{ flex: 1 }} />
 
         {/* Fórum dropdown */}
         <div style={{ position: 'relative' }}>
@@ -200,7 +220,6 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
           >
             <MessageSquare size={17} />
           </button>
-
           {forumOpen && (
             <div onClick={e => e.stopPropagation()} style={{
               position: 'absolute', top: '100%', right: 0, marginTop: 6,
@@ -294,13 +313,10 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
               background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
               boxShadow: '0 8px 24px rgba(0,0,0,.14)', width: 210, zIndex: 200, overflow: 'hidden',
             }}>
-              {/* Header do dropdown */}
               <div style={{ padding: '12px 14px', borderBottom: '1px solid #f3f4f6' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}><Prv>{profile?.nome}</Prv></div>
                 <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{ROLES[profile?.role]?.label}</div>
               </div>
-
-              {/* Ações do usuário */}
               <div style={{ padding: '6px 0' }}>
                 <button
                   onClick={() => { onNav('/perfil'); setUserOpen(false) }}
@@ -321,8 +337,6 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
                   </button>
                 )}
               </div>
-
-              {/* Sair */}
               <div style={{ padding: '6px 0', borderTop: '1px solid #f3f4f6' }}>
                 <button
                   onClick={onLogout}
@@ -337,7 +351,7 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
           )}
         </div>
 
-      </div>
+      </div>{/* fim seção direita */}
     </header>
   )
 }
@@ -430,7 +444,7 @@ function AppLayout() {
     <div style={{ display: 'flex', height: '100vh', background: C.bg, fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif", overflow: 'hidden' }}>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.sidebar-nav::-webkit-scrollbar{display:none}.sidebar-nav{scrollbar-width:none;-ms-overflow-style:none}`}</style>
 
-      {/* ── Barra superior fixa ──────────────────────────────────────── */}
+      {/* ── Barra superior fixa ───────────────────────────────── */}
       <TopBar
         profile={profile}
         currentPath={currentPath}
@@ -442,11 +456,11 @@ function AppLayout() {
         onMenuOpen={() => setSbOpen(true)}
       />
 
-      {/* Modal de notificações (gerenciado pelo layout) */}
       {notificacoesModal && (
         <NotificacoesModal profile={profile} onClose={() => setNotificacoesModal(false)} />
       )}
 
+      {/* ── Menu lateral ─────────────────────────────────────── */}
       <Sidebar
         nav={nav}
         currentPath={currentPath}
@@ -457,7 +471,8 @@ function AppLayout() {
         unreadCount={unreadCount}
       />
 
-      <div style={{ flex: 1, marginLeft: mobile ? 0 : 224, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s', paddingTop: TOP_H }}>
+      {/* ── Conteúdo principal ───────────────────────────────── */}
+      <div style={{ flex: 1, marginLeft: mobile ? 0 : SB_W, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s', paddingTop: TOP_H }}>
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', paddingBottom: mobile ? 'calc(78px + env(safe-area-inset-bottom))' : 0 }}>
           <Routes>
             <Route path="/dashboard"  element={<Dashboard  profile={profile} unreadCount={unreadCount} />} />
