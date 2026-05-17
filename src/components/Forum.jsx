@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { Send, Paperclip, Download, Users, MessageSquare, Hash, X, FileText, Image, Mail, Archive, ArchiveRestore, Reply, Inbox } from 'lucide-react'
 
@@ -518,8 +519,15 @@ function MensagensPane({profile,team}){
 
 // ─── Main Forum Component ─────────────────────────────────────────────────────
 export default function Forum({profile}){
-  const [aba,setAba]=useState('chat')
+  const [searchParams] = useSearchParams()
+  const [aba,setAba]=useState(()=>searchParams.get('tab')==='mensagens'?'mensagens':'chat')
   const [team,setTeam]=useState([])
+
+  // Sync tab when URL param changes (e.g. TopBar dropdown navegates while on /forum)
+  useEffect(()=>{
+    const tab=searchParams.get('tab')
+    if(tab==='mensagens'||tab==='chat') setAba(tab)
+  },[searchParams])
   const [onlineMap,setOnlineMap]=useState({})
   const presenceRef=useRef()
 

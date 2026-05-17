@@ -36,12 +36,8 @@ import Compliance  from './components/Compliance.jsx'
 import { C } from './lib/theme'
 
 // ── TopBar: constantes ────────────────────────────────────────────────────
-const TOP_H   = 52
-const SB_W    = 224          // largura do menu lateral
-const TBG     = '#f0fdf4'    // verde claro — seção direita
-const TBORD   = '#bbf7d0'    // borda inferior seção direita
-const TTEXT   = '#064e3b'    // texto verde escuro
-const TICON   = '#166534'    // ícones seção direita
+const TOP_H = 52
+const SB_W  = 224   // largura do menu lateral
 
 const dropItemStyle = {
   display: 'flex', alignItems: 'center', gap: 10,
@@ -131,11 +127,23 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
   const [forumOpen, setForumOpen] = useState(false)
   const [userOpen,  setUserOpen]  = useState(false)
 
+  // ── Cores dinâmicas por tema ──────────────────────────────────────────
+  const isDark  = theme === 'dark'
+  const RBG     = isDark ? '#1e293b' : '#ffffff'   // fundo seção direita
+  const RBORD   = isDark ? '#334155' : '#e5e7eb'   // borda inferior
+  const RTEXT   = isDark ? '#e2e8f0' : '#111827'   // texto
+  const RICON   = isDark ? '#94a3b8' : '#374151'   // ícones neutros
+  const RHOVER  = isDark ? 'rgba(255,255,255,0.07)' : '#f3f4f6'  // hover btn
+  const RDROP   = isDark ? '#1e293b' : '#ffffff'   // fundo dropdown
+  const RDROPB  = isDark ? '#334155' : '#e5e7eb'   // borda dropdown
+  const RDROPHI = isDark ? '#334155' : '#f3f4f6'   // item hover dropdown
+  const RSEP    = isDark ? '#334155' : '#e5e7eb'   // separador vertical
+
   const btnBase = {
     position: 'relative', border: 'none', background: 'transparent',
     cursor: 'pointer', display: 'flex', alignItems: 'center',
     justifyContent: 'center', padding: 7, borderRadius: 8,
-    transition: 'background .12s', color: TICON,
+    transition: 'background .12s', color: RICON,
   }
 
   useEffect(() => {
@@ -144,6 +152,11 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
     window.addEventListener('click', h)
     return () => window.removeEventListener('click', h)
   }, [forumOpen, userOpen])
+
+  const forumLinks = [
+    { label: 'Chat em tempo real', Icon: MessageSquare, tab: 'chat'      },
+    { label: 'Mensagens',           Icon: Mail,          tab: 'mensagens' },
+  ]
 
   return (
     <header style={{
@@ -154,41 +167,32 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
     }}>
 
       {/* ── ESQUERDA: mesma cor e largura do menu lateral ─────── */}
-      {!mobile ? (
+      {!mobile && (
         <div style={{
           width: SB_W, flexShrink: 0,
           background: C.navy,
           display: 'flex', alignItems: 'center',
           padding: '0 18px', gap: 10,
         }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 9,
-            background: C.gold, display: 'flex',
-            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: C.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Scale size={17} color={C.navy} />
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>
-              {APP_CONFIG.nome}
-            </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-              {APP_CONFIG.subtitulo}
-            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{APP_CONFIG.nome}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{APP_CONFIG.subtitulo}</div>
           </div>
         </div>
-      ) : (
-        /* Mobile: botão hambúrguer + logo compacto na seção verde */
-        null
       )}
 
-      {/* ── DIREITA: verde claro, ações ───────────────────────── */}
+      {/* ── DIREITA: branca / escura (tema) + sombra ─────────── */}
       <div style={{
-        flex: 1, background: TBG,
-        borderBottom: `1px solid ${TBORD}`,
+        flex: 1, background: RBG,
+        borderBottom: `1px solid ${RBORD}`,
         display: 'flex', alignItems: 'center',
         padding: '0 14px', gap: 4,
-        boxShadow: '0 1px 4px rgba(6,78,59,.07)',
+        boxShadow: isDark
+          ? '0 1px 0 rgba(255,255,255,0.04)'
+          : '0 1px 4px rgba(0,0,0,.08), 0 0 0 0 transparent',
       }}>
 
         {/* Mobile: hambúrguer + logo compacto */}
@@ -201,7 +205,7 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
               <div style={{ width: 26, height: 26, borderRadius: 7, background: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Scale size={13} color="#d97706" />
               </div>
-              <span style={{ fontSize: 13, fontWeight: 800, color: TTEXT }}>{APP_CONFIG.nome}</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: RTEXT }}>{APP_CONFIG.nome}</span>
             </div>
           </>
         )}
@@ -214,8 +218,8 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
           <button
             title="Fórum"
             onClick={e => { e.stopPropagation(); setForumOpen(v => !v); setUserOpen(false) }}
-            style={{ ...btnBase, background: forumOpen || currentPath === '/forum' ? '#dcfce7' : 'transparent' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+            style={{ ...btnBase, background: forumOpen || currentPath === '/forum' ? RHOVER : 'transparent' }}
+            onMouseEnter={e => e.currentTarget.style.background = RHOVER}
             onMouseLeave={e => { if (!forumOpen && currentPath !== '/forum') e.currentTarget.style.background = 'transparent' }}
           >
             <MessageSquare size={17} />
@@ -223,21 +227,18 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
           {forumOpen && (
             <div onClick={e => e.stopPropagation()} style={{
               position: 'absolute', top: '100%', right: 0, marginTop: 6,
-              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
-              boxShadow: '0 8px 24px rgba(0,0,0,.12)', width: 210, zIndex: 200, overflow: 'hidden',
+              background: RDROP, border: `1px solid ${RDROPB}`, borderRadius: 10,
+              boxShadow: '0 8px 24px rgba(0,0,0,.14)', width: 210, zIndex: 200, overflow: 'hidden',
             }}>
               <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 900, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.06em' }}>Fórum</div>
-              {[
-                { label: 'Chat em tempo real', Icon: MessageSquare },
-                { label: 'Mensagens',           Icon: Mail         },
-              ].map(({ label, Icon }) => (
-                <button key={label}
-                  onClick={() => { onNav('/forum'); setForumOpen(false) }}
-                  style={dropItemStyle}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+              {forumLinks.map(({ label, Icon, tab }) => (
+                <button key={tab}
+                  onClick={() => { onNav(`/forum?tab=${tab}`); setForumOpen(false) }}
+                  style={{ ...dropItemStyle, color: RTEXT }}
+                  onMouseEnter={e => e.currentTarget.style.background = RDROPHI}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <Icon size={14} style={{ color: '#6b7280', flexShrink: 0 }} />{label}
+                  <Icon size={14} style={{ color: RICON, flexShrink: 0 }} />{label}
                 </button>
               ))}
               <div style={{ height: 6 }} />
@@ -250,16 +251,12 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
           title="Notificações"
           onClick={onNotificacoes}
           style={btnBase}
-          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+          onMouseEnter={e => e.currentTarget.style.background = RHOVER}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
           <Bell size={17} />
           {unreadCount > 0 && (
-            <span style={{
-              position: 'absolute', top: 3, right: 3,
-              width: 8, height: 8, borderRadius: '50%',
-              background: '#dc2626', border: '1.5px solid ' + TBG,
-            }} />
+            <span style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: '50%', background: '#dc2626', border: `1.5px solid ${RBG}` }} />
           )}
         </button>
 
@@ -268,26 +265,26 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
           title={privacyMode ? 'Desativar modo privacidade' : 'Ativar modo privacidade'}
           onClick={togglePrivacy}
           className={privacyMode ? 'privacy-toggle-icon' : ''}
-          style={{ ...btnBase, background: privacyMode ? '#fee2e2' : 'transparent', color: privacyMode ? '#dc2626' : TICON }}
-          onMouseEnter={e => { if (!privacyMode) e.currentTarget.style.background = '#dcfce7' }}
+          style={{ ...btnBase, background: privacyMode ? (isDark ? '#450a0a' : '#fee2e2') : 'transparent', color: privacyMode ? '#dc2626' : RICON }}
+          onMouseEnter={e => { if (!privacyMode) e.currentTarget.style.background = RHOVER }}
           onMouseLeave={e => { if (!privacyMode) e.currentTarget.style.background = 'transparent' }}
         >
           {privacyMode ? <EyeOff size={17} /> : <Eye size={17} />}
         </button>
 
-        {/* Modo escuro */}
+        {/* Modo escuro/claro */}
         <button
           title="Alternar modo Claro / Escuro"
           onClick={toggleTheme}
           style={btnBase}
-          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+          onMouseEnter={e => e.currentTarget.style.background = RHOVER}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          {isDark ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
         {/* Separador */}
-        <div style={{ width: 1, height: 22, background: TBORD, margin: '0 6px' }} />
+        <div style={{ width: 1, height: 22, background: RSEP, margin: '0 6px' }} />
 
         {/* Avatar / usuário dropdown */}
         <div style={{ position: 'relative' }}>
@@ -295,53 +292,53 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
             title="Menu do usuário"
             onClick={e => { e.stopPropagation(); setUserOpen(v => !v); setForumOpen(false) }}
             style={{ display: 'flex', alignItems: 'center', gap: 7, border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 6px 4px 4px', borderRadius: 8, transition: 'background .12s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+            onMouseEnter={e => e.currentTarget.style.background = RHOVER}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <AvatarUsuario profile={profile} size={30} fontSize={11} />
             {!mobile && (
-              <span style={{ fontSize: 13, fontWeight: 700, color: TTEXT, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: RTEXT, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <Prv>{profile?.nome?.split(' ')[0]}</Prv>
               </span>
             )}
-            <ChevronDown size={13} color={TTEXT} style={{ flexShrink: 0 }} />
+            <ChevronDown size={13} color={RTEXT} style={{ flexShrink: 0 }} />
           </button>
 
           {userOpen && (
             <div onClick={e => e.stopPropagation()} style={{
               position: 'absolute', top: '100%', right: 0, marginTop: 6,
-              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
-              boxShadow: '0 8px 24px rgba(0,0,0,.14)', width: 210, zIndex: 200, overflow: 'hidden',
+              background: RDROP, border: `1px solid ${RDROPB}`, borderRadius: 10,
+              boxShadow: '0 8px 24px rgba(0,0,0,.16)', width: 210, zIndex: 200, overflow: 'hidden',
             }}>
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid #f3f4f6' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}><Prv>{profile?.nome}</Prv></div>
+              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${RDROPB}` }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: RTEXT }}><Prv>{profile?.nome}</Prv></div>
                 <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{ROLES[profile?.role]?.label}</div>
               </div>
               <div style={{ padding: '6px 0' }}>
                 <button
                   onClick={() => { onNav('/perfil'); setUserOpen(false) }}
-                  style={dropItemStyle}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                  style={{ ...dropItemStyle, color: RTEXT }}
+                  onMouseEnter={e => e.currentTarget.style.background = RDROPHI}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <Settings size={14} style={{ color: '#6b7280', flexShrink: 0 }} /> Meu Perfil
+                  <Settings size={14} style={{ color: RICON, flexShrink: 0 }} /> Meu Perfil
                 </button>
                 {can(profile, 'equipe.ver') && (
                   <button
                     onClick={() => { onNav('/equipe'); setUserOpen(false) }}
-                    style={dropItemStyle}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                    style={{ ...dropItemStyle, color: RTEXT }}
+                    onMouseEnter={e => e.currentTarget.style.background = RDROPHI}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
-                    <Users size={14} style={{ color: '#6b7280', flexShrink: 0 }} /> Equipe
+                    <Users size={14} style={{ color: RICON, flexShrink: 0 }} /> Equipe
                   </button>
                 )}
               </div>
-              <div style={{ padding: '6px 0', borderTop: '1px solid #f3f4f6' }}>
+              <div style={{ padding: '6px 0', borderTop: `1px solid ${RDROPB}` }}>
                 <button
                   onClick={onLogout}
                   style={{ ...dropItemStyle, color: '#dc2626' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                  onMouseEnter={e => e.currentTarget.style.background = isDark ? '#450a0a' : '#fef2f2'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <LogOut size={14} style={{ color: '#dc2626', flexShrink: 0 }} /> Sair
