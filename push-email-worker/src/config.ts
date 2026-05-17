@@ -21,4 +21,18 @@ const envSchema = z.object({
   // Nenhuma variável de ambiente adicional é necessária para compliance.
 })
 
-export const config = envSchema.parse(process.env)
+let config: z.infer<typeof envSchema>
+try {
+  config = envSchema.parse(process.env)
+} catch (err) {
+  console.error('[push-email] ERRO DE CONFIGURAÇÃO — variáveis de ambiente ausentes ou inválidas:')
+  if (err instanceof z.ZodError) {
+    for (const issue of err.issues) {
+      console.error(`  ${issue.path.join('.')}: ${issue.message}`)
+    }
+  } else {
+    console.error(err)
+  }
+  process.exit(1)
+}
+export { config }
