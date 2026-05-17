@@ -294,7 +294,7 @@ export default function AndamentosProcessuaisPush({profile, processo=null, compa
       <div>
         <h3 style={{margin:'0 0 4px',fontSize:compact?15:18,display:'flex',gap:8,alignItems:'center'}}><Mail size={18}/> {headerTitle}</h3>
         <div style={{fontSize:12,color:C.muted,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-          <span>Caixa monitorada: <b>{configForm.imap_user||DEFAULT_PUSH_EMAIL}</b> · {sub}</span>
+          <span>Caixa monitorada: <b className="prv">{configForm.imap_user||DEFAULT_PUSH_EMAIL}</b> · {sub}</span>
           <span style={{position:'relative',display:'inline-flex'}}>
             <button
               type="button"

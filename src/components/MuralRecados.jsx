@@ -334,7 +334,7 @@ export default function MuralRecados({ profile }) {
                     alignItems: 'flex-start', gap: 6, marginBottom: 4,
                   }}>
                     <div>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{r.criado_por_nome}</span>
+                      <span className="prv" style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{r.criado_por_nome}</span>
                       <div style={{ fontSize: 11, color: Y.dark, marginTop: 1, opacity: 0.8 }}>{fullDate(r.criado_em)}</div>
                     </div>
                     {editingId !== r.id && (
@@ -402,6 +402,7 @@ export default function MuralRecados({ profile }) {
                     </div>
                   ) : (
                     <div
+                      className="prv"
                       style={{ fontSize: 13, color: C.text, lineHeight: 1.5, wordBreak: 'break-word' }}
                       dangerouslySetInnerHTML={{ __html: r.texto }}
                     />

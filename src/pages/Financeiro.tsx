@@ -657,7 +657,7 @@ export default function Financeiro({ profile }: { profile: any }) {
                 <div style={{ fontSize: 11, fontWeight: 800, color: C.muted, textTransform: "uppercase", letterSpacing: ".06em" }}>{card.title}</div>
                 <Icon size={16} color={card.color} />
               </div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: card.color, marginTop: 8 }}>{card.count ? card.value : money(card.value)}</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: card.color, marginTop: 8 }} className={card.count ? '' : 'prv'}>{card.count ? card.value : money(card.value)}</div>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{card.sub}</div>
             </div>
           );
