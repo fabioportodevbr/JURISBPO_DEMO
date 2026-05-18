@@ -179,6 +179,107 @@ function respostasPorImagemPrincipal(img) {
   return { respostas, confianca: CHECKBOX_CONFLITO_ROWS.length ? encontradas / CHECKBOX_CONFLITO_ROWS.length : 0 }
 }
 
+function multiplicarMatrizPdf(base, next) {
+  return [
+    base[0] * next[0] + base[2] * next[1],
+    base[1] * next[0] + base[3] * next[1],
+    base[0] * next[2] + base[2] * next[3],
+    base[1] * next[2] + base[3] * next[3],
+    base[0] * next[4] + base[2] * next[5] + base[4],
+    base[1] * next[4] + base[3] * next[5] + base[5],
+  ]
+}
+
+function agruparPorLinhaPdf(items, tolerancia = 4) {
+  const linhas = []
+  items.forEach(item => {
+    let linha = linhas.find(row => Math.abs(row.y - item.y) <= tolerancia)
+    if (!linha) {
+      linha = { y: item.y, items: [] }
+      linhas.push(linha)
+    }
+    linha.items.push(item)
+  })
+  return linhas.sort((a, b) => b.y - a.y)
+}
+
+function ladoRadioLegado(x) {
+  if (x >= 105 && x <= 130) return 'sim'
+  if (x >= 160 && x <= 185) return 'nao'
+  return null
+}
+
+async function respostasPorRadiosLegado(pdf, pdfjsLib) {
+  const respostas = {}
+  const linhas = []
+  const OPS = pdfjsLib.OPS || {}
+
+  for (let p = 1; p <= pdf.numPages; p += 1) {
+    const page = await pdf.getPage(p)
+    const op = await page.getOperatorList()
+    let matrix = [1, 0, 0, 1, 0, 0]
+    const stack = []
+    const bases = []
+    const checks = []
+
+    for (let i = 0; i < op.fnArray.length; i += 1) {
+      const fn = op.fnArray[i]
+      const args = op.argsArray[i]
+      if (fn === OPS.save) {
+        stack.push(matrix.slice())
+        continue
+      }
+      if (fn === OPS.restore) {
+        matrix = stack.pop() || [1, 0, 0, 1, 0, 0]
+        continue
+      }
+      if (fn === OPS.transform) {
+        matrix = multiplicarMatrizPdf(matrix, args)
+        continue
+      }
+      if (fn !== OPS.paintImageXObject || !args?.[0]) continue
+
+      const [, sourceW = 0, sourceH = 0] = args
+      const item = {
+        x: matrix[4],
+        y: matrix[5],
+        w: Math.abs(matrix[0]),
+        h: Math.abs(matrix[3]),
+        sourceW,
+        sourceH,
+      }
+      const lado = ladoRadioLegado(item.x)
+      if (!lado) continue
+
+      if (sourceW >= 70 && sourceW <= 90 && sourceH >= 70 && sourceH <= 90 && item.w >= 8 && item.w <= 12 && item.h >= 8 && item.h <= 12) {
+        bases.push({ ...item, lado })
+      }
+      if (sourceW >= 45 && sourceW <= 55 && sourceH >= 45 && sourceH <= 55 && item.w >= 5 && item.w <= 8 && item.h >= 5 && item.h <= 8) {
+        checks.push({ ...item, lado })
+      }
+    }
+
+    agruparPorLinhaPdf(bases).forEach(linha => {
+      const temSim = linha.items.some(item => item.lado === 'sim')
+      const temNao = linha.items.some(item => item.lado === 'nao')
+      if (!temSim || !temNao) return
+      const checksLinha = checks.filter(item => Math.abs(item.y - linha.y) <= 6)
+      const marcado = checksLinha.find(item => item.lado === 'sim' || item.lado === 'nao')
+      linhas.push({ pagina: p, y: linha.y, value: marcado ? marcado.lado === 'sim' : null })
+    })
+  }
+
+  linhas
+    .sort((a, b) => a.pagina !== b.pagina ? a.pagina - b.pagina : b.y - a.y)
+    .slice(0, CHECKBOX_CONFLITO_ROWS.length)
+    .forEach((linha, index) => {
+      respostas[CHECKBOX_CONFLITO_ROWS[index].key] = linha.value
+    })
+
+  const encontradas = CHECKBOX_CONFLITO_ROWS.reduce((total, row) => total + (respostas[row.key] !== null && respostas[row.key] !== undefined ? 1 : 0), 0)
+  return { respostas, confianca: CHECKBOX_CONFLITO_ROWS.length ? encontradas / CHECKBOX_CONFLITO_ROWS.length : 0 }
+}
+
 function normConflitoTexto(texto = '') {
   return texto
     .normalize('NFD')
@@ -446,6 +547,13 @@ async function extrairConflitoPdf(file) {
         confianca: Math.max(parsed.confianca, byTextRadios.confianca),
       }
       metodo = 'texto_pdf_radio'
+    }
+  }
+  if (parsed.confianca < 1) {
+    const byLegacyRadios = await respostasPorRadiosLegado(pdf, pdfjsLib)
+    if (byLegacyRadios.confianca > parsed.confianca) {
+      parsed = byLegacyRadios
+      metodo = 'imagem_radio_legado'
     }
   }
   if (parsed.confianca < 1) {
