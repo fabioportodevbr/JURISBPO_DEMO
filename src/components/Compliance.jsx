@@ -567,7 +567,7 @@ async function extrairConflitoPdf(file) {
     }
   }
   const respostas = Object.fromEntries(CHECKBOX_CONFLITO_ROWS.map(row => [row.key, parsed.respostas[row.key] === true]))
-  const extracaoIncompleta = parsed.confianca < 0.8
+  const extracaoIncompleta = parsed.confianca < 0.8 || metodo === 'imagem_checkbox'
   const risco = extracaoIncompleta ? 'MEDIO' : avaliarRiscoConflito(respostas)
   const meta = RISCO_CONFLITO_META[risco]
   return {
@@ -1958,6 +1958,10 @@ function conflitoArquivado(row) {
   return conflitoGestao(row).arquivado === true
 }
 
+function conflitoQuarentena(row) {
+  return conflitoGestao(row).quarentena === true && !conflitoArquivado(row)
+}
+
 function respostasComGestao(row, patch) {
   const respostas = { ...(row?.respostas || {}) }
   respostas[CONFLITO_GESTAO_KEY] = {
@@ -1974,7 +1978,7 @@ function ConflitosInteresseTab({ profile }) {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [archiveView, setArchiveView] = useState(false)
+  const [viewMode, setViewMode] = useState('ativa')
   const [selectedIds, setSelectedIds] = useState([])
   const [savingDecision, setSavingDecision] = useState(false)
   const [decisionForm, setDecisionForm] = useState({ observacoes_resultado: '', parecer_decisao: '' })
@@ -2135,6 +2139,7 @@ function ConflitosInteresseTab({ profile }) {
       const agora = new Date().toISOString()
       await atualizarGestaoAnalises(targets, {
         arquivado: true,
+        quarentena: false,
         arquivado_em: agora,
         arquivado_por: profile.id,
         arquivado_por_nome: profile.nome || profile.email,
@@ -2153,6 +2158,43 @@ function ConflitosInteresseTab({ profile }) {
       const agora = new Date().toISOString()
       await atualizarGestaoAnalises(targets, {
         arquivado: false,
+        quarentena: false,
+        reativado_em: agora,
+        reativado_por: profile.id,
+        reativado_por_nome: profile.nome || profile.email,
+      })
+      setSelectedIds([])
+      if (targets.some(row => row.id === selected?.id)) setSelected(null)
+    } catch (e) {
+      setError(e?.message || String(e))
+    }
+  }
+
+  async function quarentenarAnalises(targetRows) {
+    const targets = (targetRows || []).filter(row => row && !conflitoArquivado(row) && !conflitoQuarentena(row))
+    if (!targets.length) return
+    try {
+      const agora = new Date().toISOString()
+      await atualizarGestaoAnalises(targets, {
+        quarentena: true,
+        quarentena_em: agora,
+        quarentena_por: profile.id,
+        quarentena_por_nome: profile.nome || profile.email,
+      })
+      setSelectedIds([])
+      if (targets.some(row => row.id === selected?.id)) setSelected(null)
+    } catch (e) {
+      setError(e?.message || String(e))
+    }
+  }
+
+  async function desquarentenaAnalises(targetRows) {
+    const targets = (targetRows || []).filter(row => row && conflitoQuarentena(row))
+    if (!targets.length) return
+    try {
+      const agora = new Date().toISOString()
+      await atualizarGestaoAnalises(targets, {
+        quarentena: false,
         reativado_em: agora,
         reativado_por: profile.id,
         reativado_por_nome: profile.nome || profile.email,
@@ -2221,9 +2263,14 @@ function ConflitosInteresseTab({ profile }) {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
   }
 
-  const activeRows = useMemo(() => rows.filter(row => !conflitoArquivado(row)), [rows])
+  const activeRows = useMemo(() => rows.filter(row => !conflitoArquivado(row) && !conflitoQuarentena(row)), [rows])
+  const quarentenaRows = useMemo(() => rows.filter(row => conflitoQuarentena(row)), [rows])
   const archivedRows = useMemo(() => rows.filter(row => conflitoArquivado(row)), [rows])
-  const visibleRows = useMemo(() => archiveView ? archivedRows : activeRows, [archiveView, activeRows, archivedRows])
+  const visibleRows = useMemo(() => {
+    if (viewMode === 'arquivo') return archivedRows
+    if (viewMode === 'quarentena') return quarentenaRows
+    return activeRows
+  }, [viewMode, activeRows, quarentenaRows, archivedRows])
   const stats = useMemo(() => ({
     total: visibleRows.length,
     baixo: visibleRows.filter(r => r.nivel_risco === 'BAIXO').length,
@@ -2237,7 +2284,7 @@ function ConflitosInteresseTab({ profile }) {
   useEffect(() => {
     setSelectedIds([])
     setSelected(null)
-  }, [archiveView])
+  }, [viewMode])
 
   useEffect(() => {
     const gestao = conflitoGestao(detalhe)
@@ -2253,6 +2300,7 @@ function ConflitosInteresseTab({ profile }) {
 
   const detalheGestao = conflitoGestao(detalhe)
   const detalheArquivado = conflitoArquivado(detalhe)
+  const detalheQuarentena = conflitoQuarentena(detalhe)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 18, alignItems: 'start' }}>
@@ -2299,28 +2347,44 @@ function ConflitosInteresseTab({ profile }) {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
           <div style={{ display: 'inline-flex', border: '1px solid ' + C.border, borderRadius: 9, overflow: 'hidden', background: C.white }}>
-            <button type="button" onClick={() => setArchiveView(false)}
-              style={{ border: 0, borderRight: '1px solid ' + C.border, background: !archiveView ? C.greenBg : C.white, color: !archiveView ? C.green : C.text, padding: '8px 11px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
+            <button type="button" onClick={() => setViewMode('ativa')}
+              style={{ border: 0, borderRight: '1px solid ' + C.border, background: viewMode === 'ativa' ? C.greenBg : C.white, color: viewMode === 'ativa' ? C.green : C.text, padding: '8px 11px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
               Em analise ({activeRows.length})
             </button>
-            <button type="button" onClick={() => setArchiveView(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, border: 0, background: archiveView ? C.grayBg : C.white, color: archiveView ? C.gray : C.text, padding: '8px 11px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
+            <button type="button" onClick={() => setViewMode('quarentena')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, border: 0, borderRight: '1px solid ' + C.border, background: viewMode === 'quarentena' ? '#fff8e1' : C.white, color: viewMode === 'quarentena' ? C.amber : C.text, padding: '8px 11px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
+              <ShieldAlert size={13} /> Quarentena ({quarentenaRows.length})
+            </button>
+            <button type="button" onClick={() => setViewMode('arquivo')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, border: 0, background: viewMode === 'arquivo' ? C.grayBg : C.white, color: viewMode === 'arquivo' ? C.gray : C.text, padding: '8px 11px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
               <Archive size={13} /> Arquivo ({archivedRows.length})
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, fontWeight: 800, cursor: visibleRows.length ? 'pointer' : 'default' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, fontWeight: 800, cursor: visibleRows.length ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>
               <input type="checkbox" checked={allVisibleSelected} disabled={!visibleRows.length} onChange={toggleSelecionarTodos} />
               Selecionar todos
             </label>
             {selectedRows.length > 0 && (
               <span style={{ fontSize: 11, color: C.muted, fontWeight: 800 }}>{selectedRows.length} selecionada{selectedRows.length > 1 ? 's' : ''}</span>
             )}
-            <button type="button" disabled={!selectedRows.length} onClick={() => archiveView ? reativarAnalises(selectedRows) : arquivarAnalises(selectedRows)}
+            {viewMode === 'ativa' && (
+              <button type="button" disabled={!selectedRows.length} onClick={() => quarentenarAnalises(selectedRows)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.amber : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+                <ShieldAlert size={13} /> Quarentena
+              </button>
+            )}
+            {viewMode === 'quarentena' && (
+              <button type="button" disabled={!selectedRows.length} onClick={() => desquarentenaAnalises(selectedRows)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.green : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+                <RotateCcw size={13} /> Reativar
+              </button>
+            )}
+            <button type="button" disabled={!selectedRows.length} onClick={() => viewMode === 'arquivo' ? reativarAnalises(selectedRows) : arquivarAnalises(selectedRows)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.text : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
-              {archiveView ? <RotateCcw size={13} /> : <Archive size={13} />}
-              {archiveView ? 'Reativar' : 'Arquivar'}
+              {viewMode === 'arquivo' ? <RotateCcw size={13} /> : <Archive size={13} />}
+              {viewMode === 'arquivo' ? 'Reativar' : 'Arquivar'}
             </button>
             <button type="button" disabled={!selectedRows.length} onClick={() => excluirAnalises(selectedRows)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + (selectedRows.length ? C.red : C.border), background: C.white, color: selectedRows.length ? C.red : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
@@ -2345,7 +2409,7 @@ function ConflitosInteresseTab({ profile }) {
 
         <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
           {loading ? <div style={{ padding: 24, color: C.muted, textAlign: 'center' }}>Carregando analises...</div>
-            : visibleRows.length === 0 ? <div style={{ padding: 30, color: C.muted, textAlign: 'center' }}>{archiveView ? 'Nenhuma analise arquivada.' : 'Nenhuma analise registrada.'}</div>
+            : visibleRows.length === 0 ? <div style={{ padding: 30, color: C.muted, textAlign: 'center' }}>{viewMode === 'arquivo' ? 'Nenhuma analise arquivada.' : viewMode === 'quarentena' ? 'Nenhuma analise em quarentena.' : 'Nenhuma analise registrada.'}</div>
             : visibleRows.map(row => {
               const meta = RISCO_CONFLITO_META[row.nivel_risco] || RISCO_CONFLITO_META.BAIXO
               const gestao = conflitoGestao(row)
@@ -2353,16 +2417,17 @@ function ConflitosInteresseTab({ profile }) {
               return (
                 <div key={row.id} role="button" tabIndex={0} onClick={() => setSelected(row)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelected(row) }}
-                  style={{ width: '100%', display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto auto', gap: 10, alignItems: 'center',
+                  style={{ width: '100%', display: 'flex', gap: 8, alignItems: 'center',
                     padding: '11px 13px', border: 0, borderBottom: '1px solid ' + C.border,
                     background: detalhe?.id === row.id ? meta.bg : C.white, textAlign: 'left', cursor: 'pointer' }}>
                   <input type="checkbox" checked={isChecked} onChange={() => toggleSelecionado(row.id)}
                     onClick={e => e.stopPropagation()} title="Selecionar analise" />
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.arquivo_nome}</div>
                     <div style={{ fontSize: 11, color: C.muted }}>
                       {fmt(row.criado_em)} - {meta.statusLabel}
                       {gestao.arquivado_em ? ` - Arquivada em ${fmt(gestao.arquivado_em)}` : ''}
+                      {gestao.quarentena_em && !gestao.arquivado_em ? ` - Quarentena em ${fmt(gestao.quarentena_em)}` : ''}
                     </div>
                   </div>
                   <RiskBadge risco={row.nivel_risco} />
@@ -2370,9 +2435,21 @@ function ConflitosInteresseTab({ profile }) {
                     style={{ display: 'flex', border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: 6, color: C.muted, cursor: 'pointer' }}>
                     <Eye size={14} />
                   </button>
-                  <button type="button" onClick={e => { e.stopPropagation(); archiveView ? reativarAnalises([row]) : arquivarAnalises([row]) }} title={archiveView ? 'Reativar analise' : 'Arquivar analise'}
+                  {viewMode === 'ativa' && (
+                    <button type="button" onClick={e => { e.stopPropagation(); quarentenarAnalises([row]) }} title="Mover para quarentena"
+                      style={{ display: 'flex', border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: 6, color: C.amber, cursor: 'pointer' }}>
+                      <ShieldAlert size={14} />
+                    </button>
+                  )}
+                  {viewMode === 'quarentena' && (
+                    <button type="button" onClick={e => { e.stopPropagation(); desquarentenaAnalises([row]) }} title="Reativar da quarentena"
+                      style={{ display: 'flex', border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: 6, color: C.green, cursor: 'pointer' }}>
+                      <RotateCcw size={14} />
+                    </button>
+                  )}
+                  <button type="button" onClick={e => { e.stopPropagation(); viewMode === 'arquivo' ? reativarAnalises([row]) : arquivarAnalises([row]) }} title={viewMode === 'arquivo' ? 'Reativar analise' : 'Arquivar analise'}
                     style={{ display: 'flex', border: '1px solid ' + C.border, background: C.white, borderRadius: 7, padding: 6, color: C.muted, cursor: 'pointer' }}>
-                    {archiveView ? <RotateCcw size={14} /> : <Archive size={14} />}
+                    {viewMode === 'arquivo' ? <RotateCcw size={14} /> : <Archive size={14} />}
                   </button>
                   <button type="button" onClick={e => { e.stopPropagation(); excluirAnalises([row]) }} title="Excluir analise"
                     style={{ display: 'flex', border: '1px solid ' + C.red, background: C.white, borderRadius: 7, padding: 6, color: C.red, cursor: 'pointer' }}>
@@ -2401,6 +2478,18 @@ function ConflitosInteresseTab({ profile }) {
                 style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, color: C.text, cursor: 'pointer' }}>
                 <Eye size={13} /> Visualizar
               </button>
+              {!detalheArquivado && !detalheQuarentena && (
+                <button type="button" onClick={() => quarentenarAnalises([detalhe])}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, color: C.amber, cursor: 'pointer' }}>
+                  <ShieldAlert size={13} /> Quarentena
+                </button>
+              )}
+              {detalheQuarentena && (
+                <button type="button" onClick={() => desquarentenaAnalises([detalhe])}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, color: C.green, cursor: 'pointer' }}>
+                  <RotateCcw size={13} /> Reativar
+                </button>
+              )}
               <button type="button" onClick={() => detalheArquivado ? reativarAnalises([detalhe]) : arquivarAnalises([detalhe])}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: C.white, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, color: C.text, cursor: 'pointer' }}>
                 {detalheArquivado ? <RotateCcw size={13} /> : <Archive size={13} />}
@@ -2418,6 +2507,11 @@ function ConflitosInteresseTab({ profile }) {
               {detalheArquivado && (
                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid ' + C.border, fontSize: 11, color: C.muted, lineHeight: 1.45 }}>
                   Arquivada em {fmt(detalheGestao.arquivado_em)}{detalheGestao.arquivado_por_nome ? ` por ${detalheGestao.arquivado_por_nome}` : ''}
+                </div>
+              )}
+              {detalheQuarentena && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid ' + C.border, fontSize: 11, color: C.amber, lineHeight: 1.45 }}>
+                  Em quarentena desde {fmt(detalheGestao.quarentena_em)}{detalheGestao.quarentena_por_nome ? ` — por ${detalheGestao.quarentena_por_nome}` : ''}
                 </div>
               )}
             </div>
