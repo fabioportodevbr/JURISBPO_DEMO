@@ -196,7 +196,17 @@ export async function ingestUnreadEmails() {
   let ignored = 0
   let failed = 0
 
-  await client.connect()
+  // Sem este handler, um timeout de socket emite 'error' sem listener e derruba o processo inteiro.
+  client.on('error', (err: Error) => {
+    console.error('[push-email] IMAP socket error (handled):', err.message ?? err)
+  })
+
+  try {
+    await client.connect()
+  } catch (err) {
+    console.error('[push-email] Falha ao conectar IMAP:', err)
+    return { processed: 0, saved: 0 }
+  }
 
   try {
     const lock = await client.getMailboxLock('INBOX')
