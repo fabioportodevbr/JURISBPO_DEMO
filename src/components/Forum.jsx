@@ -395,19 +395,24 @@ function MensagensPane({profile,team}){
   const enviar=async()=>{
     if(!form.destinatario_id||!form.assunto.trim())return
     setSending(true)
-    const{data:nova}=await supabase.from('mensagens').insert({remetente_id:profile.id,destinatario_id:form.destinatario_id,assunto:form.assunto,corpo:form.corpo,lida:false,arquivada_por:[]}).select('id').single()
-    if(nova?.id){
-      if(form.arquivos?.length){
-        for(const f of form.arquivos){
-          const ext=f.name.split('.').pop()
-          const path=`mensagens/${nova.id}/${Date.now()}.${ext}`
-          const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false})
-          if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:nova.id,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}
-        }
-      }
-      await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:form.destinatario_id,tipo:'mensagem',titulo:'Nova mensagem de '+( profile.nome||'Usuário'),descricao:form.assunto,origem_tipo:'mensagem',origem_id:String(nova.id),lida:false,arquivada:false})
-      window.dispatchEvent(new Event('jurisbpo:notificacoes-atualizadas'))
+    const novaId=crypto.randomUUID()
+    const{error:erroInsert}=await supabase.from('mensagens').insert({id:novaId,remetente_id:profile.id,destinatario_id:form.destinatario_id,assunto:form.assunto,corpo:form.corpo,lida:false,arquivada_por:[]})
+    if(erroInsert){
+      console.error('Erro ao enviar mensagem:',erroInsert)
+      setSending(false)
+      return alert('Erro ao enviar: '+erroInsert.message)
     }
+    if(form.arquivos?.length){
+      for(const f of form.arquivos){
+        const ext=f.name.split('.').pop()
+        const path=`mensagens/${novaId}/${Date.now()}.${ext}`
+        const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false})
+        if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:novaId,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}
+      }
+    }
+    const{error:erroNotif}=await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:form.destinatario_id,tipo:'mensagem',titulo:'Nova mensagem de '+(profile.nome||'Usuário'),descricao:form.assunto,origem_tipo:'mensagem',origem_id:novaId,lida:false,arquivada:false})
+    if(erroNotif)console.error('Erro ao criar notificação:',erroNotif)
+    window.dispatchEvent(new Event('jurisbpo:notificacoes-atualizadas'))
     setForm({destinatario_id:'',assunto:'',corpo:'',arquivos:[]})
     setCompose(false)
     setSending(false)
@@ -418,14 +423,19 @@ function MensagensPane({profile,team}){
     if(!replyText.trim()&&!replyFiles.length)return
     setSending(true)
     const destId=selected.remetente_id===profile.id?selected.destinatario_id:selected.remetente_id
-    const{data:nova}=await supabase.from('mensagens').insert({remetente_id:profile.id,destinatario_id:destId,assunto:'Re: '+selected.assunto,corpo:replyText,parent_id:selected.parent_id||selected.id,lida:false,arquivada_por:[]}).select('id').single()
-    if(nova?.id){
-      if(replyFiles.length){
-        for(const f of replyFiles){const ext=f.name.split('.').pop();const path=`mensagens/${nova.id}/${Date.now()}.${ext}`;const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false});if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:nova.id,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}}
-      }
-      await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:destId,tipo:'mensagem',titulo:(profile.nome||'Usuário')+' respondeu sua mensagem',descricao:selected.assunto,origem_tipo:'mensagem',origem_id:String(nova.id),lida:false,arquivada:false})
-      window.dispatchEvent(new Event('jurisbpo:notificacoes-atualizadas'))
+    const novaId=crypto.randomUUID()
+    const{error:erroInsert}=await supabase.from('mensagens').insert({id:novaId,remetente_id:profile.id,destinatario_id:destId,assunto:'Re: '+selected.assunto,corpo:replyText,parent_id:selected.parent_id||selected.id,lida:false,arquivada_por:[]})
+    if(erroInsert){
+      console.error('Erro ao responder:',erroInsert)
+      setSending(false)
+      return alert('Erro ao responder: '+erroInsert.message)
     }
+    if(replyFiles.length){
+      for(const f of replyFiles){const ext=f.name.split('.').pop();const path=`mensagens/${novaId}/${Date.now()}.${ext}`;const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false});if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:novaId,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}}
+    }
+    const{error:erroNotif}=await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:destId,tipo:'mensagem',titulo:(profile.nome||'Usuário')+' respondeu sua mensagem',descricao:selected.assunto,origem_tipo:'mensagem',origem_id:novaId,lida:false,arquivada:false})
+    if(erroNotif)console.error('Erro ao criar notificação de resposta:',erroNotif)
+    window.dispatchEvent(new Event('jurisbpo:notificacoes-atualizadas'))
     setReplyText('');setReplyFiles([]);setSending(false);carregar()
   }
 
