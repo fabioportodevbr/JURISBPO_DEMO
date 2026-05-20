@@ -9,6 +9,7 @@ import { ingestUnreadEmails } from './services/emailIngestor.js'
 import { ingestComplianceEmails } from './services/complianceIngestor.js'
 import { processComplianceOutbox } from './services/complianceOutbox.js'
 import { getComplianceConfigs } from './services/getComplianceConfigs.js'
+import { ingestPublicacoesLider } from './services/publicacoesLiderIngestor.js'
 
 // ── Andamentos processuais ────────────────────────────────────────────────────
 async function runAndamentos() {
@@ -46,11 +47,22 @@ async function runComplianceOutbox() {
   }
 }
 
+// ── Publicacoes Lider ─────────────────────────────────────────────────────────
+async function runPublicacoesLider() {
+  if (!config.LIDER_WS_ENABLED) return
+  try {
+    const result = await ingestPublicacoesLider()
+    console.log(`[lider] Processadas: ${result.processed}; salvas: ${result.saved}`)
+  } catch (err) {
+    console.error('[lider] Erro na ingestao de publicacoes:', err)
+  }
+}
+
 // ── Entrypoint ────────────────────────────────────────────────────────────────
 const once = process.argv.includes('--once')
 
 if (once) {
-  Promise.all([runAndamentos(), runCompliance(), runComplianceOutbox()]).catch((err) => {
+  Promise.all([runAndamentos(), runCompliance(), runComplianceOutbox(), runPublicacoesLider()]).catch((err) => {
     console.error('[push-email] Erro:', err)
     process.exit(1)
   })
@@ -76,4 +88,13 @@ if (once) {
     runComplianceOutbox().catch((err) => console.error('[compliance] Erro outbox:', err))
   })
   runComplianceOutbox().catch((err) => console.error('[compliance] Erro inicial outbox:', err))
+
+  // Publicacoes Lider: uma vez por hora (somente se LIDER_WS_ENABLED=true)
+  if (config.LIDER_WS_ENABLED) {
+    console.log(`[lider] WebService de publicacoes ativo — polling a cada hora.`)
+    cron.schedule('0 * * * *', () => {
+      runPublicacoesLider().catch((err) => console.error('[lider] Erro cron:', err))
+    })
+    runPublicacoesLider().catch((err) => console.error('[lider] Erro inicial:', err))
+  }
 }

@@ -16,16 +16,25 @@ const envSchema = z.object({
   ALERT_WEBHOOK_URL:       z.string().url().optional().or(z.literal('')),
 
   // ── Canal de Compliance ──────────────────────────────────────────────────
-  // As configurações IMAP/SMTP de compliance são gerenciadas pelo gerente
+  // As configuracoes IMAP/SMTP de compliance sao gerenciadas pelo gerente
   // diretamente na UI (tabela compliance_config no Supabase).
-  // Nenhuma variável de ambiente adicional é necessária para compliance.
+  // Nenhuma variavel de ambiente adicional e necessaria para compliance.
+
+  // ── WebService Publicacoes Lider ─────────────────────────────────────────
+  LIDER_WS_ENABLED:   z.coerce.boolean().default(false),
+  LIDER_WS_URL:       z.string().default('http://201.48.5.17/WSPublicacoes/WSPublicacoes.asmx'),
+  LIDER_WS_NAMESPACE: z.string().default('http://tempuri.org/'),
+  LIDER_WS_VERSION:   z.coerce.number().default(5),
+  LIDER_LOGIN:        z.string().default('BRBPO'),
+  LIDER_SENHA:        z.string().default('90856660'),
+  LIDER_GRUPO:        z.coerce.number().default(0),
 })
 
 let config: z.infer<typeof envSchema>
 try {
   config = envSchema.parse(process.env)
 } catch (err) {
-  console.error('[push-email] ERRO DE CONFIGURAÇÃO — variáveis de ambiente ausentes ou inválidas:')
+  console.error('[push-email] ERRO DE CONFIGURACAO -- variaveis de ambiente ausentes ou invalidas:')
   if (err instanceof z.ZodError) {
     for (const issue of err.issues) {
       console.error(`  ${issue.path.join('.')}: ${issue.message}`)
