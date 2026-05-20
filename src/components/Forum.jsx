@@ -345,7 +345,7 @@ function ChatPane({profile,team,onlineMap}){
 }
 
 // ─── Messages Tab (async, from existing mensagens table) ──────────────────────
-function MensagensPane({profile,team}){
+function MensagensPane({profile,team,openId}){
   const [modo,setModo]=useState('entrada')
   const [mensagens,setMensagens]=useState([])
   const [anexos,setAnexos]=useState([])
@@ -369,6 +369,15 @@ function MensagensPane({profile,team}){
   }
 
   useEffect(()=>{carregar()},[profile.id])
+
+  useEffect(()=>{
+    if(!openId||!mensagens.length||selected)return
+    const root=mensagens.find(m=>m.id===openId&&!m.parent_id)
+    if(!root)return
+    if(root.remetente_id===profile.id&&root.destinatario_id!==profile.id)setModo('enviadas')
+    else setModo('entrada')
+    setSelected(root)
+  },[openId,mensagens])
 
   const anexosPorMsg=useMemo(()=>{const o={};(anexos||[]).forEach(a=>{if(!o[a.mensagem_id])o[a.mensagem_id]=[];o[a.mensagem_id].push(a)});return o},[anexos])
   const mensagensPorParent=useMemo(()=>{const o={};(mensagens||[]).forEach(m=>{const k=m.parent_id||m.id;if(!o[k])o[k]=[];o[k].push(m)});return o},[mensagens])
@@ -433,7 +442,8 @@ function MensagensPane({profile,team}){
     if(replyFiles.length){
       for(const f of replyFiles){const ext=f.name.split('.').pop();const path=`mensagens/${novaId}/${Date.now()}.${ext}`;const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false});if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:novaId,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}}
     }
-    const{error:erroNotif}=await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:destId,tipo:'mensagem',titulo:(profile.nome||'Usuário')+' respondeu sua mensagem',descricao:selected.assunto,origem_tipo:'mensagem',origem_id:novaId,lida:false,arquivada:false})
+    const rootId=selected.parent_id||selected.id
+    const{error:erroNotif}=await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:destId,tipo:'mensagem',titulo:(profile.nome||'Usuário')+' respondeu sua mensagem',descricao:selected.assunto,origem_tipo:'mensagem',origem_id:rootId,lida:false,arquivada:false})
     if(erroNotif)console.error('Erro ao criar notificação de resposta:',erroNotif)
     window.dispatchEvent(new Event('jurisbpo:notificacoes-atualizadas'))
     setReplyText('');setReplyFiles([]);setSending(false);carregar()
@@ -615,7 +625,7 @@ export default function Forum({profile}){
     </div>
     <div style={{flex:1,overflow:'hidden'}}>
       {aba==='chat'&&<ChatPane profile={profile} team={team} onlineMap={onlineMap}/>}
-      {aba==='mensagens'&&<MensagensPane profile={profile} team={team}/>}
+      {aba==='mensagens'&&<MensagensPane profile={profile} team={team} openId={searchParams.get('open')||undefined}/>}
     </div>
   </div>
 }

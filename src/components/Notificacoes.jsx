@@ -21,7 +21,7 @@ function Chip({tipo}){const [label,bg,color]=tipoInfo[tipo]||[tipo||'Aviso',C.gr
 
 function Empty({text}){return <div style={{background:C.white,border:'1px solid '+C.border,borderRadius:12,padding:28,textAlign:'center',color:C.muted}}><Inbox size={28} style={{display:'block',margin:'0 auto 8px'}}/>{text}</div>}
 
-export default function Notificacoes({profile, embedded=false}){
+export default function Notificacoes({profile, embedded=false, onNavigate}){
   const [modo,setModo]=useState('entrada')
   const [notificacoes,setNotificacoes]=useState([])
   const [loading,setLoading]=useState(false)
@@ -75,7 +75,8 @@ export default function Notificacoes({profile, embedded=false}){
   }
 
   function NotificationCard({n}){
-    return <div onClick={()=>marcarLida(n)} style={{background:n.lida?C.white:C.blueBg,border:'1px solid '+(n.lida?C.border:'#93c5fd'),borderRadius:12,padding:'14px 16px',cursor:'pointer',display:'flex',gap:12,alignItems:'flex-start'}}>
+    const handleClick=()=>{marcarLida(n);if(n.origem_id&&onNavigate)onNavigate(n)}
+    return <div onClick={handleClick} style={{background:n.lida?C.white:C.blueBg,border:'1px solid '+(n.lida?C.border:'#93c5fd'),borderRadius:12,padding:'14px 16px',cursor:'pointer',display:'flex',gap:12,alignItems:'flex-start'}}>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:4}}>
           <Chip tipo={n.tipo}/>
@@ -124,7 +125,7 @@ export default function Notificacoes({profile, embedded=false}){
   </div>
 }
 
-export function NotificacoesModal({profile,onClose}){
+export function NotificacoesModal({profile,onClose,onNavigate}){
   return <div onMouseDown={e=>e.target===e.currentTarget&&(e.currentTarget._md=1)} onClick={e=>e.target===e.currentTarget&&e.currentTarget._md&&(delete e.currentTarget._md,onClose())} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:680,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
     <div style={{background:C.white,borderRadius:14,width:'100%',maxWidth:760,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,.25)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:18,borderBottom:'1px solid '+C.border}}>
@@ -132,7 +133,7 @@ export function NotificacoesModal({profile,onClose}){
         <button onClick={onClose} style={{border:0,background:'none',cursor:'pointer',display:'flex',padding:4,color:C.text}}><X/></button>
       </div>
       <div style={{padding:18,overflow:'auto'}}>
-        <Notificacoes profile={profile} embedded />
+        <Notificacoes profile={profile} embedded onNavigate={onNavigate}/>
       </div>
     </div>
   </div>

@@ -400,6 +400,14 @@ function AppLayout() {
     navigate('/login')
   }
 
+  const ATIVIDADE_TIPOS = ['nova_atividade','atividade_redistribuida','atividade_aceita','atividade_devolvida','atividade_50_prazo','atividade_vencida']
+  const handleNotificacaoNavigate = (n) => {
+    setNotificacoesModal(false)
+    if(!n.origem_id) return
+    if(ATIVIDADE_TIPOS.includes(n.tipo)) navigate(`/atividades?open=${n.origem_id}`)
+    else if(n.tipo === 'mensagem') navigate(`/forum?tab=mensagens&open=${n.origem_id}`)
+  }
+
   if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg }}>
@@ -455,7 +463,7 @@ function AppLayout() {
       />
 
       {notificacoesModal && (
-        <NotificacoesModal profile={profile} onClose={() => setNotificacoesModal(false)} />
+        <NotificacoesModal profile={profile} onClose={() => setNotificacoesModal(false)} onNavigate={handleNotificacaoNavigate} />
       )}
 
       <AlertaAtividadePopup profile={profile} />

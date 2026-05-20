@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
 import { Plus, RefreshCw, Pencil, Trash2, X, CalendarDays, Paperclip, Archive, RotateCcw, Search, ChevronDown, Bell } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
@@ -58,6 +59,7 @@ function AtividadeCard({t,team,cont,onOpen}){
 
 /* ── Componente principal ── */
 export default function Atividades({profile}){
+  const [searchParams,setSearchParams]=useSearchParams()
   const [items,setItems]=useState([])
   const [team,setTeam]=useState([])
   const [proc,setProc]=useState([])
@@ -144,6 +146,13 @@ export default function Atividades({profile}){
     loadRotinas()
   }
   useEffect(()=>{load()},[profile.escritorio_id,profile.id,profile.role])
+
+  useEffect(()=>{
+    const openId=searchParams.get('open')
+    if(!openId||!items.length)return
+    const item=items.find(x=>x.id===openId)
+    if(item){open(item);setSearchParams({},{replace:true})}
+  },[items,searchParams])
 
   /* carrega histórico quando tab muda */
   useEffect(()=>{
