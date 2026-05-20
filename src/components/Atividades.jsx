@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, can, fetchAllRows } from '../lib/supabase.js'
-import { Plus, RefreshCw, Pencil, Trash2, X, CalendarDays, Paperclip, Archive, RotateCcw, Search, ChevronDown } from 'lucide-react'
+import { Plus, RefreshCw, Pencil, Trash2, X, CalendarDays, Paperclip, Archive, RotateCcw, Search, ChevronDown, Bell } from 'lucide-react'
 import DocumentosVinculados from './DocumentoVinculados.jsx'
 
 import { C } from '../lib/theme'
@@ -170,7 +170,7 @@ export default function Atividades({profile}){
   /* ── Ações ── */
   const open=(t=null,tipo='tarefa')=>{
     if(!t&&!canCreate)return alert('Visitante possui acesso somente leitura.')
-    setForm(t?{...t,audiencia_modalidade:t.audiencia_modalidade||'presencial',audiencia_tipo:t.audiencia_tipo||'inicial'}:{tipo,status:'a_fazer',titulo:'',descricao:'',prioridade:'media',responsavel_id:profile.id,prazo:'',horario:'',local:'',processo_id:'',contrato_id:'',audiencia_modalidade:'presencial',audiencia_tipo:'inicial'})
+    setForm(t?{...t,audiencia_modalidade:t.audiencia_modalidade||'presencial',audiencia_tipo:t.audiencia_tipo||'inicial',alerta_antecedencia:t.alerta_antecedencia||'',alerta_unidade:t.alerta_unidade||'horas'}:{tipo,status:'a_fazer',titulo:'',descricao:'',prioridade:'media',responsavel_id:profile.id,prazo:'',horario:'',local:'',processo_id:'',contrato_id:'',audiencia_modalidade:'presencial',audiencia_tipo:'inicial',alerta_antecedencia:'',alerta_unidade:'horas'})
     setTab('dados')
     setHistory([])
     setModal(true)
@@ -191,7 +191,8 @@ export default function Atividades({profile}){
     const antigo=items.find(x=>x.id===form.id)
     const{processos,contratos,profiles:_,... cleanForm}=form
     const vaiArquivar=cleanForm.status==='concluida'&&antigo?.status!=='concluida'
-    const payload={...cleanForm,escritorio_id:profile.escritorio_id,responsavel_id:form.responsavel_id||null,processo_id:form.processo_id||null,contrato_id:form.contrato_id||null,prazo:form.prazo||null,horario:form.horario||null,criado_por:form.criado_por||profile.id,concluida_em:cleanForm.status==='concluida'?(form.concluida_em||new Date().toISOString()):null}
+    const alertaAnt=parseInt(cleanForm.alerta_antecedencia,10)
+    const payload={...cleanForm,escritorio_id:profile.escritorio_id,responsavel_id:form.responsavel_id||null,processo_id:form.processo_id||null,contrato_id:form.contrato_id||null,prazo:form.prazo||null,horario:form.horario||null,criado_por:form.criado_por||profile.id,concluida_em:cleanForm.status==='concluida'?(form.concluida_em||new Date().toISOString()):null,alerta_antecedencia:alertaAnt>0?alertaAnt:null,alerta_unidade:alertaAnt>0?(cleanForm.alerta_unidade||'horas'):null}
     let r
     if(form.id)r=await supabase.from('atividades').update(payload).eq('id',form.id).select().single()
     else r=await supabase.from('atividades').insert(payload).select().single()
@@ -480,6 +481,43 @@ export default function Atividades({profile}){
                 <F label="Horário"><input type="time" style={INP} value={form.horario||''} onChange={e=>setForm({...form,horario:e.target.value})}/></F>
               </div>
               <F label="Local / link"><input style={INP} value={form.local||''} onChange={e=>setForm({...form,local:e.target.value})}/></F>
+
+              {/* ── Alerta ── */}
+              <div style={{background:form.alerta_antecedencia?'#fffbeb':'#f8fafc',border:'1px solid '+(form.alerta_antecedencia?'#fbbf24':C.border),borderRadius:10,padding:'12px 14px',marginBottom:4}}>
+                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+                  <Bell size={14} color={form.alerta_antecedencia?'#b45309':C.muted}/>
+                  <span style={{fontSize:12,fontWeight:800,textTransform:'uppercase',color:form.alerta_antecedencia?'#b45309':C.muted}}>Alerta de antecedência</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Ex: 30"
+                    value={form.alerta_antecedencia||''}
+                    onChange={e=>setForm({...form,alerta_antecedencia:e.target.value})}
+                    style={{...INP,width:100,flexShrink:0}}
+                  />
+                  <select
+                    value={form.alerta_unidade||'horas'}
+                    onChange={e=>setForm({...form,alerta_unidade:e.target.value})}
+                    style={{...INP,width:'auto',flex:1,minWidth:100}}
+                  >
+                    <option value="minutos">Minutos</option>
+                    <option value="horas">Horas</option>
+                    <option value="dias">Dias</option>
+                  </select>
+                  <span style={{fontSize:12,color:C.muted,whiteSpace:'nowrap'}}>antes do prazo</span>
+                  {form.alerta_antecedencia&&<button type="button" onClick={()=>setForm({...form,alerta_antecedencia:'',alerta_unidade:'horas'})} style={{border:0,background:'none',cursor:'pointer',color:C.muted,display:'flex',padding:2}}><X size={14}/></button>}
+                </div>
+                {form.alerta_antecedencia&&!form.prazo&&<p style={{margin:'8px 0 0',fontSize:11,color:'#b45309'}}>⚠ Defina uma data/prazo para o alerta funcionar.</p>}
+                {form.alerta_antecedencia&&form.prazo&&(()=>{
+                  const factorMs={minutos:60_000,horas:3_600_000,dias:86_400_000}
+                  const prazoDatetime=form.horario?new Date(`${form.prazo}T${form.horario}`):new Date(`${form.prazo}T23:59:00`)
+                  const alertaDatetime=new Date(prazoDatetime.getTime()-parseInt(form.alerta_antecedencia,10)*(factorMs[form.alerta_unidade]||3_600_000))
+                  return <p style={{margin:'8px 0 0',fontSize:11,color:'#b45309'}}>Aviso em: {alertaDatetime.toLocaleString('pt-BR')}</p>
+                })()}
+              </div>
+
               <F label="Processo vinculado"><select style={INP} value={form.processo_id||''} onChange={e=>setForm({...form,processo_id:e.target.value,contrato_id:''})}><option value="">Sem processo</option>{proc.map(p=><option key={p.id} value={p.id}>{p.titulo} — {p.numero}</option>)}</select></F>
               {!['prazo_processual','audiencia'].includes(form.tipo)&&<F label="Contrato vinculado"><select style={INP} value={form.contrato_id||''} onChange={e=>setForm({...form,contrato_id:e.target.value,processo_id:''})}><option value="">Sem contrato</option>{cont.map(c=><option key={c.id} value={c.id}>{c.titulo}</option>)}</select></F>}
 

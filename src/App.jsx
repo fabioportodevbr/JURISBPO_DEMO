@@ -14,6 +14,7 @@ import AvatarUsuario from './components/common/AvatarUsuario.jsx'
 import { ThemeProvider, useTheme } from './lib/ThemeContext.jsx'
 import { PrivacyProvider, usePrivacy, Prv } from './lib/PrivacyContext.jsx'
 import { NotificacoesModal } from './components/Notificacoes.jsx'
+import AlertaAtividadePopup from './components/AlertaAtividadePopup.jsx'
 
 // ── Importa as páginas ────────────────────────────────────────────────────
 import Dashboard   from './components/Dashboard.jsx'
@@ -456,6 +457,8 @@ function AppLayout() {
       {notificacoesModal && (
         <NotificacoesModal profile={profile} onClose={() => setNotificacoesModal(false)} />
       )}
+
+      <AlertaAtividadePopup profile={profile} />
 
       {/* ── Menu lateral ─────────────────────────────────────── */}
       <Sidebar
