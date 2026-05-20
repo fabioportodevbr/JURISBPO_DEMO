@@ -205,6 +205,7 @@ export async function ingestUnreadEmails() {
     await client.connect()
   } catch (err) {
     console.error('[push-email] Falha ao conectar IMAP:', err)
+    try { client.close() } catch {}  // garante que o socket é fechado
     return { processed: 0, saved: 0 }
   }
 
