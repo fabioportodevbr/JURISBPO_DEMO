@@ -9,7 +9,6 @@
  * - Workflow visual de status (stepper)
  * - Composer de mensagens (officer_reply, diligência, nota interna)
  * - Anonimização do remetente (UI nunca exibe remetente_email)
- * - Aba Configurações: gerente configura IMAP + SMTP diretamente na UI
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
