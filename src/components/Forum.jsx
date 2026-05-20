@@ -381,12 +381,14 @@ function MensagensPane({profile,team}){
     const seen=new Set()
     return mensagens.filter(m=>{
       if(m.parent_id)return false
-      const arq=arquivada(m)
-      if(modo==='entrada'&&arq)return false
-      if(modo==='arquivo'&&!arq)return false
       if(seen.has(m.id))return false
       seen.add(m.id)
-      return m.remetente_id===profile.id||m.destinatario_id===profile.id
+      const arq=arquivada(m)
+      if(modo==='arquivo') return arq&&(m.remetente_id===profile.id||m.destinatario_id===profile.id)
+      if(arq) return false
+      if(modo==='entrada') return m.destinatario_id===profile.id
+      if(modo==='enviadas') return m.remetente_id===profile.id
+      return false
     })
   },[mensagens,modo,profile.id])
 
@@ -394,13 +396,17 @@ function MensagensPane({profile,team}){
     if(!form.destinatario_id||!form.assunto.trim())return
     setSending(true)
     const{data:nova}=await supabase.from('mensagens').insert({remetente_id:profile.id,destinatario_id:form.destinatario_id,assunto:form.assunto,corpo:form.corpo,lida:false,arquivada_por:[]}).select('id').single()
-    if(nova?.id&&form.arquivos?.length){
-      for(const f of form.arquivos){
-        const ext=f.name.split('.').pop()
-        const path=`mensagens/${nova.id}/${Date.now()}.${ext}`
-        const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false})
-        if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:nova.id,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}
+    if(nova?.id){
+      if(form.arquivos?.length){
+        for(const f of form.arquivos){
+          const ext=f.name.split('.').pop()
+          const path=`mensagens/${nova.id}/${Date.now()}.${ext}`
+          const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false})
+          if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:nova.id,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}
+        }
       }
+      await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:form.destinatario_id,tipo:'mensagem',titulo:'Nova mensagem de '+( profile.nome||'Usuário'),descricao:form.assunto,origem_tipo:'mensagem',origem_id:String(nova.id),lida:false,arquivada:false})
+      window.dispatchEvent(new Event('jurisbpo:notificacoes-atualizadas'))
     }
     setForm({destinatario_id:'',assunto:'',corpo:'',arquivos:[]})
     setCompose(false)
@@ -411,9 +417,14 @@ function MensagensPane({profile,team}){
   const responder=async()=>{
     if(!replyText.trim()&&!replyFiles.length)return
     setSending(true)
-    const{data:nova}=await supabase.from('mensagens').insert({remetente_id:profile.id,destinatario_id:selected.remetente_id===profile.id?selected.destinatario_id:selected.remetente_id,assunto:'Re: '+selected.assunto,corpo:replyText,parent_id:selected.parent_id||selected.id,lida:false,arquivada_por:[]}).select('id').single()
-    if(nova?.id&&replyFiles.length){
-      for(const f of replyFiles){const ext=f.name.split('.').pop();const path=`mensagens/${nova.id}/${Date.now()}.${ext}`;const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false});if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:nova.id,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}}
+    const destId=selected.remetente_id===profile.id?selected.destinatario_id:selected.remetente_id
+    const{data:nova}=await supabase.from('mensagens').insert({remetente_id:profile.id,destinatario_id:destId,assunto:'Re: '+selected.assunto,corpo:replyText,parent_id:selected.parent_id||selected.id,lida:false,arquivada_por:[]}).select('id').single()
+    if(nova?.id){
+      if(replyFiles.length){
+        for(const f of replyFiles){const ext=f.name.split('.').pop();const path=`mensagens/${nova.id}/${Date.now()}.${ext}`;const{error}=await supabase.storage.from('documentos').upload(path,f,{upsert:false});if(!error){const{data:u}=supabase.storage.from('documentos').getPublicUrl(path);await supabase.from('mensagens_anexos').insert({mensagem_id:nova.id,nome:f.name,url:u.publicUrl,tipo:f.type,tamanho:f.size})}}
+      }
+      await supabase.from('notificacoes').insert({escritorio_id:profile.escritorio_id,usuario_id:destId,tipo:'mensagem',titulo:(profile.nome||'Usuário')+' respondeu sua mensagem',descricao:selected.assunto,origem_tipo:'mensagem',origem_id:String(nova.id),lida:false,arquivada:false})
+      window.dispatchEvent(new Event('jurisbpo:notificacoes-atualizadas'))
     }
     setReplyText('');setReplyFiles([]);setSending(false);carregar()
   }
@@ -449,14 +460,15 @@ function MensagensPane({profile,team}){
 
   return <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
     <div style={{padding:'16px 24px',borderBottom:'1px solid '+C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,background:C.white}}>
-      <div style={{display:'flex',gap:8}}>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         <button onClick={()=>setModo('entrada')} style={{border:'1px solid '+C.border,background:modo==='entrada'?C.navy:C.white,color:modo==='entrada'?'white':C.text,borderRadius:20,padding:'7px 14px',fontWeight:700,cursor:'pointer',display:'flex',gap:6,alignItems:'center',fontSize:13}}><Inbox size={14}/>Entrada</button>
+        <button onClick={()=>setModo('enviadas')} style={{border:'1px solid '+C.border,background:modo==='enviadas'?C.navy:C.white,color:modo==='enviadas'?'white':C.text,borderRadius:20,padding:'7px 14px',fontWeight:700,cursor:'pointer',display:'flex',gap:6,alignItems:'center',fontSize:13}}><Send size={14}/>Enviadas</button>
         <button onClick={()=>setModo('arquivo')} style={{border:'1px solid '+C.border,background:modo==='arquivo'?C.navy:C.white,color:modo==='arquivo'?'white':C.text,borderRadius:20,padding:'7px 14px',fontWeight:700,cursor:'pointer',display:'flex',gap:6,alignItems:'center',fontSize:13}}><Archive size={14}/>Arquivo</button>
       </div>
       <button onClick={()=>setCompose(true)} style={{background:C.navy,color:'white',border:0,borderRadius:8,padding:'9px 16px',fontWeight:700,cursor:'pointer',display:'flex',gap:6,alignItems:'center',fontSize:13}}><Send size={14}/>Nova mensagem</button>
     </div>
     <div style={{flex:1,overflowY:'auto',padding:'16px 24px',display:'flex',flexDirection:'column',gap:10}}>
-      {loading?<div style={{color:C.muted,textAlign:'center',padding:40}}>Carregando...</div>:raizes.length===0?<div style={{textAlign:'center',padding:'60px 0',color:C.muted}}><Mail size={32} style={{display:'block',margin:'0 auto 12px',opacity:.3}}/><p style={{margin:0,fontSize:14}}>{modo==='arquivo'?'Nenhuma mensagem arquivada.':'Caixa de entrada vazia.'}</p></div>:raizes.map(m=>{
+      {loading?<div style={{color:C.muted,textAlign:'center',padding:40}}>Carregando...</div>:raizes.length===0?<div style={{textAlign:'center',padding:'60px 0',color:C.muted}}><Mail size={32} style={{display:'block',margin:'0 auto 12px',opacity:.3}}/><p style={{margin:0,fontSize:14}}>{modo==='arquivo'?'Nenhuma mensagem arquivada.':modo==='enviadas'?'Nenhuma mensagem enviada.':'Caixa de entrada vazia.'}</p></div>:raizes.map(m=>{
         const env=m.remetente_id===profile.id
         const outro=env?teamMap[m.destinatario_id]:teamMap[m.remetente_id]
         const respostas=(mensagensPorParent[m.id]||[]).filter(r=>r.id!==m.id)
