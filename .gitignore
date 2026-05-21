@@ -9,3 +9,4 @@ dist/
 next-dev*.log
 *.tsbuildinfo
 scratch_schema.js
+package-lock.json
