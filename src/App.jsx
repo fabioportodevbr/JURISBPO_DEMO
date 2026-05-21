@@ -37,8 +37,10 @@ import Compliance  from './components/Compliance.jsx'
 import { C } from './lib/theme'
 
 // ── TopBar: constantes ────────────────────────────────────────────────────
-const TOP_H = 52
-const SB_W  = 224   // largura do menu lateral
+const TOP_H     = 52
+const SB_W      = 256    // largura do menu lateral (aumentada)
+const SB_MARGIN = 12     // margem flutuante das bordas do browser
+const SB_GAP    = 8      // espaço entre sidebar e conteúdo/topbar
 
 const dropItemStyle = {
   display: 'flex', alignItems: 'center', gap: 10,
@@ -65,7 +67,7 @@ function buildNav(profile) {
   return all.filter(item => !item.perm || can(profile, item.perm))
 }
 
-// ── Sidebar (sem cabeçalho de logo — fica na TopBar) ─────────────────────
+// ── Sidebar (logo no topo, flutuante no desktop) ──────────────────────────
 function Sidebar({ nav, currentPath, onNav, open, onClose, mobile, unreadCount }) {
   const [hovered, setHovered] = useState(null)
   return (
@@ -74,12 +76,34 @@ function Sidebar({ nav, currentPath, onNav, open, onClose, mobile, unreadCount }
         <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 98 }} />
       )}
       <aside style={{
-        position: 'fixed', top: TOP_H, bottom: 0, width: SB_W,
-        left: open ? 0 : -SB_W - 16,
+        position: 'fixed',
+        top: mobile ? TOP_H : SB_MARGIN,
+        bottom: mobile ? 0 : SB_MARGIN,
+        width: SB_W,
+        left: open ? (mobile ? 0 : SB_MARGIN) : -(SB_W + SB_MARGIN * 2),
         background: C.navy, display: 'flex', flexDirection: 'column',
         zIndex: 99, transition: 'left 0.22s ease',
+        borderRadius: mobile ? 0 : 16,
+        overflow: 'hidden',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
         fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif",
       }}>
+        {/* Logo — apenas no desktop */}
+        {!mobile && (
+          <div style={{
+            padding: '16px 18px 14px', flexShrink: 0,
+            display: 'flex', alignItems: 'center', gap: 10,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: C.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Scale size={17} color={C.navy} />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{APP_CONFIG.nome}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{APP_CONFIG.subtitulo}</div>
+            </div>
+          </div>
+        )}
         <nav className="sidebar-nav" style={{ flex: 1, padding: '10px 10px', overflowY: 'auto' }}>
           {nav.map(({ path, label, Icon, accent }) => {
             const active = currentPath === path
@@ -161,40 +185,25 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
 
   return (
     <header style={{
-      position: 'fixed', top: 0, left: 0, right: 0, height: TOP_H,
-      display: 'flex', alignItems: 'stretch',
+      position: 'fixed',
+      top: mobile ? 0 : SB_MARGIN,
+      left: mobile ? 0 : SB_MARGIN + SB_W + SB_GAP,
+      right: mobile ? 0 : SB_MARGIN,
+      height: TOP_H,
+      background: RBG,
+      borderRadius: mobile ? 0 : 12,
+      ...(mobile
+        ? { borderBottom: `1px solid ${RBORD}` }
+        : { border: `1px solid ${RBORD}` }
+      ),
+      display: 'flex', alignItems: 'center',
+      padding: '0 14px', gap: 4,
+      boxShadow: isDark
+        ? '0 4px 20px rgba(0,0,0,0.30)'
+        : '0 4px 20px rgba(0,0,0,.10)',
       zIndex: 100,
       fontFamily: "'Nunito Sans',system-ui,-apple-system,BlinkMacSystemFont,sans-serif",
     }}>
-
-      {/* ── ESQUERDA: mesma cor e largura do menu lateral ─────── */}
-      {!mobile && (
-        <div style={{
-          width: SB_W, flexShrink: 0,
-          background: C.navy,
-          display: 'flex', alignItems: 'center',
-          padding: '0 18px', gap: 10,
-        }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: C.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Scale size={17} color={C.navy} />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{APP_CONFIG.nome}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{APP_CONFIG.subtitulo}</div>
-          </div>
-        </div>
-      )}
-
-      {/* ── DIREITA: branca / escura (tema) + sombra ─────────── */}
-      <div style={{
-        flex: 1, background: RBG,
-        borderBottom: `1px solid ${RBORD}`,
-        display: 'flex', alignItems: 'center',
-        padding: '0 14px', gap: 4,
-        boxShadow: isDark
-          ? '0 1px 0 rgba(255,255,255,0.04)'
-          : '0 1px 4px rgba(0,0,0,.08), 0 0 0 0 transparent',
-      }}>
 
         {/* Mobile: hambúrguer + logo compacto */}
         {mobile && (
@@ -349,7 +358,6 @@ function TopBar({ profile, currentPath, onNav, onLogout, unreadCount, onNotifica
           )}
         </div>
 
-      </div>{/* fim seção direita */}
     </header>
   )
 }
@@ -480,7 +488,7 @@ function AppLayout() {
       />
 
       {/* ── Conteúdo principal ───────────────────────────────── */}
-      <div style={{ flex: 1, marginLeft: mobile ? 0 : SB_W, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s', paddingTop: TOP_H }}>
+      <div style={{ flex: 1, marginLeft: mobile ? 0 : SB_MARGIN + SB_W + SB_GAP, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'margin-left 0.22s', paddingTop: mobile ? TOP_H : SB_MARGIN + TOP_H + SB_GAP }}>
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', paddingBottom: mobile ? 'calc(78px + env(safe-area-inset-bottom))' : 0 }}>
           <Routes>
             <Route path="/dashboard"  element={<Dashboard  profile={profile} unreadCount={unreadCount} />} />
