@@ -40,6 +40,7 @@ export default function Equipe({profile}){
   const [novoMembro,setNovoMembro]=useState({nome:'',email:'',cargo:'Advogado(a)',papel:'advogado',senhaTemporaria:''})
   const [creating,setCreating]=useState(false)
   const [removing,setRemoving]=useState(null)
+  const [togglingCompliance,setTogglingCompliance]=useState(null)
 
   const isGerente=useMemo(()=>can(profile,'equipe.gerenciar') || profile?.papel==='gerente' || profile?.role==='gerente',[profile])
 
@@ -47,7 +48,7 @@ export default function Equipe({profile}){
     setLoading(true)
     const {data:links,error:linksError}=await supabase
       .from('usuarios_escritorios')
-      .select('usuario_id,papel,ativo,created_at')
+      .select('usuario_id,papel,ativo,compliance_access,created_at')
       .eq('escritorio_id',profile.escritorio_id)
       .eq('ativo',true)
       .order('created_at',{ascending:true})
@@ -159,6 +160,21 @@ export default function Equipe({profile}){
     alert('Membro incluído com sucesso.')
   }
 
+  async function toggleComplianceAccess(x){
+    if(!isGerente) return
+    const novoValor=!x.compliance_access
+    setTogglingCompliance(x.usuario_id)
+    const {error}=await supabase
+      .from('usuarios_escritorios')
+      .update({compliance_access:novoValor})
+      .eq('usuario_id',x.usuario_id)
+      .eq('escritorio_id',profile.escritorio_id)
+    setTogglingCompliance(null)
+    if(error) return alert('Erro ao alterar acesso ao compliance: '+error.message)
+    if(selecionado?.usuario_id===x.usuario_id) setSelecionado(prev=>prev?{...prev,compliance_access:novoValor}:prev)
+    await load()
+  }
+
   async function removerMembro(x){
     if(!isGerente) return alert('Apenas gerentes podem remover membros.')
     if(x.usuario_id===profile.id) return alert('Você não pode remover seu próprio usuário pela tela de Equipe.')
@@ -265,6 +281,23 @@ export default function Equipe({profile}){
           <InfoLine icon={<Scale size={17}/>} label="OAB" value={membroSelecionado.profile?.oab}/>
           <InfoLine icon={<Phone size={17}/>} label="Telefone" value={membroSelecionado.profile?.telefone}/>
         </div>
+
+        {isGerente&&membroSelecionado.papel!=='gerente'&&membroSelecionado.usuario_id!==profile.id&&<div style={{border:'1px solid '+C.border,borderRadius:14,padding:'12px 14px',background:C.bg,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:9}}>
+            <ShieldCheck size={18} color={membroSelecionado.compliance_access?C.green:C.muted}/>
+            <div>
+              <div style={{fontWeight:700,fontSize:14,color:C.text}}>Acesso ao Compliance</div>
+              <div style={{fontSize:12,color:C.muted}}>Permite visualizar e gerenciar denúncias de compliance</div>
+            </div>
+          </div>
+          <button
+            disabled={togglingCompliance===membroSelecionado.usuario_id}
+            onClick={()=>toggleComplianceAccess(membroSelecionado)}
+            style={{border:0,borderRadius:20,padding:'7px 16px',cursor:togglingCompliance===membroSelecionado.usuario_id?'not-allowed':'pointer',background:membroSelecionado.compliance_access?C.green:C.border,color:membroSelecionado.compliance_access?'white':C.text,fontWeight:700,fontSize:13,minWidth:110,transition:'background .15s'}}
+          >
+            {togglingCompliance===membroSelecionado.usuario_id?'Salvando...':(membroSelecionado.compliance_access?'Habilitado':'Desabilitado')}
+          </button>
+        </div>}
 
         <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}>
           {isGerente && membroSelecionado.usuario_id!==profile.id ? <button disabled={removing===membroSelecionado.usuario_id} onClick={()=>removerMembro(membroSelecionado)} style={{...BTN,background:C.redBg,color:C.red,border:'1px solid '+C.red}}><Trash2 size={16}/>Remover da equipe</button> : <span/>}

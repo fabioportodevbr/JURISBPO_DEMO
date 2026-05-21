@@ -39,6 +39,7 @@ export const can = (profile, acao) => {
   const role = ROLES[profile.role]
   const nivel = role?.nivel || 0
   const readOnly = !!role?.readOnly
+  const complianceAccess = !!profile.compliance_access
   const perms = {
     'processos.ver': nivel >= 1,
     'processos.criar': !readOnly && nivel >= 2,
@@ -63,8 +64,8 @@ export const can = (profile, acao) => {
     'ia.usar': nivel >= 2,
     'perfil.editar': !readOnly,
     'mensagens.enviar': !readOnly && nivel >= 1,
-    'compliance.ver': nivel >= 4,
-    'compliance.gerenciar': nivel >= 4,
+    'compliance.ver': nivel >= 4 || complianceAccess,
+    'compliance.gerenciar': nivel >= 4 || complianceAccess,
   }
   return perms[acao] ?? false
 }
@@ -84,7 +85,7 @@ export async function getProfile(userId, email) {
 
   const { data: links, error: lError } = await supabase
     .from('usuarios_escritorios')
-    .select('id, escritorio_id, papel, ativo, escritorios(id, nome, slug, plano, ativo)')
+    .select('id, escritorio_id, papel, ativo, compliance_access, escritorios(id, nome, slug, plano, ativo)')
     .eq('usuario_id', userId)
     .eq('ativo', true)
     .limit(1)
@@ -100,6 +101,7 @@ export async function getProfile(userId, email) {
     escritorio_id: link.escritorio_id,
     escritorio: link.escritorios,
     escritorio_nome: link.escritorios?.nome || 'Empresa',
+    compliance_access: link.compliance_access || false,
   }
 }
 
