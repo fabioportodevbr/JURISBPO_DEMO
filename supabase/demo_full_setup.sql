@@ -1,13 +1,669 @@
 -- =============================================================
--- JurisBPO DEMO — Setup Completo (migrations + seed)
--- Execute este arquivo UMA VEZ no SQL Editor do Supabase DEMO.
+-- JurisBPO DEMO — Setup Completo
+-- Ordem: schema base → migrations → seed de demonstração
+-- Execute UMA VEZ no SQL Editor do projeto Supabase DEMO.
 -- =============================================================
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- ===================================================================
+-- PARTE 1: SCHEMA BASE (tabelas, funções e RLS principais)
+-- ===================================================================
+-- ============================================================
+-- JURISBPO v2 - Schema limpo multi-escritorio com RLS
+-- Execute em um projeto Supabase novo ou apos reset controlado.
+-- ============================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ============================================================
+-- LIMPEZA OPCIONAL
+-- Em projeto novo, pode executar como esta.
+-- Em projeto com dados, FACA BACKUP antes.
+-- ============================================================
+DROP TABLE IF EXISTS public.documentos CASCADE;
+DROP TABLE IF EXISTS public.compliance_conflito_interesse_analises CASCADE;
+DROP TABLE IF EXISTS public.atividade_atribuicoes CASCADE;
+DROP TABLE IF EXISTS public.atividades CASCADE;
+DROP TABLE IF EXISTS public.contratos CASCADE;
+DROP TABLE IF EXISTS public.processos CASCADE;
+DROP TABLE IF EXISTS public.clientes CASCADE;
+DROP TABLE IF EXISTS public.usuarios_escritorios CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+DROP TABLE IF EXISTS public.escritorios CASCADE;
+
+-- ============================================================
+-- TABELAS PRINCIPAIS
+-- ============================================================
+
+CREATE TABLE public.escritorios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL,
+  slug TEXT UNIQUE,
+  plano TEXT NOT NULL DEFAULT 'free',
+  ativo BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT UNIQUE NOT NULL,
+  nome TEXT,
+  telefone TEXT,
+  cargo TEXT,
+  oab TEXT,
+  cor TEXT DEFAULT '#c9a227',
+  avatar_url TEXT,
+  ativo BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.usuarios_escritorios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  papel TEXT NOT NULL DEFAULT 'advogado',
+  ativo BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT usuarios_escritorios_unique UNIQUE (usuario_id, escritorio_id),
+  CONSTRAINT usuarios_escritorios_papel_check CHECK (papel IN ('gerente','advogado','assistente','cliente','visitante'))
+);
+
+ALTER TABLE public.usuarios_escritorios
+DROP CONSTRAINT IF EXISTS usuarios_escritorios_usuario_profile_fkey;
+
+ALTER TABLE public.usuarios_escritorios
+ADD CONSTRAINT usuarios_escritorios_usuario_profile_fkey
+FOREIGN KEY (usuario_id)
+REFERENCES public.profiles(id)
+ON DELETE CASCADE;
+
+CREATE TABLE public.clientes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  tipo TEXT DEFAULT 'pessoa_fisica',
+  documento TEXT,
+  email TEXT,
+  telefone TEXT,
+  observacoes TEXT,
+  ativo BOOLEAN NOT NULL DEFAULT true,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT clientes_tipo_check CHECK (tipo IN ('pessoa_fisica','pessoa_juridica','outro'))
+);
+
+CREATE TABLE public.processos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  cliente_id UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
+  numero TEXT,
+  titulo TEXT NOT NULL,
+  parte_contraria TEXT,
+  partes_contrarias JSONB NOT NULL DEFAULT '[]'::jsonb,
+  tribunal TEXT,
+  orgao TEXT,
+  data_ajuizamento DATE,
+  valor_acao NUMERIC(14,2),
+  status TEXT NOT NULL DEFAULT 'ativo',
+  fase TEXT NOT NULL DEFAULT 'conhecimento',
+  responsavel_id UUID REFERENCES auth.users(id),
+  observacoes TEXT,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT processos_status_check CHECK (status IN ('ativo','arquivo_temporario','encerrado')),
+  CONSTRAINT processos_fase_check CHECK (fase IN ('conhecimento','recurso','execucao_provisoria','execucao_sentenca','arquivo_definitivo')),
+  CONSTRAINT processos_partes_contrarias_array_check CHECK (jsonb_typeof(partes_contrarias) = 'array'),
+  CONSTRAINT processos_encerrado_fase_check CHECK (status <> 'encerrado' OR fase = 'arquivo_definitivo')
+);
+
+CREATE TABLE public.processo_apensamentos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  processo_id UUID NOT NULL REFERENCES public.processos(id) ON DELETE CASCADE,
+  processo_apensado_id UUID NOT NULL REFERENCES public.processos(id) ON DELETE CASCADE,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT processo_apensamentos_processos_diferentes_check CHECK (processo_id <> processo_apensado_id)
+);
+
+CREATE TABLE public.contratos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  cliente_id UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
+  titulo TEXT NOT NULL,
+  parte TEXT,
+  tipo TEXT,
+  status TEXT NOT NULL DEFAULT 'ativo',
+  data_inicio DATE,
+  data_fim DATE,
+  responsavel_id UUID REFERENCES auth.users(id),
+  observacoes TEXT,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT contratos_status_check CHECK (status IN ('ativo','a_vencer','encerrado','arquivo_temporario'))
+);
+
+CREATE TABLE public.atividades (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL DEFAULT 'tarefa',
+  titulo TEXT NOT NULL,
+  descricao TEXT,
+  status TEXT NOT NULL DEFAULT 'a_fazer',
+  prioridade TEXT NOT NULL DEFAULT 'media',
+  processo_id UUID REFERENCES public.processos(id) ON DELETE CASCADE,
+  contrato_id UUID REFERENCES public.contratos(id) ON DELETE CASCADE,
+  responsavel_id UUID REFERENCES auth.users(id),
+  criado_por UUID REFERENCES auth.users(id),
+  prazo DATE,
+  horario TIME,
+  local TEXT,
+  concluida_em TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT atividades_tipo_check CHECK (tipo IN ('tarefa','prazo_processual','audiencia','reuniao')),
+  CONSTRAINT atividades_status_check CHECK (status IN ('a_fazer','em_andamento','concluida','cancelada')),
+  CONSTRAINT atividades_prioridade_check CHECK (prioridade IN ('baixa','media','alta','urgente')),
+  CONSTRAINT atividades_prazo_audiencia_processo_check CHECK (
+    tipo NOT IN ('prazo_processual','audiencia') OR processo_id IS NOT NULL
+  )
+);
+
+CREATE TABLE public.compliance_conflito_interesse_analises (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  arquivo_nome TEXT NOT NULL,
+  arquivo_tipo TEXT,
+  arquivo_tamanho_bytes BIGINT,
+  storage_bucket TEXT NOT NULL DEFAULT 'compliance-anexos',
+  storage_path TEXT,
+  colaborador_nome TEXT,
+  colaborador_documento TEXT,
+  colaborador_matricula TEXT,
+  respostas JSONB NOT NULL DEFAULT '{}'::jsonb,
+  nivel_risco TEXT NOT NULL,
+  flag TEXT NOT NULL,
+  status TEXT NOT NULL,
+  recomendacao TEXT,
+  metodo_extracao TEXT,
+  confianca_extracao NUMERIC(5,4),
+  texto_extraido TEXT,
+  atividade_id UUID REFERENCES public.atividades(id) ON DELETE SET NULL,
+  criado_por UUID REFERENCES auth.users(id),
+  criado_por_nome TEXT,
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT compliance_conflitos_nivel_check CHECK (nivel_risco IN ('BAIXO','MEDIO','ALTO')),
+  CONSTRAINT compliance_conflitos_flag_check CHECK (flag IN ('VERDE','AMARELA','VERMELHA')),
+  CONSTRAINT compliance_conflitos_status_check CHECK (status IN ('analisado_sem_conflito','pendente_revisao','alerta_critico'))
+);
+
+CREATE TABLE public.atividade_atribuicoes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  atividade_id UUID NOT NULL REFERENCES public.atividades(id) ON DELETE CASCADE,
+  usuario_anterior_id UUID REFERENCES auth.users(id),
+  usuario_novo_id UUID REFERENCES auth.users(id),
+  atribuido_por UUID REFERENCES auth.users(id),
+  observacao TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.documentos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  processo_id UUID REFERENCES public.processos(id) ON DELETE CASCADE,
+  contrato_id UUID REFERENCES public.contratos(id) ON DELETE CASCADE,
+  atividade_id UUID REFERENCES public.atividades(id) ON DELETE SET NULL,
+  nome TEXT NOT NULL,
+  storage_bucket TEXT NOT NULL DEFAULT 'documentos',
+  storage_path TEXT NOT NULL,
+  mime_type TEXT,
+  tamanho_bytes BIGINT,
+  uploaded_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT documentos_vinculo_check CHECK (
+    processo_id IS NOT NULL OR contrato_id IS NOT NULL OR atividade_id IS NOT NULL
+  )
+);
+
+-- Futuro: biblioteca de modelos/minutas sem vinculo obrigatorio
+CREATE TABLE public.modelos_documentos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES public.escritorios(id) ON DELETE CASCADE,
+  titulo TEXT NOT NULL,
+  categoria TEXT,
+  descricao TEXT,
+  storage_bucket TEXT DEFAULT 'modelos',
+  storage_path TEXT,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- FUNCOES AUXILIARES
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.touch_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.usuario_tem_escritorio(p_escritorio_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usuarios_escritorios ue
+    WHERE ue.escritorio_id = p_escritorio_id
+      AND ue.usuario_id = auth.uid()
+      AND ue.ativo = true
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_eh_gerente(p_escritorio_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usuarios_escritorios ue
+    WHERE ue.escritorio_id = p_escritorio_id
+      AND ue.usuario_id = auth.uid()
+      AND ue.ativo = true
+      AND ue.papel = 'gerente'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_pode_escrever(p_escritorio_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usuarios_escritorios ue
+    WHERE ue.escritorio_id = p_escritorio_id
+      AND ue.usuario_id = auth.uid()
+      AND ue.ativo = true
+      AND ue.papel <> 'visitante'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_pode_editar_proprio_profile()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usuarios_escritorios ue
+    WHERE ue.usuario_id = auth.uid()
+      AND ue.ativo = true
+      AND ue.papel <> 'visitante'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_tem_escritorio_storage(p_name TEXT)
+RETURNS BOOLEAN AS $$
+  SELECT CASE
+    WHEN split_part(p_name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    THEN public.usuario_tem_escritorio(split_part(p_name, '/', 1)::uuid)
+    ELSE false
+  END;
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.usuario_pode_escrever_storage(p_name TEXT)
+RETURNS BOOLEAN AS $$
+  SELECT CASE
+    WHEN split_part(p_name, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    THEN public.usuario_pode_escrever(split_part(p_name, '/', 1)::uuid)
+    ELSE false
+  END;
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- ============================================================
+-- TRIGGERS updated_at
+-- ============================================================
+
+CREATE TRIGGER trg_escritorios_updated_at BEFORE UPDATE ON public.escritorios
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_profiles_updated_at BEFORE UPDATE ON public.profiles
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_usuarios_escritorios_updated_at BEFORE UPDATE ON public.usuarios_escritorios
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_clientes_updated_at BEFORE UPDATE ON public.clientes
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_processos_updated_at BEFORE UPDATE ON public.processos
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_contratos_updated_at BEFORE UPDATE ON public.contratos
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_atividades_updated_at BEFORE UPDATE ON public.atividades
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_documentos_updated_at BEFORE UPDATE ON public.documentos
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER trg_modelos_documentos_updated_at BEFORE UPDATE ON public.modelos_documentos
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+-- ============================================================
+-- INDICES
+-- ============================================================
+CREATE INDEX idx_usuarios_escritorios_usuario ON public.usuarios_escritorios(usuario_id);
+CREATE INDEX idx_usuarios_escritorios_escritorio ON public.usuarios_escritorios(escritorio_id);
+CREATE INDEX idx_clientes_escritorio ON public.clientes(escritorio_id);
+CREATE INDEX idx_processos_escritorio ON public.processos(escritorio_id);
+CREATE INDEX idx_processos_status ON public.processos(status);
+CREATE INDEX idx_processos_busca ON public.processos(numero, titulo, tribunal, orgao);
+CREATE INDEX idx_processos_partes_contrarias ON public.processos USING gin (partes_contrarias);
+CREATE INDEX idx_processo_apensamentos_escritorio ON public.processo_apensamentos(escritorio_id);
+CREATE INDEX idx_processo_apensamentos_processo ON public.processo_apensamentos(processo_id);
+CREATE INDEX idx_processo_apensamentos_apensado ON public.processo_apensamentos(processo_apensado_id);
+CREATE UNIQUE INDEX idx_processo_apensamentos_unico ON public.processo_apensamentos(
+  escritorio_id,
+  least(processo_id, processo_apensado_id),
+  greatest(processo_id, processo_apensado_id)
+);
+CREATE INDEX idx_contratos_escritorio ON public.contratos(escritorio_id);
+CREATE INDEX idx_atividades_escritorio ON public.atividades(escritorio_id);
+CREATE INDEX idx_atividades_tipo ON public.atividades(tipo);
+CREATE INDEX idx_atividades_prazo ON public.atividades(prazo);
+CREATE INDEX idx_atividades_processo ON public.atividades(processo_id);
+CREATE INDEX idx_atividades_contrato ON public.atividades(contrato_id);
+CREATE INDEX idx_compliance_conflitos_escritorio ON public.compliance_conflito_interesse_analises(escritorio_id, criado_em DESC);
+CREATE INDEX idx_compliance_conflitos_risco ON public.compliance_conflito_interesse_analises(escritorio_id, nivel_risco, status);
+CREATE INDEX idx_documentos_escritorio ON public.documentos(escritorio_id);
+CREATE INDEX idx_documentos_processo ON public.documentos(processo_id);
+CREATE INDEX idx_documentos_contrato ON public.documentos(contrato_id);
+CREATE INDEX idx_modelos_documentos_escritorio ON public.modelos_documentos(escritorio_id);
+
+-- ============================================================
+-- RLS
+-- ============================================================
+
+ALTER TABLE public.escritorios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.usuarios_escritorios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.processos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.processo_apensamentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contratos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.atividades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.compliance_conflito_interesse_analises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.atividade_atribuicoes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.documentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.modelos_documentos ENABLE ROW LEVEL SECURITY;
+
+-- profiles
+CREATE POLICY profiles_select_own ON public.profiles
+FOR SELECT TO authenticated USING (id = auth.uid());
+CREATE POLICY profiles_update_own ON public.profiles
+FOR UPDATE TO authenticated USING (id = auth.uid() AND public.usuario_pode_editar_proprio_profile()) WITH CHECK (id = auth.uid() AND public.usuario_pode_editar_proprio_profile());
+CREATE POLICY profiles_insert_own ON public.profiles
+FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
+
+-- escritorios
+CREATE POLICY escritorios_select_member ON public.escritorios
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(id));
+CREATE POLICY escritorios_update_manager ON public.escritorios
+FOR UPDATE TO authenticated USING (public.usuario_eh_gerente(id)) WITH CHECK (public.usuario_eh_gerente(id));
+
+-- usuarios_escritorios
+CREATE POLICY usuarios_escritorios_select_member ON public.usuarios_escritorios
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY usuarios_escritorios_insert_manager ON public.usuarios_escritorios
+FOR INSERT TO authenticated WITH CHECK (public.usuario_eh_gerente(escritorio_id));
+CREATE POLICY usuarios_escritorios_update_manager ON public.usuarios_escritorios
+FOR UPDATE TO authenticated USING (public.usuario_eh_gerente(escritorio_id)) WITH CHECK (public.usuario_eh_gerente(escritorio_id));
+CREATE POLICY usuarios_escritorios_delete_manager ON public.usuarios_escritorios
+FOR DELETE TO authenticated USING (public.usuario_eh_gerente(escritorio_id));
+
+-- entidades por escritorio
+CREATE POLICY clientes_select_member ON public.clientes
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY clientes_write_non_visitor ON public.clientes
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY processos_select_member ON public.processos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY processos_write_non_visitor ON public.processos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY processo_apensamentos_select_member ON public.processo_apensamentos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY processo_apensamentos_write_non_visitor ON public.processo_apensamentos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY contratos_select_member ON public.contratos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY contratos_write_non_visitor ON public.contratos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY atividades_select_member ON public.atividades
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY atividades_write_non_visitor ON public.atividades
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY compliance_conflitos_gerente_rls ON public.compliance_conflito_interesse_analises
+FOR ALL TO authenticated USING (public.usuario_eh_gerente(escritorio_id)) WITH CHECK (public.usuario_eh_gerente(escritorio_id));
+
+CREATE POLICY documentos_select_member ON public.documentos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY documentos_write_non_visitor ON public.documentos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+CREATE POLICY modelos_documentos_select_member ON public.modelos_documentos
+FOR SELECT TO authenticated USING (public.usuario_tem_escritorio(escritorio_id));
+CREATE POLICY modelos_documentos_write_non_visitor ON public.modelos_documentos
+FOR ALL TO authenticated USING (public.usuario_pode_escrever(escritorio_id)) WITH CHECK (public.usuario_pode_escrever(escritorio_id));
+
+-- historico de atribuicoes: acessa se pertence ao escritorio da atividade
+CREATE POLICY atividade_atribuicoes_select_member ON public.atividade_atribuicoes
+FOR SELECT TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.atividades a
+    WHERE a.id = atividade_id AND public.usuario_tem_escritorio(a.escritorio_id)
+  )
+);
+CREATE POLICY atividade_atribuicoes_insert_member ON public.atividade_atribuicoes
+FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.atividades a
+    WHERE a.id = atividade_id AND public.usuario_pode_escrever(a.escritorio_id)
+  )
+);
+
+-- ============================================================
+-- DATA API GRANTS
+-- Supabase 2026: public schema objects are not automatically
+-- exposed to the Data API in new projects. Keep grants explicit.
+-- RLS policies above still control row-level access.
+-- ============================================================
+GRANT USAGE ON SCHEMA public TO authenticated, service_role;
+
+DO $$
+DECLARE
+  obj_name TEXT;
+  proc_sig TEXT;
+  api_tables TEXT[] := ARRAY[
+    'acervo_modelos',
+    'andamentos_processuais_push',
+    'andamentos_processuais_push_arquivo',
+    'atividade_atribuicoes',
+    'atividade_historico',
+    'atividades',
+    'chat_mensagens',
+    'chat_salas',
+    'clientes',
+    'compliance_anexos',
+    'compliance_config',
+    'compliance_conflito_interesse_analises',
+    'compliance_denuncias',
+    'compliance_mensagens',
+    'contratos',
+    'documentos',
+    'escritorios',
+    'financeiro_lancamentos',
+    'financeiro_processos',
+    'google_calendar_config',
+    'mensagens',
+    'mensagens_anexos',
+    'modelos_documentos',
+    'mural_recados',
+    'notificacoes',
+    'oficios',
+    'oficios_anexos',
+    'oficios_auditoria',
+    'oficios_controle_ano',
+    'oficios_controle_log',
+    'oficios_destinatarios',
+    'oficios_empresas',
+    'partes_crm',
+    'processo_apensamentos',
+    'processos',
+    'profiles',
+    'push_email_config',
+    'rotinas',
+    'tarefas',
+    'usuarios_escritorios'
+  ];
+  api_views TEXT[] := ARRAY[
+    'financeiro_resumo_escritorio'
+  ];
+  api_routines TEXT[] := ARRAY[
+    'marcar_chat_lido',
+    'usuario_eh_gerente',
+    'usuario_pode_editar_proprio_profile',
+    'usuario_pode_escrever',
+    'usuario_pode_escrever_storage',
+    'usuario_tem_escritorio',
+    'usuario_tem_escritorio_storage'
+  ];
+BEGIN
+  FOREACH obj_name IN ARRAY api_tables LOOP
+    IF to_regclass(format('public.%I', obj_name)) IS NOT NULL THEN
+      EXECUTE format(
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.%I TO authenticated, service_role',
+        obj_name
+      );
+    END IF;
+  END LOOP;
+
+  FOREACH obj_name IN ARRAY api_views LOOP
+    IF to_regclass(format('public.%I', obj_name)) IS NOT NULL THEN
+      EXECUTE format(
+        'GRANT SELECT ON TABLE public.%I TO authenticated, service_role',
+        obj_name
+      );
+    END IF;
+  END LOOP;
+
+  FOR proc_sig IN
+    SELECT format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = ANY(api_routines)
+  LOOP
+    EXECUTE format(
+      'GRANT EXECUTE ON FUNCTION %s TO authenticated, service_role',
+      proc_sig
+    );
+  END LOOP;
+END $$;
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
+
+-- ============================================================
+-- STORAGE
+-- Cria buckets se a tabela storage.buckets estiver acessivel.
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('documentos', 'documentos', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('modelos', 'modelos', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets AS b (id, name, public, file_size_limit)
+VALUES ('compliance-anexos', 'compliance-anexos', false, 52428800)
+ON CONFLICT (id) DO UPDATE
+SET file_size_limit = greatest(coalesce(b.file_size_limit, 0), excluded.file_size_limit);
+
+DROP POLICY IF EXISTS documentos_storage_select ON storage.objects;
+DROP POLICY IF EXISTS documentos_storage_insert ON storage.objects;
+DROP POLICY IF EXISTS documentos_storage_update ON storage.objects;
+DROP POLICY IF EXISTS documentos_storage_delete ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_select ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_insert ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_update ON storage.objects;
+DROP POLICY IF EXISTS compliance_anexos_storage_delete ON storage.objects;
+
+CREATE POLICY documentos_storage_select ON storage.objects
+FOR SELECT TO authenticated
+USING (bucket_id IN ('documentos','modelos') AND public.usuario_tem_escritorio_storage(name));
+
+CREATE POLICY documentos_storage_insert ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY documentos_storage_update ON storage.objects
+FOR UPDATE TO authenticated
+USING (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name))
+WITH CHECK (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY documentos_storage_delete ON storage.objects
+FOR DELETE TO authenticated
+USING (bucket_id IN ('documentos','modelos') AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY compliance_anexos_storage_select ON storage.objects
+FOR SELECT TO authenticated
+USING (bucket_id = 'compliance-anexos' AND public.usuario_tem_escritorio_storage(name));
+
+CREATE POLICY compliance_anexos_storage_insert ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY compliance_anexos_storage_update ON storage.objects
+FOR UPDATE TO authenticated
+USING (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name))
+WITH CHECK (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name));
+
+CREATE POLICY compliance_anexos_storage_delete ON storage.objects
+FOR DELETE TO authenticated
+USING (bucket_id = 'compliance-anexos' AND public.usuario_pode_escrever_storage(name));
+
+-- ============================================================
+-- BOOTSTRAP: criar escritorio/profile/vinculo para usuario atual
+-- Rode este bloco depois de criar o usuario no Auth.
+-- Substitua o email se necessario.
+-- ============================================================
+-- INSERT INTO public.escritorios (nome, slug, plano)
+-- VALUES ('Empresa Principal', 'empresa-principal', 'free')
+-- ON CONFLICT (slug) DO UPDATE SET nome = EXCLUDED.nome
+-- RETURNING id;
+--
+-- INSERT INTO public.profiles (id, email, nome, ativo)
+-- SELECT id, email, 'Fábio Porto', true
+-- FROM auth.users
+-- WHERE email = 'fabioporto@gmail.com'
+-- ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, nome = EXCLUDED.nome, ativo = true;
+--
+-- INSERT INTO public.usuarios_escritorios (usuario_id, escritorio_id, papel, ativo)
+-- SELECT u.id, e.id, 'gerente', true
+-- FROM auth.users u
+-- CROSS JOIN public.escritorios e
+-- WHERE u.email = 'fabioporto@gmail.com'
+--   AND e.slug = 'meu-escritorio'
+-- ON CONFLICT (usuario_id, escritorio_id)
+-- DO UPDATE SET papel = 'gerente', ativo = true;
+
+NOTIFY pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 001_financeiro_lancamentos.sql
+-- MIGRATION: 001_financeiro_lancamentos.sql
 -- ===================================================================
 -- JurisBPO - Seção Financeiro
 -- Migration: financeiro_lancamentos com RLS por escritorio_id
@@ -164,7 +820,7 @@ group by escritorio_id;
 
 
 -- ===================================================================
--- migration: 20260505_acompanhamento_push_email.sql
+-- MIGRATION: 20260505_acompanhamento_push_email.sql
 -- ===================================================================
 -- JurisBPO - Acompanhamento processual via push por e-mail
 -- Seguro para aplicar sobre banco existente: cria apenas a tabela nova, indices e policies do módulo.
@@ -229,7 +885,7 @@ with check (public.usuario_tem_escritorio(escritorio_id));
 
 
 -- ===================================================================
--- migration: 20260505_push_corpo_email.sql
+-- MIGRATION: 20260505_push_corpo_email.sql
 -- ===================================================================
 -- JurisBPO - Patch do módulo PUSH processual
 -- Adiciona armazenamento do corpo completo do e-mail recebido.
@@ -243,7 +899,7 @@ comment on column public.andamentos_processuais_push.corpo_email is
 
 
 -- ===================================================================
--- migration: 20260505_push_status_ignorado.sql
+-- MIGRATION: 20260505_push_status_ignorado.sql
 -- ===================================================================
 -- JurisBPO - Refinamento do módulo de acompanhamento processual via push
 -- Permite desconsiderar andamentos sem apagar o histórico.
@@ -266,7 +922,7 @@ create index if not exists idx_andamentos_push_status
 
 
 -- ===================================================================
--- migration: 20260506_visitante_somente_leitura.sql
+-- MIGRATION: 20260506_visitante_somente_leitura.sql
 -- ===================================================================
 -- Perfil visitante: acesso de leitura com bloqueio de escrita no banco.
 
@@ -476,7 +1132,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260507_acervo_modelos_anexos.sql
+-- MIGRATION: 20260507_acervo_modelos_anexos.sql
 -- ===================================================================
 -- JurisBPO - Anexos na aba Modelos do Acervo
 
@@ -492,7 +1148,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260507_atividades_arquivo_historico.sql
+-- MIGRATION: 20260507_atividades_arquivo_historico.sql
 -- ===================================================================
 -- JurisBPO - Historico de arquivamento/conclusao de atividades
 
@@ -510,7 +1166,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260507_financeiro_origens_restituicao.sql
+-- MIGRATION: 20260507_financeiro_origens_restituicao.sql
 -- ===================================================================
 -- JurisBPO - Origem dos valores restituidos no financeiro processual
 
@@ -524,7 +1180,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260507_financeiro_valor_restituido.sql
+-- MIGRATION: 20260507_financeiro_valor_restituido.sql
 -- ===================================================================
 -- JurisBPO - Valores restituidos no financeiro processual
 -- Valores como depositos recursais devolvidos devem abater o valor efetivamente gasto.
@@ -539,7 +1195,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260510_acervo_oficios_crm_arquivo.sql
+-- MIGRATION: 20260510_acervo_oficios_crm_arquivo.sql
 -- ===================================================================
 -- Acervo: ofícios vinculados a empresas do grupo (partes_crm), ano vigente e arquivamento anual.
 
@@ -599,7 +1255,7 @@ end $$;
 
 
 -- ===================================================================
--- migration: 20260510_compliance_config.sql
+-- MIGRATION: 20260510_compliance_config.sql
 -- ===================================================================
 -- =============================================================================
 -- CONFIGURAÇÃO DO CANAL DE COMPLIANCE — JurisBPO
@@ -688,7 +1344,7 @@ CREATE POLICY "compliance_config_gerente_rls" ON compliance_config
 
 
 -- ===================================================================
--- migration: 20260510_compliance_module.sql
+-- MIGRATION: 20260510_compliance_module.sql
 -- ===================================================================
 -- =============================================================================
 -- MÓDULO DE COMPLIANCE — JurisBPO
@@ -884,7 +1540,7 @@ CREATE POLICY "compliance_msgs_gerente_rls" ON compliance_mensagens
 
 
 -- ===================================================================
--- migration: 20260510_compliance_reply_tipo.sql
+-- MIGRATION: 20260510_compliance_reply_tipo.sql
 -- ===================================================================
 -- Adiciona tipo resposta_diligencia à tabela compliance_mensagens
 ALTER TABLE compliance_mensagens
@@ -896,7 +1552,7 @@ ALTER TABLE compliance_mensagens
 
 
 -- ===================================================================
--- migration: 20260510_oficios_controle_log_e_validacao.sql
+-- MIGRATION: 20260510_oficios_controle_log_e_validacao.sql
 -- ===================================================================
 -- Tabela de log de controle anual de ofícios (arquivamento / reabertura)
 -- e trigger que impede arquivar o ano em curso.
@@ -956,7 +1612,7 @@ create trigger trg_validar_arquivamento_oficio
 
 
 -- ===================================================================
--- migration: 20260511_backfill_oficios_parte_grupo.sql
+-- MIGRATION: 20260511_backfill_oficios_parte_grupo.sql
 -- ===================================================================
 -- Backfill seguro: associa ofícios (e destinatários) legados às empresas do grupo no CRM.
 -- Rode primeiro os SELECTs de verificação (comentados ao final) se quiser inspecionar o pareamento.
@@ -1060,7 +1716,7 @@ WHERE a.oficio_id = o.id
 
 
 -- ===================================================================
--- migration: 20260512120000_financeiro_honorarios_e_custos.sql
+-- MIGRATION: 20260512120000_financeiro_honorarios_e_custos.sql
 -- ===================================================================
 -- JurisBPO - Honorarios e custos no financeiro processual
 
@@ -1074,7 +1730,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260512133000_processos_apensamentos.sql
+-- MIGRATION: 20260512133000_processos_apensamentos.sql
 -- ===================================================================
 -- JurisBPO - Apensamento de processos e fase de execucao provisoria
 
@@ -1131,7 +1787,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260512170000_compliance_conflitos_interesse.sql
+-- MIGRATION: 20260512170000_compliance_conflitos_interesse.sql
 -- ===================================================================
 -- JurisBPO - Analise de conflitos de interesse no modulo de Compliance
 
@@ -1226,7 +1882,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260512174500_compliance_anexos_file_size_limit.sql
+-- MIGRATION: 20260512174500_compliance_anexos_file_size_limit.sql
 -- ===================================================================
 -- Aumenta o limite de upload do bucket usado pelos anexos de Compliance.
 -- Formularios de conflito de interesse escaneados costumam passar de 10 MB.
@@ -1240,7 +1896,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260512_push_email_config_arquivo.sql
+-- MIGRATION: 20260512_push_email_config_arquivo.sql
 -- ===================================================================
 -- JurisBPO - Configuracao do push processual e arquivo de desconsideracoes
 
@@ -1386,7 +2042,7 @@ where arquivado_em < now() - interval '30 days';
 
 
 -- ===================================================================
--- migration: 20260513100000_financeiro_agravo_instrumento.sql
+-- MIGRATION: 20260513100000_financeiro_agravo_instrumento.sql
 -- ===================================================================
 -- JurisBPO - Agravo de instrumento no financeiro processual
 
@@ -1403,7 +2059,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260513170000_processos_multiplas_reclamadas.sql
+-- MIGRATION: 20260513170000_processos_multiplas_reclamadas.sql
 -- ===================================================================
 -- Processos: suporte a multiplas reclamadas mantendo compatibilidade com parte_contraria.
 
@@ -1459,7 +2115,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260513183000_data_api_explicit_grants.sql
+-- MIGRATION: 20260513183000_data_api_explicit_grants.sql
 -- ===================================================================
 -- JurisBPO - explicit Data API grants for Supabase 2026 opt-in behavior.
 -- Supabase will stop auto-exposing new public schema objects to the Data API.
@@ -1565,7 +2221,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260514033000_repair_processos_financeiro_schema.sql
+-- MIGRATION: 20260514033000_repair_processos_financeiro_schema.sql
 -- ===================================================================
 -- Repara colunas esperadas pelo app em producao.
 -- Idempotente: pode ser executada mais de uma vez sem perda de dados.
@@ -1606,7 +2262,7 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
--- migration: 20260515_fix_numero_controle_duplicados.sql
+-- MIGRATION: 20260515_fix_numero_controle_duplicados.sql
 -- ===================================================================
 -- Migração corretiva: numero_controle duplicados
 -- 2026-05-15
@@ -1743,7 +2399,7 @@ CREATE INDEX IF NOT EXISTS idx_processos_numero_controle
 
 
 -- ===================================================================
--- migration: 20260515_numero_controle_processos.sql
+-- MIGRATION: 20260515_numero_controle_processos.sql
 -- ===================================================================
 -- Migration: numero_controle para processos
 -- Gerado em: 2026-05-15
@@ -1851,7 +2507,7 @@ CREATE INDEX IF NOT EXISTS idx_processos_numero_controle ON public.processos (nu
 
 
 -- ===================================================================
--- migration: 20260519_publicacoes_lider.sql
+-- MIGRATION: 20260519_publicacoes_lider.sql
 -- ===================================================================
 -- JurisBPO - Publicações do Diário da Justiça via WebService Lider
 -- Seguro para aplicar sobre banco existente.
@@ -1942,7 +2598,7 @@ create policy publicacoes_lider_select_member
 
 
 -- ===================================================================
--- migration: 20260520_atividades_alerta.sql
+-- MIGRATION: 20260520_atividades_alerta.sql
 -- ===================================================================
 -- Adiciona campos de alerta às atividades
 ALTER TABLE public.atividades
@@ -1964,7 +2620,7 @@ CREATE INDEX IF NOT EXISTS idx_atividades_alerta
 
 
 -- ===================================================================
--- migration: 20260520_mensagens_rls.sql
+-- MIGRATION: 20260520_mensagens_rls.sql
 -- ===================================================================
 -- Garante que RLS da tabela mensagens permita:
 --   - remetente e destinatário lerem a conversa
@@ -2023,7 +2679,7 @@ CREATE POLICY mensagens_anexos_insert ON public.mensagens_anexos
 
 
 -- ===================================================================
--- migration: 20260520_mensagens_rls_fix.sql
+-- MIGRATION: 20260520_mensagens_rls_fix.sql
 -- ===================================================================
 -- Remove política que bloqueia TODOS os usuários (inclusive gerentes)
 -- de inserir mensagens. A política mensagens_insert (criada em
@@ -2033,7 +2689,7 @@ DROP POLICY IF EXISTS "visitante_no_insert_mensagens" ON public.mensagens;
 
 
 -- ===================================================================
--- migration: 20260521_compliance_access.sql
+-- MIGRATION: 20260521_compliance_access.sql
 -- ===================================================================
 -- ---------------------------------------------------------------------------
 -- compliance_access: permissão individual de acesso ao módulo de compliance
