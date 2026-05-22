@@ -8,7 +8,7 @@ import { config } from './config.js'
 import { ingestUnreadEmails } from './services/emailIngestor.js'
 import { ingestComplianceEmails } from './services/complianceIngestor.js'
 import { processComplianceOutbox } from './services/complianceOutbox.js'
-import { getComplianceConfigs } from './services/getComplianceConfigs.js'
+import { getComplianceConfigs, getComplianceOutboxConfigs } from './services/getComplianceConfigs.js'
 import { ingestPublicacoesLider } from './services/publicacoesLiderIngestor.js'
 
 // ── Andamentos processuais ────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ async function runCompliance() {
 }
 
 async function runComplianceOutbox() {
-  const configs = await getComplianceConfigs()
+  const configs = await getComplianceOutboxConfigs()
   for (const cfg of configs) {
     try {
       await processComplianceOutbox(cfg)

@@ -2,7 +2,8 @@
  * complianceOutbox.ts
  * Processa mensagens com status_envio='pendente' (auto_resposta, officer_reply, diligencia).
  * Lê o remetente_email da denúncia (SERVICE_ROLE, nunca exposto ao frontend)
- * e envia via SMTP usando a configuração lida do banco (compliance_config).
+ * e envia via Resend ou SMTP usando a configuracao lida do banco
+ * (compliance_config).
  *
  * Roda via cron a cada minuto para cada escritório com compliance ativo.
  */
@@ -75,8 +76,15 @@ export async function processComplianceOutbox(cfg: ComplianceDbConfig): Promise<
         continue
       }
 
-      // Valida configuração SMTP mínima
-      if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPassword) {
+      if (!cfg.smtpFromEmail) {
+        await markFailed(row.id, 'Remetente do compliance nao configurado para este escritorio')
+        continue
+      }
+
+      // O Railway envia por Resend quando RESEND_API_KEY existe. SMTP e apenas
+      // fallback para ambientes que ainda nao usam o provedor HTTP.
+      const resendConfigured = !!process.env.RESEND_API_KEY?.trim()
+      if (!resendConfigured && (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPassword)) {
         await markFailed(row.id, 'SMTP não configurado para este escritório')
         continue
       }
@@ -135,9 +143,9 @@ export async function processComplianceOutbox(cfg: ComplianceDbConfig): Promise<
         }
       }
 
-      // For diligência, set reply-to to the monitored IMAP inbox so sector replies are auto-ingested
-      const replyTo = row.tipo === 'diligencia' ? cfg.imapUser : undefined
-      await sendEmail({ to: toEmail, subject, html, replyTo, attachments }, cfg)
+      // sendEmail usa smtpFromEmail como Reply-To por padrao. Isso mantem as
+      // respostas no inbound do Resend em vez da caixa IMAP antiga.
+      await sendEmail({ to: toEmail, subject, html, attachments }, cfg)
 
       await supabase
         .from('compliance_mensagens')
