@@ -27,6 +27,59 @@ function extractFirstUrl(text: string): string | undefined {
   return text.match(/https?:\/\/[^\s)\]]+/i)?.[0]
 }
 
+function extractDocumentId(text: string): string | undefined {
+  return text.match(/Identificador do documento[:\s]+(\d+)/i)?.[1]
+}
+
+function splitIntoPublicacaoSections(text: string): string[] {
+  const CNJ = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/
+  const parts = text.split(/\n(?=Publica[çc][aã]o:\s*\n)/i)
+  return parts.filter(s => /Publica[çc][aã]o:\s*\n/i.test(s) && CNJ.test(s))
+}
+
+export function parseCourtEmailMultiple(input: {
+  from?: string
+  subject?: string
+  text?: string
+  htmlAsText?: string
+  date?: Date
+}): ParsedAndamento[] {
+  const subject = input.subject ?? ''
+  const body = normalizeText(input.text || input.htmlAsText || '')
+  const full = normalizeText(`${subject}\n${body}`)
+
+  const sections = splitIntoPublicacaoSections(full)
+
+  if (sections.length > 1) {
+    return sections.flatMap(section => {
+      const numeroProcesso = extractProcessNumber(section)
+      if (!numeroProcesso) return []
+
+      const documentId = extractDocumentId(section)
+      const rawTextHash = sha256(documentId ? `doc:${documentId}` : section)
+      const sectionWithSubject = normalizeText(`${subject}\n${section}`)
+
+      return [{
+        numeroProcesso,
+        tribunal: detectTribunal(sectionWithSubject),
+        assunto: subject || undefined,
+        movimento: detectMovement(subject, section),
+        dataMovimento: extractBrazilianDate(section) ?? input.date?.toISOString().slice(0, 10),
+        urlOrigem: extractFirstUrl(section),
+        fonte: 'email' as const,
+        remetente: input.from,
+        assuntoEmail: subject,
+        corpoResumo: excerpt(section),
+        corpoEmail: section || undefined,
+        rawTextHash,
+      }]
+    })
+  }
+
+  const parsed = parseCourtEmail(input)
+  return parsed ? [parsed] : []
+}
+
 export function parseCourtEmail(input: {
   from?: string
   subject?: string

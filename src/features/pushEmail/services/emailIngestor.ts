@@ -1,7 +1,7 @@
 import { ImapFlow } from 'imapflow'
 import { getPushEmailConfig, resolveRuntimePushEmailConfig } from '../config'
 import { createPushEmailSupabase } from '../db/supabaseServer'
-import { parseCourtEmail } from '../parsers/emailParser'
+import { parseCourtEmailMultiple } from '../parsers/emailParser'
 import type { PushEmailResult } from '../types'
 import { persistAndamento } from './persistAndamento'
 
@@ -244,7 +244,7 @@ export async function ingestUnreadEmails(): Promise<PushEmailResult> {
           processed++
 
           const text = await downloadTextPart(client, uid)
-          const parsed = parseCourtEmail({
+          const parsedList = parseCourtEmailMultiple({
             from,
             subject,
             text,
@@ -252,13 +252,20 @@ export async function ingestUnreadEmails(): Promise<PushEmailResult> {
             date: headerMsg?.envelope?.date ?? undefined,
           })
 
-          if (!parsed) {
+          if (!parsedList.length) {
             ignored++
             continue
           }
 
-          await persistAndamento(supabase, config, parsed)
-          saved++
+          for (const parsed of parsedList) {
+            try {
+              await persistAndamento(supabase, config, parsed)
+              saved++
+            } catch (itemErr) {
+              failed++
+              console.error('[push-email] Falha ao persistir andamento', parsed.numeroProcesso, itemErr)
+            }
+          }
 
           await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true })
         } catch (err) {
