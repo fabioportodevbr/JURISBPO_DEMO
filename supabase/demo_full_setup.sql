@@ -16,6 +16,14 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
+-- REMOVER TRIGGERS/FUNÇÕES CONFLITANTES DE TEMPLATES SUPABASE
+-- O template "Auto-create user profile on signup" cria um trigger
+-- que usa colunas display_name/photo_url incompatíveis com nosso schema.
+-- ============================================================
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+
+-- ============================================================
 -- LIMPEZA OPCIONAL
 -- Em projeto novo, pode executar como esta.
 -- Em projeto com dados, FACA BACKUP antes.
