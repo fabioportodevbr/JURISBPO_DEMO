@@ -1979,6 +1979,7 @@ function ConflitosInteresseTab({ profile }) {
   const [selected, setSelected] = useState(null)
   const [viewMode, setViewMode] = useState('ativa')
   const [selectedIds, setSelectedIds] = useState([])
+  const [filtroCor, setFiltroCor] = useState(null) // null = todos, 'BAIXO', 'MEDIO', 'ALTO'
   const [savingDecision, setSavingDecision] = useState(false)
   const [decisionForm, setDecisionForm] = useState({ observacoes_resultado: '', parecer_decisao: '' })
   const [error, setError] = useState('')
@@ -2276,13 +2277,17 @@ function ConflitosInteresseTab({ profile }) {
     medio: visibleRows.filter(r => r.nivel_risco === 'MEDIO').length,
     alto: visibleRows.filter(r => r.nivel_risco === 'ALTO').length,
   }), [visibleRows])
-  const selectedRows = useMemo(() => visibleRows.filter(row => selectedIds.includes(row.id)), [visibleRows, selectedIds])
-  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every(row => selectedIds.includes(row.id))
-  const detalhe = selected && visibleRows.some(row => row.id === selected.id) ? selected : visibleRows[0] || null
+  const filteredRows = useMemo(() =>
+    filtroCor ? visibleRows.filter(r => r.nivel_risco === filtroCor) : visibleRows
+  , [visibleRows, filtroCor])
+  const selectedRows = useMemo(() => filteredRows.filter(row => selectedIds.includes(row.id)), [filteredRows, selectedIds])
+  const allVisibleSelected = filteredRows.length > 0 && filteredRows.every(row => selectedIds.includes(row.id))
+  const detalhe = selected && filteredRows.some(row => row.id === selected.id) ? selected : filteredRows[0] || null
 
   useEffect(() => {
     setSelectedIds([])
     setSelected(null)
+    setFiltroCor(null)
   }, [viewMode])
 
   useEffect(() => {
@@ -2294,7 +2299,13 @@ function ConflitosInteresseTab({ profile }) {
   }, [detalhe?.id])
 
   function toggleSelecionarTodos() {
-    setSelectedIds(allVisibleSelected ? [] : visibleRows.map(row => row.id))
+    setSelectedIds(allVisibleSelected ? [] : filteredRows.map(row => row.id))
+  }
+  function selectByCor(nivelRisco) {
+    const ids = filteredRows.filter(r => r.nivel_risco === nivelRisco).map(r => r.id)
+    if (!ids.length) return
+    const allSel = ids.every(id => selectedIds.includes(id))
+    setSelectedIds(prev => allSel ? prev.filter(id => !ids.includes(id)) : [...new Set([...prev, ...ids])])
   }
 
   const detalheGestao = conflitoGestao(detalhe)
@@ -2360,11 +2371,25 @@ function ConflitosInteresseTab({ profile }) {
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, fontWeight: 800, cursor: visibleRows.length ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>
-              <input type="checkbox" checked={allVisibleSelected} disabled={!visibleRows.length} onChange={toggleSelecionarTodos} />
-              Selecionar todos
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, fontWeight: 800, cursor: filteredRows.length ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={allVisibleSelected} disabled={!filteredRows.length} onChange={toggleSelecionarTodos} />
+              Todos
             </label>
+            {[
+              { label: 'Verde',    nivelRisco: 'BAIXO', color: C.green },
+              { label: 'Amarela',  nivelRisco: 'MEDIO', color: C.amber },
+              { label: 'Vermelha', nivelRisco: 'ALTO',  color: C.red   },
+            ].map(({ label, nivelRisco, color }) => {
+              const rowsCor = filteredRows.filter(r => r.nivel_risco === nivelRisco)
+              const allSel = rowsCor.length > 0 && rowsCor.every(r => selectedIds.includes(r.id))
+              return (
+                <label key={nivelRisco} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, cursor: rowsCor.length ? 'pointer' : 'default', whiteSpace: 'nowrap', color: rowsCor.length ? color : C.muted }}>
+                  <input type="checkbox" checked={allSel} disabled={!rowsCor.length} onChange={() => selectByCor(nivelRisco)} />
+                  {label}
+                </label>
+              )
+            })}
             {selectedRows.length > 0 && (
               <span style={{ fontSize: 11, color: C.muted, fontWeight: 800 }}>{selectedRows.length} selecionada{selectedRows.length > 1 ? 's' : ''}</span>
             )}
@@ -2394,22 +2419,28 @@ function ConflitosInteresseTab({ profile }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 12 }}>
           {[
-            ['Total', stats.total, C.navy],
-            ['Verde', stats.baixo, C.green],
-            ['Amarela', stats.medio, C.amber],
-            ['Vermelha', stats.alto, C.red],
-          ].map(([label, value, color]) => (
-            <div key={label} style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 9, padding: '10px 12px' }}>
-              <div style={{ fontSize: 21, fontWeight: 900, color }}>{value}</div>
-              <div style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>{label}</div>
-            </div>
-          ))}
+            { label: 'Total',    value: stats.total, color: C.navy,  bg: C.soft,     nivelRisco: null    },
+            { label: 'Verde',    value: stats.baixo, color: C.green, bg: C.greenBg,  nivelRisco: 'BAIXO' },
+            { label: 'Amarela',  value: stats.medio, color: C.amber, bg: C.amberBg,  nivelRisco: 'MEDIO' },
+            { label: 'Vermelha', value: stats.alto,  color: C.red,   bg: C.redBg,    nivelRisco: 'ALTO'  },
+          ].map(({ label, value, color, bg, nivelRisco }) => {
+            const ativo = filtroCor === nivelRisco
+            return (
+              <div key={label} onClick={() => setFiltroCor(ativo ? null : nivelRisco)}
+                style={{ background: ativo ? bg : C.white, border: '2px solid ' + (ativo ? color : C.border),
+                  borderRadius: 9, padding: '10px 12px', cursor: 'pointer', transition: 'all .12s',
+                  userSelect: 'none' }}>
+                <div style={{ fontSize: 21, fontWeight: 900, color }}>{value}</div>
+                <div style={{ fontSize: 11, color: ativo ? color : C.muted, fontWeight: 700 }}>{label}{ativo ? ' ✓' : ''}</div>
+              </div>
+            )
+          })}
         </div>
 
         <div style={{ background: C.white, border: '1px solid ' + C.border, borderRadius: 12, overflow: 'hidden' }}>
           {loading ? <div style={{ padding: 24, color: C.muted, textAlign: 'center' }}>Carregando analises...</div>
-            : visibleRows.length === 0 ? <div style={{ padding: 30, color: C.muted, textAlign: 'center' }}>{viewMode === 'arquivo' ? 'Nenhuma analise arquivada.' : viewMode === 'quarentena' ? 'Nenhuma analise em quarentena.' : 'Nenhuma analise registrada.'}</div>
-            : visibleRows.map(row => {
+            : filteredRows.length === 0 ? <div style={{ padding: 30, color: C.muted, textAlign: 'center' }}>{filtroCor ? `Nenhuma análise ${filtroCor === 'BAIXO' ? 'verde' : filtroCor === 'MEDIO' ? 'amarela' : 'vermelha'} nesta aba.` : viewMode === 'arquivo' ? 'Nenhuma analise arquivada.' : viewMode === 'quarentena' ? 'Nenhuma analise em quarentena.' : 'Nenhuma analise registrada.'}</div>
+            : filteredRows.map(row => {
               const meta = RISCO_CONFLITO_META[row.nivel_risco] || RISCO_CONFLITO_META.BAIXO
               const gestao = conflitoGestao(row)
               const isChecked = selectedIds.includes(row.id)
