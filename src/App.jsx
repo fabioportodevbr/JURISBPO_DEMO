@@ -15,6 +15,7 @@ import { ThemeProvider, useTheme } from './lib/ThemeContext.jsx'
 import { PrivacyProvider, usePrivacy, Prv } from './lib/PrivacyContext.jsx'
 import { NotificacoesModal } from './components/Notificacoes.jsx'
 import AlertaAtividadePopup from './components/AlertaAtividadePopup.jsx'
+import PushNotificacaoPopup from './components/PushNotificacaoPopup.jsx'
 
 // ── Importa as páginas ────────────────────────────────────────────────────
 import Dashboard   from './components/Dashboard.jsx'
@@ -475,6 +476,7 @@ function AppLayout() {
       )}
 
       <AlertaAtividadePopup profile={profile} />
+      <PushNotificacaoPopup profile={profile} />
 
       {/* ── Menu lateral ─────────────────────────────────────── */}
       <Sidebar
