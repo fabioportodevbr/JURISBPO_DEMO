@@ -3012,6 +3012,36 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- ===================================================================
+-- REMOVER RESTRIÇÕES DE VISITANTE (não aplicáveis ao ambiente demo)
+-- O trigger bloquear_visitante_escrita impede inserts do seed quando
+-- executado como postgres (sem auth.uid). No demo todos os usuários
+-- têm acesso completo — papel 'visitante' não é utilizado.
+-- ===================================================================
+DO $$
+DECLARE
+  t text;
+  tables text[] := ARRAY[
+    'clientes','processos','contratos','atividades','documentos',
+    'modelos_documentos','partes_crm','financeiro_processos',
+    'financeiro_lancamentos','acervo_modelos','andamentos_processuais_push',
+    'notificacoes','mensagens','mensagens_anexos','oficios_controle_ano',
+    'compliance_denuncias','compliance_mensagens','compliance_config',
+    'compliance_conflito_interesse_analises'
+  ];
+BEGIN
+  FOREACH t IN ARRAY tables LOOP
+    IF to_regclass('public.' || t) IS NOT NULL THEN
+      EXECUTE format('DROP TRIGGER IF EXISTS trg_bloquear_visitante_escrita ON public.%I', t);
+    END IF;
+  END LOOP;
+END $$;
+
+DROP FUNCTION IF EXISTS public.bloquear_visitante_escrita() CASCADE;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ===================================================================
 -- SEED DE DEMONSTRAÇÃO
 -- ===================================================================
 -- =============================================================================
