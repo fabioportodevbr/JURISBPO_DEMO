@@ -1,0 +1,26 @@
+name: Prevent tracked env secrets
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  no-env-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject tracked env files
+        shell: bash
+        run: |
+          tracked_env_files="$(
+            git ls-files |
+              grep -E '(^|/)\.env($|\.)' |
+              grep -Ev '(^|/)\.env\.example$' || true
+          )"
+
+          if [ -n "$tracked_env_files" ]; then
+            echo "Tracked env files are not allowed. Keep secrets local and commit only .env.example files."
+            echo "$tracked_env_files"
+            exit 1
+          fi

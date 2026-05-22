@@ -4,8 +4,11 @@ out/
 dist/
 .vite/
 .vercel/
+# Segredos locais. Arquivos de exemplo seguem versionados.
 .env
-.env*.local
+.env.*
+!.env.example
+!**/.env.example
 next-dev*.log
 *.tsbuildinfo
 scratch_schema.js
