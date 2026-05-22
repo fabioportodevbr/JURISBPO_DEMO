@@ -2371,49 +2371,55 @@ function ConflitosInteresseTab({ profile }) {
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, fontWeight: 800, cursor: filteredRows.length ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>
-              <input type="checkbox" checked={allVisibleSelected} disabled={!filteredRows.length} onChange={toggleSelecionarTodos} />
-              Todos
-            </label>
-            {[
-              { label: 'Verde',    nivelRisco: 'BAIXO', color: C.green },
-              { label: 'Amarela',  nivelRisco: 'MEDIO', color: C.amber },
-              { label: 'Vermelha', nivelRisco: 'ALTO',  color: C.red   },
-            ].map(({ label, nivelRisco, color }) => {
-              const rowsCor = filteredRows.filter(r => r.nivel_risco === nivelRisco)
-              const allSel = rowsCor.length > 0 && rowsCor.every(r => selectedIds.includes(r.id))
-              return (
-                <label key={nivelRisco} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, cursor: rowsCor.length ? 'pointer' : 'default', whiteSpace: 'nowrap', color: rowsCor.length ? color : C.muted }}>
-                  <input type="checkbox" checked={allSel} disabled={!rowsCor.length} onChange={() => selectByCor(nivelRisco)} />
-                  {label}
-                </label>
-              )
-            })}
-            {selectedRows.length > 0 && (
-              <span style={{ fontSize: 11, color: C.muted, fontWeight: 800 }}>{selectedRows.length} selecionada{selectedRows.length > 1 ? 's' : ''}</span>
-            )}
-            {viewMode === 'ativa' && (
-              <button type="button" disabled={!selectedRows.length} onClick={() => quarentenarAnalises(selectedRows)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.amber : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
-                <ShieldAlert size={13} /> Quarentena
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* Linha 1 — checkboxes de seleção */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, fontWeight: 800, cursor: filteredRows.length ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>
+                <input type="checkbox" checked={allVisibleSelected} disabled={!filteredRows.length} onChange={toggleSelecionarTodos} />
+                Todos
+              </label>
+              {[
+                { label: 'Verde',    nivelRisco: 'BAIXO', color: C.green },
+                { label: 'Amarela',  nivelRisco: 'MEDIO', color: C.amber },
+                { label: 'Vermelha', nivelRisco: 'ALTO',  color: C.red   },
+              ].map(({ label, nivelRisco, color }) => {
+                const rowsCor = filteredRows.filter(r => r.nivel_risco === nivelRisco)
+                const allSel = rowsCor.length > 0 && rowsCor.every(r => selectedIds.includes(r.id))
+                return (
+                  <label key={nivelRisco} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, cursor: rowsCor.length ? 'pointer' : 'default', whiteSpace: 'nowrap', color: rowsCor.length ? color : C.muted }}>
+                    <input type="checkbox" checked={allSel} disabled={!rowsCor.length} onChange={() => selectByCor(nivelRisco)} />
+                    {label}
+                  </label>
+                )
+              })}
+              {selectedRows.length > 0 && (
+                <span style={{ fontSize: 11, color: C.muted, fontWeight: 800 }}>{selectedRows.length} selecionada{selectedRows.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
+            {/* Linha 2 — botões de ação em lote */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {viewMode === 'ativa' && (
+                <button type="button" disabled={!selectedRows.length} onClick={() => quarentenarAnalises(selectedRows)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.amber : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+                  <ShieldAlert size={13} /> Quarentena
+                </button>
+              )}
+              {viewMode === 'quarentena' && (
+                <button type="button" disabled={!selectedRows.length} onClick={() => desquarentenaAnalises(selectedRows)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.green : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+                  <RotateCcw size={13} /> Reativar
+                </button>
+              )}
+              <button type="button" disabled={!selectedRows.length} onClick={() => viewMode === 'arquivo' ? reativarAnalises(selectedRows) : arquivarAnalises(selectedRows)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.text : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+                {viewMode === 'arquivo' ? <RotateCcw size={13} /> : <Archive size={13} />}
+                {viewMode === 'arquivo' ? 'Reativar' : 'Arquivar'}
               </button>
-            )}
-            {viewMode === 'quarentena' && (
-              <button type="button" disabled={!selectedRows.length} onClick={() => desquarentenaAnalises(selectedRows)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.green : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
-                <RotateCcw size={13} /> Reativar
+              <button type="button" disabled={!selectedRows.length} onClick={() => excluirAnalises(selectedRows)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + (selectedRows.length ? C.red : C.border), background: C.white, color: selectedRows.length ? C.red : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
+                <Trash2 size={13} /> Excluir
               </button>
-            )}
-            <button type="button" disabled={!selectedRows.length} onClick={() => viewMode === 'arquivo' ? reativarAnalises(selectedRows) : arquivarAnalises(selectedRows)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + C.border, background: selectedRows.length ? C.white : C.grayBg, color: selectedRows.length ? C.text : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
-              {viewMode === 'arquivo' ? <RotateCcw size={13} /> : <Archive size={13} />}
-              {viewMode === 'arquivo' ? 'Reativar' : 'Arquivar'}
-            </button>
-            <button type="button" disabled={!selectedRows.length} onClick={() => excluirAnalises(selectedRows)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid ' + (selectedRows.length ? C.red : C.border), background: C.white, color: selectedRows.length ? C.red : C.muted, borderRadius: 8, padding: '8px 10px', fontSize: 12, fontWeight: 900, cursor: selectedRows.length ? 'pointer' : 'not-allowed' }}>
-              <Trash2 size={13} /> Excluir
-            </button>
+            </div>
           </div>
         </div>
 
