@@ -752,57 +752,26 @@ create policy financeiro_select_mesmo_escritorio
 on public.financeiro_lancamentos
 for select
 to authenticated
-using (
-  escritorio_id in (
-    select p.escritorio_id
-    from public.profiles p
-    where p.id = auth.uid()
-  )
-);
+using (public.usuario_tem_escritorio(escritorio_id));
 
 create policy financeiro_insert_mesmo_escritorio
 on public.financeiro_lancamentos
 for insert
 to authenticated
-with check (
-  criado_por = auth.uid()
-  and escritorio_id in (
-    select p.escritorio_id
-    from public.profiles p
-    where p.id = auth.uid()
-  )
-);
+with check (public.usuario_pode_escrever(escritorio_id));
 
 create policy financeiro_update_mesmo_escritorio
 on public.financeiro_lancamentos
 for update
 to authenticated
-using (
-  escritorio_id in (
-    select p.escritorio_id
-    from public.profiles p
-    where p.id = auth.uid()
-  )
-)
-with check (
-  escritorio_id in (
-    select p.escritorio_id
-    from public.profiles p
-    where p.id = auth.uid()
-  )
-);
+using  (public.usuario_pode_escrever(escritorio_id))
+with check (public.usuario_pode_escrever(escritorio_id));
 
 create policy financeiro_delete_mesmo_escritorio
 on public.financeiro_lancamentos
 for delete
 to authenticated
-using (
-  escritorio_id in (
-    select p.escritorio_id
-    from public.profiles p
-    where p.id = auth.uid()
-  )
-);
+using (public.usuario_pode_escrever(escritorio_id));
 
 -- View opcional para resumos por escritorio.
 create or replace view public.financeiro_resumo_escritorio as
