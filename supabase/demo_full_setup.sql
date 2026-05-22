@@ -20,13 +20,24 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- Em projeto novo, pode executar como esta.
 -- Em projeto com dados, FACA BACKUP antes.
 -- ============================================================
+DROP TABLE IF EXISTS public.mensagens_anexos CASCADE;
+DROP TABLE IF EXISTS public.mensagens CASCADE;
 DROP TABLE IF EXISTS public.documentos CASCADE;
+DROP TABLE IF EXISTS public.financeiro_processos CASCADE;
 DROP TABLE IF EXISTS public.compliance_conflito_interesse_analises CASCADE;
 DROP TABLE IF EXISTS public.atividade_atribuicoes CASCADE;
 DROP TABLE IF EXISTS public.atividades CASCADE;
 DROP TABLE IF EXISTS public.contratos CASCADE;
 DROP TABLE IF EXISTS public.processos CASCADE;
 DROP TABLE IF EXISTS public.clientes CASCADE;
+DROP TABLE IF EXISTS public.oficios_controle_log CASCADE;
+DROP TABLE IF EXISTS public.oficios_controle_ano CASCADE;
+DROP TABLE IF EXISTS public.oficios_anexos CASCADE;
+DROP TABLE IF EXISTS public.oficios_auditoria CASCADE;
+DROP TABLE IF EXISTS public.oficios_destinatarios CASCADE;
+DROP TABLE IF EXISTS public.oficios CASCADE;
+DROP TABLE IF EXISTS public.oficios_empresas CASCADE;
+DROP TABLE IF EXISTS public.partes_crm CASCADE;
 DROP TABLE IF EXISTS public.usuarios_escritorios CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP TABLE IF EXISTS public.escritorios CASCADE;
@@ -1135,6 +1146,84 @@ notify pgrst, 'reload schema';
 
 
 -- ===================================================================
+-- TABELA: financeiro_processos
+-- (criada originalmente via interface Supabase; recriada aqui para demo)
+-- ===================================================================
+create table if not exists public.financeiro_processos (
+  id uuid primary key default gen_random_uuid(),
+  escritorio_id uuid not null references public.escritorios(id) on delete cascade,
+  processo_id uuid references public.processos(id) on delete set null,
+  criado_por uuid references auth.users(id) on delete set null,
+
+  natureza text,
+  status_pagamento text default 'pendente',
+
+  valor_bruto numeric(14,2) not null default 0,
+  deposito_ro numeric(14,2) not null default 0,
+  deposito_rr numeric(14,2) not null default 0,
+  deposito_embargos numeric(14,2) not null default 0,
+  agravo_instrumento numeric(14,2) not null default 0,
+  custas numeric(14,2) not null default 0,
+  fgts numeric(14,2) not null default 0,
+  honorarios_sucumbenciais numeric(14,2) not null default 0,
+  honorarios_periciais numeric(14,2) not null default 0,
+  honorarios_e_custos numeric(14,2) not null default 0,
+  inss_reclamante numeric(14,2) not null default 0,
+  inss_reclamada numeric(14,2) not null default 0,
+  multa_inadimplemento numeric(14,2) not null default 0,
+
+  seguro_garantia boolean not null default false,
+  apolice_numero text,
+  apolice_inicio date,
+  apolice_fim date,
+  valor_assegurado numeric(14,2) not null default 0,
+  seguro_premio numeric(14,2) not null default 0,
+
+  forma_pagamento text,
+  numero_parcelas integer not null default 1,
+  primeiro_vencimento date,
+  data_referencia date,
+
+  valor_restituido numeric(14,2) not null default 0,
+  valor_restituido_origens text[] not null default '{}',
+
+  observacoes text,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_financeiro_processos_escritorio_id
+  on public.financeiro_processos (escritorio_id);
+
+create index if not exists idx_financeiro_processos_processo_id
+  on public.financeiro_processos (processo_id);
+
+alter table public.financeiro_processos enable row level security;
+
+drop policy if exists financeiro_processos_select on public.financeiro_processos;
+drop policy if exists financeiro_processos_write on public.financeiro_processos;
+
+create policy financeiro_processos_select
+on public.financeiro_processos
+for select to authenticated
+using (public.usuario_tem_escritorio(escritorio_id));
+
+create policy financeiro_processos_write
+on public.financeiro_processos
+for all to authenticated
+using (public.usuario_pode_escrever(escritorio_id))
+with check (public.usuario_pode_escrever(escritorio_id));
+
+drop trigger if exists trg_financeiro_processos_updated_at on public.financeiro_processos;
+create trigger trg_financeiro_processos_updated_at
+before update on public.financeiro_processos
+for each row execute function public.set_updated_at();
+
+notify pgrst, 'reload schema';
+
+
+-- ===================================================================
 -- MIGRATION: 20260507_financeiro_origens_restituicao.sql
 -- ===================================================================
 -- JurisBPO - Origem dos valores restituidos no financeiro processual
@@ -1159,6 +1248,124 @@ alter table public.financeiro_processos
 
 comment on column public.financeiro_processos.valor_restituido is
   'Valor restituido/devolvido no processo, usado para abater o valor efetivamente gasto.';
+
+notify pgrst, 'reload schema';
+
+
+-- ===================================================================
+-- TABELAS: partes_crm, oficios_empresas, oficios e relacionadas
+-- (criadas originalmente via interface Supabase; recriadas aqui para demo)
+-- ===================================================================
+
+create table if not exists public.partes_crm (
+  id uuid primary key default gen_random_uuid(),
+  escritorio_id uuid not null references public.escritorios(id) on delete cascade,
+  nome text not null,
+  nome_fantasia text,
+  cnpj text,
+  tipo text not null default 'parte_contraria',
+  status text not null default 'ativo',
+  grupo_economico text,
+  email text,
+  telefone text,
+  contato_principal text,
+  endereco text,
+  observacoes text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint partes_crm_tipo_check check (tipo in ('empresa_grupo','cliente','fornecedor','parte_contraria','terceiro','escritorio_advocacia')),
+  constraint partes_crm_status_check check (status in ('ativo','inativo'))
+);
+
+create index if not exists idx_partes_crm_escritorio_id on public.partes_crm (escritorio_id);
+create index if not exists idx_partes_crm_tipo on public.partes_crm (tipo);
+
+alter table public.partes_crm enable row level security;
+
+drop policy if exists partes_crm_select on public.partes_crm;
+drop policy if exists partes_crm_write on public.partes_crm;
+
+create policy partes_crm_select on public.partes_crm
+for select to authenticated using (public.usuario_tem_escritorio(escritorio_id));
+
+create policy partes_crm_write on public.partes_crm
+for all to authenticated
+using (public.usuario_pode_escrever(escritorio_id))
+with check (public.usuario_pode_escrever(escritorio_id));
+
+-- Tabela legada de empresas para módulo de ofícios
+create table if not exists public.oficios_empresas (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.oficios (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid references public.oficios_empresas(id) on delete set null,
+  parte_grupo_id uuid references public.partes_crm(id) on delete set null,
+  escritorio_id uuid references public.escritorios(id) on delete cascade,
+  numero text,
+  departamento text,
+  responsavel text,
+  data date,
+  destinatario text,
+  referencia text,
+  remetente text,
+  forma_envio text,
+  arquivado text,
+  observacoes text,
+  ano int,
+  controle_arquivado boolean not null default false,
+  updated_at timestamptz,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_by_nome text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_nome text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_oficios_escritorio_id on public.oficios (escritorio_id);
+create index if not exists idx_oficios_parte_grupo_id on public.oficios (parte_grupo_id);
+
+create table if not exists public.oficios_destinatarios (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid references public.oficios_empresas(id) on delete set null,
+  parte_grupo_id uuid references public.partes_crm(id) on delete set null,
+  escritorio_id uuid references public.escritorios(id) on delete cascade,
+  nome text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.oficios_auditoria (
+  id uuid primary key default gen_random_uuid(),
+  oficio_id uuid references public.oficios(id) on delete set null,
+  empresa_id uuid references public.oficios_empresas(id) on delete set null,
+  parte_grupo_id uuid references public.partes_crm(id) on delete set null,
+  escritorio_id uuid references public.escritorios(id) on delete cascade,
+  numero_oficio text,
+  acao text,
+  usuario_id uuid,
+  usuario_nome text,
+  dados_json jsonb,
+  timestamp timestamptz not null default now()
+);
+
+create index if not exists idx_oficios_auditoria_escritorio on public.oficios_auditoria (escritorio_id);
+
+create table if not exists public.oficios_anexos (
+  id uuid primary key default gen_random_uuid(),
+  oficio_id uuid not null references public.oficios(id) on delete cascade,
+  nome_arquivo text,
+  arquivo_base64 text,
+  arquivo_tipo text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_nome text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_oficios_anexos_oficio_id on public.oficios_anexos (oficio_id);
 
 notify pgrst, 'reload schema';
 
@@ -2586,6 +2793,45 @@ ALTER TABLE public.atividades
 CREATE INDEX IF NOT EXISTS idx_atividades_alerta
   ON public.atividades(escritorio_id, prazo)
   WHERE alerta_antecedencia IS NOT NULL AND status NOT IN ('concluida','cancelada');
+
+
+-- ===================================================================
+-- TABELAS: mensagens e mensagens_anexos
+-- (criadas originalmente via interface Supabase; recriadas aqui para demo)
+-- ===================================================================
+
+create table if not exists public.mensagens (
+  id uuid primary key default gen_random_uuid(),
+  escritorio_id uuid references public.escritorios(id) on delete cascade,
+  remetente_id uuid references auth.users(id) on delete set null,
+  destinatario_id uuid references auth.users(id) on delete set null,
+  assunto text,
+  corpo text,
+  lida boolean not null default false,
+  arquivada_por text[] not null default '{}',
+  parent_id uuid references public.mensagens(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_mensagens_remetente on public.mensagens (remetente_id);
+create index if not exists idx_mensagens_destinatario on public.mensagens (destinatario_id);
+create index if not exists idx_mensagens_escritorio on public.mensagens (escritorio_id);
+
+create table if not exists public.mensagens_anexos (
+  id uuid primary key default gen_random_uuid(),
+  mensagem_id uuid not null references public.mensagens(id) on delete cascade,
+  escritorio_id uuid references public.escritorios(id) on delete cascade,
+  nome text,
+  storage_path text,
+  mime_type text,
+  size_bytes bigint,
+  uploaded_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_mensagens_anexos_mensagem on public.mensagens_anexos (mensagem_id);
+
+notify pgrst, 'reload schema';
 
 
 -- ===================================================================
